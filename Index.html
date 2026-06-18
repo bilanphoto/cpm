@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPM Diagram Builder</title>
+<style>
+/* ============================================================
+   CPM Diagram Builder — visual identity
+   Direction: control-room / drafting-table industrial tool.
+   Steel-blue chrome, drafting-paper canvas, safety-amber accent.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  /* steel chrome */
+  --chrome-900:#12181f;
+  --chrome-800:#1b232c;
+  --chrome-700:#262f3a;
+  --chrome-600:#384452;
+  --chrome-line:#324050;
+  --chrome-text:#cdd6df;
+  --chrome-text-dim:#7c8a99;
+
+  /* drafting paper */
+  --paper:#f3f1ea;
+  --paper-line:#dcd6c4;
+  --paper-line-strong:#c7bfa6;
+
+  /* accent */
+  --amber:#e8923c;
+  --amber-deep:#c9701f;
+  --safety-red:#c0392b;
+
+  /* node palette (mirrors source diagram) */
+  --node-white:#ffffff;
+  --node-yellow:#f6d34d;
+  --node-peach:#f0b98a;
+  --node-green:#7fb56e;
+  --node-stroke:#23303c;
+
+  --connector:#c0392b;
+  --note-orange:#f0a93c;
+  --note-orange-border:#c9701f;
+
+  --radius-sm:6px;
+  --radius-md:10px;
+
+  --font-display:'Space Grotesk', 'Segoe UI', Arial, sans-serif;
+  --font-body:'Inter', 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono:'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
+}
+
+*{box-sizing:border-box;}
+html,body{
+  margin:0; padding:0; height:100%; width:100%;
+  font-family:var(--font-body);
+  background:var(--chrome-900);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+#app{
+  display:flex; flex-direction:column;
+  height:100vh; width:100vw;
+  color:var(--chrome-text);
+}
+
+/* ============== TOP BAR ============== */
+#topbar{
+  height:60px; flex:0 0 60px;
+  background:linear-gradient(180deg, var(--chrome-800), var(--chrome-900));
+  border-bottom:1px solid var(--chrome-line);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px;
+  gap:16px;
+}
+
+.brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+.brand-mark{
+  font-family:var(--font-mono); font-weight:700; font-size:13px;
+  letter-spacing:0.08em;
+  background:var(--amber); color:#1a1305;
+  padding:6px 9px; border-radius:4px;
+  flex:0 0 auto;
+}
+.brand-text{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+.brand-text input{
+  background:transparent; border:none; color:var(--chrome-text);
+  font-family:var(--font-display); font-weight:600;
+  padding:1px 4px; border-radius:3px;
+  outline:none;
+}
+#diagramTitle{ font-size:15px; letter-spacing:0.01em; width:210px; }
+#diagramSubtitle{ font-size:11px; color:var(--chrome-text-dim); font-family:var(--font-mono); width:210px;}
+.brand-text input:hover, .brand-text input:focus{ background:var(--chrome-700); }
+
+.topbar-actions{ display:flex; align-items:center; gap:6px; flex:1 1 auto; overflow-x:auto; scrollbar-width:thin; min-width:0; }
+.sep{ width:1px; height:26px; background:var(--chrome-line); margin:0 6px; flex:0 0 auto; }
+
+.btn{
+  font-family:var(--font-body); font-weight:600; font-size:12.5px;
+  border:1px solid var(--chrome-line); background:var(--chrome-700);
+  color:var(--chrome-text);
+  padding:8px 11px; border-radius:var(--radius-sm);
+  cursor:pointer; transition:background .12s, border-color .12s, transform .05s;
+  white-space:nowrap; flex:0 0 auto;
+}
+.btn:hover{ background:var(--chrome-600); border-color:#46566a; }
+.btn:active{ transform:translateY(1px); }
+.btn.primary{ background:var(--amber); border-color:var(--amber-deep); color:#1a1305; }
+.btn.primary:hover{ background:#f0a456; }
+.btn.danger{ background:transparent; border-color:var(--safety-red); color:#e57368; }
+.btn.danger:hover{ background:rgba(192,57,43,0.15); }
+.btn.ghost{ background:transparent; border-color:transparent; font-size:15px; padding:7px 10px; }
+.btn.ghost:hover{ background:var(--chrome-700); }
+.bg-color-btn{ position:relative; display:inline-flex; align-items:center; overflow:hidden; }
+.bg-color-btn input[type=color]{
+  position:absolute; inset:0; opacity:0; cursor:pointer; border:none; padding:0;
+}
+.btn.subtle{ background:transparent; color:var(--chrome-text-dim); border-color:var(--chrome-line); }
+.btn.subtle:hover{ background:var(--chrome-700); color:var(--chrome-text); }
+.btn.small{ padding:5px 10px; font-size:11.5px; }
+
+#zoomLabel{ font-family:var(--font-mono); font-size:11.5px; color:var(--chrome-text-dim); min-width:42px; text-align:center; }
+
+/* ============== WORK AREA ============== */
+#workarea{ flex:1 1 auto; display:flex; min-height:0; }
+
+/* ---- left tool rail ---- */
+#toolrail{
+  flex:0 0 84px;
+  background:var(--chrome-800);
+  border-right:1px solid var(--chrome-line);
+  overflow-y:auto;
+  padding:10px 8px 20px;
+}
+.tool-group{ margin-bottom:14px; }
+.tool-group-title{
+  font-family:var(--font-mono); font-size:9px; letter-spacing:0.12em;
+  text-transform:uppercase; color:var(--chrome-text-dim);
+  padding:0 4px 6px; border-bottom:1px solid var(--chrome-line);
+  margin-bottom:6px;
+}
+.tool{
+  width:100%; display:flex; flex-direction:column; align-items:center; gap:4px;
+  background:transparent; border:1px solid transparent; border-radius:var(--radius-sm);
+  color:var(--chrome-text-dim);
+  padding:8px 2px 7px; margin-bottom:3px;
+  cursor:pointer; transition:background .12s, color .12s, border-color .12s;
+}
+.tool svg{
+  width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+.tool span{ font-size:10px; font-weight:500; }
+.tool:hover{ background:var(--chrome-700); color:var(--chrome-text); }
+.tool.active{
+  background:rgba(232,146,60,0.16); border-color:var(--amber);
+  color:var(--amber);
+}
+
+/* ---- canvas ---- */
+#canvasWrap{
+  flex:1 1 auto; position:relative; overflow:auto;
+  background:
+    radial-gradient(circle at 0 0, rgba(255,255,255,0.02), transparent 60%),
+    var(--chrome-900);
+  cursor:default;
+}
+#canvasWrap.tool-pan{ cursor:grab; }
+#canvasWrap.tool-pan.panning{ cursor:grabbing; }
+#canvasWrap.tool-place{ cursor:crosshair; }
+
+#canvasInner{
+  position:relative;
+  width:3000px; height:1800px;
+  background:var(--paper);
+  box-shadow:0 0 0 1px var(--paper-line-strong), 0 20px 60px rgba(0,0,0,0.5);
+  transform-origin:0 0;
+  margin:40px;
+  background-image:
+    linear-gradient(var(--paper-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--paper-line) 1px, transparent 1px);
+  background-size:40px 40px;
+}
+#canvasInner.no-grid{ background-image:none; }
+
+#grid{ display:none; }
+
+#svgCanvas{ position:absolute; top:0; left:0; }
+
+/* node visuals */
+.cpm-node{ cursor:move; }
+.cpm-node-shape{ stroke:var(--node-stroke); stroke-width:2.2; }
+.cpm-node-label{
+  font-family:var(--font-display); font-weight:700;
+  text-anchor:middle; dominant-baseline:central;
+  fill:var(--node-stroke); pointer-events:none; user-select:none;
+}
+.cpm-node-sublabel{
+  font-family:var(--font-body); font-weight:600; font-size:13px;
+  fill:#1c2530; text-anchor:middle; dominant-baseline:central; pointer-events:none; user-select:none;
+}
+.cpm-node-datetime{
+  font-family:var(--font-mono); font-weight:600; font-size:12px;
+  fill:#1d4ed8; text-anchor:middle; dominant-baseline:central; pointer-events:none; user-select:none;
+}
+.cpm-node.selected .cpm-node-shape{ stroke:var(--amber); stroke-width:3.4; filter:drop-shadow(0 0 4px rgba(232,146,60,0.6)); }
+
+.connect-handle{
+  fill:var(--amber); stroke:#1a1305; stroke-width:1.2; opacity:0;
+  cursor:crosshair; transition:opacity .1s;
+}
+.cpm-node:hover .connect-handle, .cpm-node.selected .connect-handle{ opacity:0.9; }
+
+/* connector visuals */
+.cpm-connector-line{ stroke-width:3; fill:none; cursor:pointer; }
+.cpm-connector-hit{ stroke:transparent; stroke-width:16; fill:none; cursor:pointer; }
+.cpm-connector.selected .cpm-connector-line{ stroke:var(--amber) !important; }
+.cpm-connector-task{
+  font-family:var(--font-body); font-weight:600; font-size:13.5px;
+  text-anchor:middle; dominant-baseline:central; fill:#15202b; pointer-events:none; user-select:none;
+}
+.cpm-connector-duration{
+  font-family:var(--font-mono); font-weight:600; font-size:13.5px;
+  text-anchor:middle; dominant-baseline:central; fill:#1d4ed8; pointer-events:none; user-select:none;
+}
+
+/* annotation visuals */
+.cpm-note-box{ cursor:move; stroke-width:1.6; }
+.cpm-note-text{
+  font-family:var(--font-body); font-size:12.5px; fill:#3a2c10;
+  pointer-events:none; user-select:none; white-space:pre;
+}
+.cpm-banner-text{
+  font-family:var(--font-display); font-weight:700; font-size:18px;
+  text-anchor:middle; dominant-baseline:central;
+  pointer-events:none; user-select:none;
+}
+.cpm-pin-dot{ cursor:move; }
+.cpm-freetext{
+  font-family:var(--font-body); cursor:move; pointer-events:auto;
+  user-select:none; white-space:pre;
+}
+
+.cpm-note.selected .cpm-note-box, .cpm-banner.selected rect, .cpm-pin.selected circle{
+  stroke:var(--amber) !important; stroke-width:3px !important;
+}
+.cpm-freetext.selected{ outline:2px dashed var(--amber); outline-offset:3px; }
+
+/* pending connector preview */
+.connector-preview{ stroke:var(--amber); stroke-width:2.4; stroke-dasharray:6 4; fill:none; pointer-events:none; }
+
+/* ---- right inspector ---- */
+#inspector{
+  flex:0 0 280px;
+  background:var(--chrome-800);
+  border-left:1px solid var(--chrome-line);
+  overflow-y:auto;
+  padding:18px 16px;
+}
+.inspector-empty{ color:var(--chrome-text-dim); font-size:13px; line-height:1.55; text-align:center; padding-top:20px;}
+.inspector-empty-icon{ font-size:30px; color:var(--chrome-line); margin-bottom:14px; }
+
+.legend{ margin-top:28px; text-align:left; border-top:1px solid var(--chrome-line); padding-top:16px; }
+.legend-title{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--chrome-text-dim); margin-bottom:10px;}
+.legend-row{ display:flex; align-items:center; gap:9px; font-size:12px; margin-bottom:8px; color:var(--chrome-text);}
+.swatch{ width:16px; height:16px; border-radius:50%; flex:0 0 auto; border:1.5px solid var(--node-stroke); display:inline-block;}
+.swatch-white{ background:var(--node-white); }
+.swatch-yellow{ background:var(--node-yellow); }
+.swatch-peach{ background:var(--node-peach); }
+.swatch-green-hex{ background:var(--node-green); border-radius:3px; }
+.swatch-note{ background:var(--note-orange); border-radius:3px; border-color:var(--note-orange-border);}
+
+.panel-section{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.panel-title{ font-family:var(--font-display); font-weight:700; font-size:15px; }
+.secondary-section{ border-top:1px solid var(--chrome-line); padding-top:14px; margin-top:6px; gap:8px; }
+
+.field{ margin-bottom:14px; }
+.field label{
+  display:block; font-size:11px; font-weight:600; color:var(--chrome-text-dim);
+  margin-bottom:5px; letter-spacing:0.02em;
+}
+.field input[type=text], .field textarea, .field select{
+  width:100%; background:var(--chrome-900); border:1px solid var(--chrome-line);
+  color:var(--chrome-text); padding:8px 10px; border-radius:var(--radius-sm);
+  font-family:var(--font-body); font-size:13px; outline:none;
+  transition:border-color .12s;
+}
+.field input[type=text]:focus, .field textarea:focus, .field select:focus{ border-color:var(--amber); }
+.field textarea{ resize:vertical; font-family:var(--font-mono); font-size:12.5px; line-height:1.4;}
+.field input[type=color]{
+  width:100%; height:34px; border:1px solid var(--chrome-line); border-radius:var(--radius-sm);
+  background:var(--chrome-900); cursor:pointer; padding:3px;
+}
+.field input[type=range]{ width:100%; accent-color:var(--amber); margin-top:6px;}
+.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.swatch-row{ display:flex; gap:8px; margin-top:2px; }
+.color-swatch{
+  width:34px; height:28px; border-radius:6px; cursor:pointer;
+  border:2px solid var(--chrome-line); padding:0;
+  transition:transform .08s, border-color .12s;
+}
+.color-swatch:hover{ transform:translateY(-1px); border-color:var(--chrome-text); }
+.color-swatch.active{ border-color:var(--amber); box-shadow:0 0 0 2px rgba(232,146,60,0.35); }
+.checkbox-row{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--chrome-text); cursor:pointer;}
+.checkbox-row input{ accent-color:var(--amber); width:15px; height:15px; }
+
+/* ---- status bar ---- */
+#statusbar{
+  flex:0 0 26px; background:var(--chrome-900); border-top:1px solid var(--chrome-line);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 14px; font-family:var(--font-mono); font-size:11px; color:var(--chrome-text-dim);
+}
+#statusbar b{ color:var(--chrome-text); }
+
+/* scrollbars */
+#toolrail::-webkit-scrollbar, #inspector::-webkit-scrollbar, #canvasWrap::-webkit-scrollbar{ width:10px; height:10px; }
+#toolrail::-webkit-scrollbar-thumb, #inspector::-webkit-scrollbar-thumb, #canvasWrap::-webkit-scrollbar-thumb{
+  background:var(--chrome-600); border-radius:6px;
+}
+#toolrail::-webkit-scrollbar-track, #inspector::-webkit-scrollbar-track, #canvasWrap::-webkit-scrollbar-track{ background:var(--chrome-800); }
+
+/* inline edit textarea overlay */
+.inline-edit{
+  position:absolute; z-index:200; font-family:var(--font-body);
+  border:2px solid var(--amber); border-radius:4px; padding:4px 6px;
+  outline:none; background:#fff; color:#1c2530; resize:none;
+}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="application/json" id="embeddedState"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-mark">CPM</div>
+      <div class="brand-text">
+        <input id="diagramTitle" value="CPM SHUT DOWN TURNAROUND" spellcheck="false">
+        <input id="diagramSubtitle" value="20 Apr — 5 May 2025" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file">Save</button>
+      <button class="btn" id="btnNewCpm" title="Start a brand new blank CPM diagram">New CPM</button>
+      <div class="sep"></div>
+      <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+      <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+      <div class="sep"></div>
+      <button class="btn ghost" id="btnZoomOut" title="Zoom out">−</button>
+      <span id="zoomLabel">100%</span>
+      <button class="btn ghost" id="btnZoomIn" title="Zoom in">+</button>
+      <button class="btn ghost" id="btnZoomReset" title="Reset view">⤢</button>
+      <div class="sep"></div>
+      <button class="btn ghost" id="btnGrid" title="Toggle grid">▦</button>
+      <label class="btn ghost bg-color-btn" id="bgColorBtn" title="Canvas background color">
+        🎨
+        <input type="color" id="canvasBgColor" value="#f3f1ea">
+      </label>
+      <button class="btn ghost" id="btnClear" title="Clear canvas">🗑</button>
+      <div class="sep"></div>
+      <button class="btn" id="btnImportExcel" title="Import a Gantt chart .xlsx and auto-build a CPM diagram">Import Excel</button>
+      <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
+      <button class="btn primary" id="btnExportPng">Export image</button>
+    </div>
+  </header>
+
+  <div id="workarea">
+
+    <!-- ============ LEFT TOOL RAIL ============ -->
+    <aside id="toolrail">
+
+      <div class="tool-group">
+        <div class="tool-group-title">Select</div>
+        <button class="tool" data-tool="select" title="Select / Move (V)">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 1.5L11 19z"/></svg>
+          <span>Select</span>
+        </button>
+        <button class="tool" data-tool="pan" title="Pan (Space)">
+          <svg viewBox="0 0 24 24"><path d="M9 11V6a1.5 1.5 0 013 0v5M12 11V4.5a1.5 1.5 0 013 0V11m-9 .5l-1.7-1.6a1.4 1.4 0 00-2 2L8 18.5c1 1.3 2 2 4.5 2h2c3 0 4.5-1.8 4.5-4.5V11a1.5 1.5 0 00-3 0"/></svg>
+          <span>Pan</span>
+        </button>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Nodes</div>
+        <button class="tool" data-tool="node-circle" title="Circle node">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
+          <span>Circle</span>
+        </button>
+        <button class="tool" data-tool="node-hex" title="Hexagon (Hand Over)">
+          <svg viewBox="0 0 24 24"><path d="M8 3h8l5 9-5 9H8l-5-9z"/></svg>
+          <span>Hexagon</span>
+        </button>
+        <button class="tool" data-tool="node-diamond" title="Diamond node">
+          <svg viewBox="0 0 24 24"><path d="M12 2l9 10-9 10-9-10z"/></svg>
+          <span>Diamond</span>
+        </button>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Connectors</div>
+        <button class="tool" data-tool="connector" title="Arrow connector">
+          <svg viewBox="0 0 24 24"><path d="M4 12h14M14 7l5 5-5 5"/></svg>
+          <span>Arrow</span>
+        </button>
+        <button class="tool" data-tool="connector-line" title="Plain line">
+          <svg viewBox="0 0 24 24"><path d="M4 18L20 6"/></svg>
+          <span>Line</span>
+        </button>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Annotations</div>
+        <button class="tool" data-tool="note" title="Sticky note (orange callout)">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v12H10l-4 4v-4H4z"/></svg>
+          <span>Note</span>
+        </button>
+        <button class="tool" data-tool="banner" title="Section banner">
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
+          <span>Banner</span>
+        </button>
+        <button class="tool" data-tool="pin" title="Pin marker (insert blind)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M12 14v7"/></svg>
+          <span>Pin</span>
+        </button>
+        <button class="tool" data-tool="text" title="Free text label">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16M12 5v14"/></svg>
+          <span>Text</span>
+        </button>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Delete</div>
+        <button class="tool" data-tool="erase" title="Erase element">
+          <svg viewBox="0 0 24 24"><path d="M3 18l9-13 9 6-7 9z"/><path d="M9 13l5 5"/></svg>
+          <span>Erase</span>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- ============ CANVAS ============ -->
+    <main id="canvasWrap">
+      <div id="canvasInner">
+        <svg id="grid" width="100%" height="100%"></svg>
+        <svg id="svgCanvas" width="3000" height="1800" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+          </defs>
+          <g id="layerConnectors"></g>
+          <g id="layerNodes"></g>
+          <g id="layerAnnotations"></g>
+          <g id="layerOverlay"></g>
+        </svg>
+      </div>
+    </main>
+
+    <!-- ============ RIGHT INSPECTOR ============ -->
+    <aside id="inspector">
+      <div class="inspector-empty" id="inspectorEmpty">
+        <div class="inspector-empty-icon">◇</div>
+        <p>Select an element on the canvas to edit its properties, or pick a tool on the left to start drawing.</p>
+        <div class="legend">
+          <div class="legend-title">Legend reference</div>
+          <div class="legend-row"><span class="swatch swatch-white"></span> Process node</div>
+          <div class="legend-row"><span class="swatch swatch-yellow"></span> Hold / mode point</div>
+          <div class="legend-row"><span class="swatch swatch-peach"></span> Equipment stop</div>
+          <div class="legend-row"><span class="swatch swatch-green-hex"></span> Hand-over milestone</div>
+          <div class="legend-row"><span class="swatch swatch-note"></span> Insert / blind note</div>
+        </div>
+      </div>
+
+      <div class="inspector-panel" id="inspectorPanel" style="display:none">
+        <div class="panel-section">
+          <div class="panel-title" id="panelTitle">Node</div>
+          <button class="btn danger small" id="btnDeleteSelected">Delete</button>
+        </div>
+
+        <!-- generic label -->
+        <div class="field" data-field="label">
+          <label>Label</label>
+          <input type="text" id="fLabel">
+        </div>
+
+        <!-- node specific -->
+        <div class="field" data-field="sublabel">
+          <label>Caption (above node)</label>
+          <input type="text" id="fSublabel">
+        </div>
+        <div class="field" data-field="datetime">
+          <label>Date / time (below node)</label>
+          <input type="text" id="fDatetime">
+        </div>
+        <div class="field two-col" data-field="fillrow">
+          <div>
+            <label>Fill color</label>
+            <input type="color" id="fFill">
+          </div>
+          <div>
+            <label>Size</label>
+            <input type="range" id="fSize" min="20" max="80" step="2">
+          </div>
+        </div>
+
+        <!-- connector specific -->
+        <div class="field" data-field="duration">
+          <label>Duration label, e.g. (24)</label>
+          <input type="text" id="fDuration">
+        </div>
+        <div class="field" data-field="task">
+          <label>Task text (above line)</label>
+          <input type="text" id="fTask">
+        </div>
+        <div class="field" data-field="connswatches">
+          <label>Quick color</label>
+          <div class="swatch-row">
+            <button class="color-swatch" id="connSwatchRed" data-color="#c0392b" title="Red" style="background:#c0392b"></button>
+            <button class="color-swatch" id="connSwatchGreen" data-color="#3a9d4e" title="Green" style="background:#3a9d4e"></button>
+          </div>
+        </div>
+        <div class="field two-col" data-field="connstyle">
+          <div>
+            <label>Line color</label>
+            <input type="color" id="fLineColor">
+          </div>
+          <div>
+            <label>Style</label>
+            <select id="fLineStyle">
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- note / banner / text specific -->
+        <div class="field" data-field="notebody">
+          <label>Note text</label>
+          <textarea id="fNoteBody" rows="4"></textarea>
+        </div>
+        <div class="field" data-field="notecolor">
+          <label>Background color</label>
+          <select id="fNoteColor">
+            <option value="orange">Orange (insert/blind)</option>
+            <option value="green">Green (section banner)</option>
+            <option value="yellow">Yellow (decision)</option>
+            <option value="peach">Peach</option>
+            <option value="white">White</option>
+          </select>
+        </div>
+        <div class="field" data-field="textcolor">
+          <label>Text color</label>
+          <select id="fTextColor">
+            <option value="black">Black</option>
+            <option value="red">Red</option>
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+          </select>
+        </div>
+        <div class="field" data-field="fontsize">
+          <label>Font size</label>
+          <input type="range" id="fFontSize" min="10" max="36" step="1">
+        </div>
+        <div class="field" data-field="bold">
+          <label class="checkbox-row"><input type="checkbox" id="fBold"> Bold</label>
+        </div>
+
+        <div class="panel-section secondary-section">
+          <button class="btn ghost small" id="btnBringFront">Bring to front</button>
+          <button class="btn ghost small" id="btnSendBack">Send to back</button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <footer id="statusbar">
+    <span id="statusLeft">Ready</span>
+    <span id="statusRight">Elements: <b id="elCount">0</b></span>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   CPM Diagram Builder — application logic
+   Plain JS + inline SVG. No frameworks, no build step.
+   ============================================================ */
+
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------
+  // State
+  // ---------------------------------------------------------
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  let state = {
+    nodes: [],        // {id,type:'circle'|'hex'|'diamond', x,y,r,fill,label,sublabel,datetime}
+    connectors: [],    // {id, fromId, toId, fromPt?, toPt?, kind:'arrow'|'line', color, dashed, duration, task}
+    annotations: [],   // {id, type:'note'|'banner'|'pin'|'text', x,y,w,h,text,color,textColor,fontSize,bold}
+    nextId: 1
+  };
+
+  let history = [];
+  let historyIndex = -1;
+  const HISTORY_LIMIT = 80;
+
+  let currentTool = "select";
+  let selectedId = null;     // {kind:'node'|'connector'|'annotation', id}
+  let zoom = 1;
+  let gridOn = true;
+
+  // drag tracking
+  let drag = null;
+
+  // ---------------------------------------------------------
+  // DOM refs
+  // ---------------------------------------------------------
+  const $ = (sel) => document.querySelector(sel);
+  const canvasWrap = $("#canvasWrap");
+  const canvasInner = $("#canvasInner");
+  const svg = $("#svgCanvas");
+  const svgDefs = svg.querySelector("defs");
+  const layerConnectors = $("#layerConnectors");
+  const layerNodes = $("#layerNodes");
+  const layerAnnotations = $("#layerAnnotations");
+  const layerOverlay = $("#layerOverlay");
+  const elCount = $("#elCount");
+  const statusLeft = $("#statusLeft");
+
+  // ---------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------
+  function uid(){ return "el" + (state.nextId++); }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  function svgElCreate(tag, attrs){
+    const e = document.createElementNS(SVG_NS, tag);
+    if(attrs) for(const k in attrs){
+      if(attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+    }
+    return e;
+  }
+
+  function getCanvasPoint(evt){
+    const rect = canvasInner.getBoundingClientRect();
+    const x = (evt.clientX - rect.left) / zoom;
+    const y = (evt.clientY - rect.top) / zoom;
+    return {x,y};
+  }
+
+  function findNode(id){ return state.nodes.find(n=>n.id===id); }
+  function findConnector(id){ return state.connectors.find(c=>c.id===id); }
+  function findAnnotation(id){ return state.annotations.find(a=>a.id===id); }
+
+  function colorToken(name){
+    const map = {
+      orange: {fill:"#f0a93c", border:"#c9701f"},
+      green:  {fill:"#bfe0b0", border:"#5f9650"},
+      yellow: {fill:"#fdf0a8", border:"#cdb53a"},
+      peach:  {fill:"#f5cda3", border:"#cf9a5e"},
+      white:  {fill:"#ffffff", border:"#9aa6b2"},
+      none:   {fill:"transparent", border:"transparent"},
+      pink:   {fill:"#e91e8c", border:"#7a0f4d"}
+    };
+    return map[name] || map.white;
+  }
+  function textColorToken(name){
+    const map = { black:"#1c2530", red:"#c0392b", blue:"#1d4ed8", green:"#2f7a3d" };
+    return map[name] || map.black;
+  }
+
+  // ---------------------------------------------------------
+  // History (undo/redo) — snapshot based, simple & robust
+  // ---------------------------------------------------------
+  function snapshot(){ return JSON.stringify(state); }
+  function pushHistory(){
+    history = history.slice(0, historyIndex+1);
+    history.push(snapshot());
+    if(history.length > HISTORY_LIMIT) history.shift();
+    historyIndex = history.length - 1;
+  }
+  function restoreSnapshot(s){
+    state = JSON.parse(s);
+    selectedId = null;
+    renderAll();
+    updateInspector();
+  }
+  function undo(){
+    if(historyIndex <= 0) return;
+    historyIndex--;
+    restoreSnapshot(history[historyIndex]);
+    setStatus("Undo");
+  }
+  function redo(){
+    if(historyIndex >= history.length-1) return;
+    historyIndex++;
+    restoreSnapshot(history[historyIndex]);
+    setStatus("Redo");
+  }
+  function commit(){ pushHistory(); refreshCount(); }
+
+  function setStatus(msg){ statusLeft.textContent = msg; }
+
+  // ---------------------------------------------------------
+  // Shared "save to disk" helpers.
+  // Uses the native File System Access save picker (lets the person choose
+  // the folder and filename) when the browser supports it. The picker must
+  // be invoked synchronously from the click handler (before any awaited
+  // work) so the browser still recognizes it as a direct response to the
+  // person's click; the actual file content can be written later once it's
+  // ready. Falls back to a normal anchor download otherwise.
+  // ---------------------------------------------------------
+  function pickSaveHandle(suggestedName, extension, description, mimeType){
+    if(!window.showSaveFilePicker) return Promise.resolve(null);
+    return window.showSaveFilePicker({
+      suggestedName,
+      types: [{ description, accept: { [mimeType]: ["." + extension] } }]
+    }).catch(err=>{
+      if(err && err.name === "AbortError") throw err; // person cancelled — caller should stop
+      return null; // any other failure (unsupported, blocked, etc.) — caller falls back
+    });
+  }
+
+  async function writeBlobToHandle(handle, blob){
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+  }
+
+  function downloadBlobFallback(blob, suggestedName){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function refreshCount(){
+    elCount.textContent = state.nodes.length + state.connectors.length + state.annotations.length;
+  }
+
+  // ---------------------------------------------------------
+  // Tool selection
+  // ---------------------------------------------------------
+  document.querySelectorAll(".tool").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".tool").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      currentTool = btn.dataset.tool;
+      canvasWrap.classList.remove("tool-pan","tool-place");
+      if(currentTool === "pan") canvasWrap.classList.add("tool-pan");
+      else if(currentTool !== "select" && currentTool !== "erase") canvasWrap.classList.add("tool-place");
+      updateHint();
+      cancelPendingConnector();
+    });
+  });
+  document.querySelector('.tool[data-tool="select"]').classList.add("active");
+
+  function updateHint(){
+    // hint bar removed
+  }
+  updateHint();
+
+  // ---------------------------------------------------------
+  // Rendering: NODES
+  // ---------------------------------------------------------
+  function renderNodes(){
+    layerNodes.innerHTML = "";
+    state.nodes.forEach(n=>{
+      const g = svgElCreate("g", {class:"cpm-node", "data-id": n.id, transform:`translate(${n.x},${n.y})`});
+      if(selectedId && selectedId.kind==="node" && selectedId.id===n.id) g.classList.add("selected");
+
+      let shape;
+      const r = n.r;
+      const strokeAttrs = {stroke:"#23303c", "stroke-width":2.2};
+      if(n.type === "circle"){
+        shape = svgElCreate("circle", {cx:0, cy:0, r:r, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
+      } else if(n.type === "hex"){
+        const pts = hexPoints(r);
+        shape = svgElCreate("polygon", {points:pts, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
+      } else {
+        const pts = `0,${-r} ${r},0 0,${r} ${-r},0`;
+        shape = svgElCreate("polygon", {points:pts, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
+      }
+      g.appendChild(shape);
+
+      const label = svgElCreate("text", {class:"cpm-node-label", style:`font-size:${Math.max(14, r*0.62)}px`, y:0, "text-anchor":"middle", "dominant-baseline":"central"});
+      label.textContent = n.label || "";
+      g.appendChild(label);
+
+      if(n.sublabel){
+        const sub = svgElCreate("text", {class:"cpm-node-sublabel", x:0, y:-(r+14), "text-anchor":"middle", "dominant-baseline":"central"});
+        sub.textContent = n.sublabel;
+        g.appendChild(sub);
+      }
+      if(n.datetime){
+        const lines = n.datetime.split("\\n");
+        lines.forEach((ln,i)=>{
+          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:0, y:r+22+i*16, "text-anchor":"middle", "dominant-baseline":"central"});
+          dt.textContent = ln;
+          g.appendChild(dt);
+        });
+      }
+
+      const handlePositions = [[r+14,0],[-r-14,0],[0,r+14],[0,-r-14]];
+      handlePositions.forEach(([hx,hy])=>{
+        const h = svgElCreate("circle", {cx:hx, cy:hy, r:6, class:"connect-handle"});
+        h.addEventListener("mousedown", (e)=>{
+          e.stopPropagation();
+          startConnectorDrag(n.id);
+        });
+        g.appendChild(h);
+      });
+
+      g.addEventListener("mousedown", (e)=> onNodeMouseDown(e, n));
+
+      layerNodes.appendChild(g);
+    });
+  }
+
+  function hexPoints(r){
+    const pts = [];
+    for(let i=0;i<6;i++){
+      const ang = Math.PI/6 + i*(Math.PI/3);
+      pts.push([r*Math.cos(ang), r*Math.sin(ang)]);
+    }
+    return pts.map(p=>p.join(",")).join(" ");
+  }
+
+  // ---------------------------------------------------------
+  // Rendering: CONNECTORS
+  // ---------------------------------------------------------
+  function nodeAnchorPoint(node, towardX, towardY){
+    const dx = towardX - node.x, dy = towardY - node.y;
+    const dist = Math.hypot(dx,dy) || 1;
+    const r = node.r;
+    return { x: node.x + (dx/dist)*r, y: node.y + (dy/dist)*r };
+  }
+
+  // Closest point on segment AB to point P, plus the parametric t (0..1) and distance.
+  function closestPointOnSegment(px,py, ax,ay, bx,by){
+    const abx = bx-ax, aby = by-ay;
+    const lenSq = abx*abx + aby*aby || 1;
+    let t = ((px-ax)*abx + (py-ay)*aby) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + abx*t, cy = ay + aby*t;
+    return { t, x:cx, y:cy, dist: Math.hypot(px-cx, py-cy) };
+  }
+
+  // Find nodes (other than the two endpoints) whose body would be crossed by
+  // a straight line from p1 to p2, so the connector can be bent around them.
+  function findObstructions(p1, p2, excludeIds){
+    const hits = [];
+    state.nodes.forEach(n=>{
+      if(excludeIds.includes(n.id)) return;
+      const cp = closestPointOnSegment(n.x, n.y, p1.x, p1.y, p2.x, p2.y);
+      // ignore near the very ends (that's just the node we're leaving/arriving at)
+      if(cp.t < 0.06 || cp.t > 0.94) return;
+      const clearance = n.r + 16;
+      if(cp.dist < clearance){
+        hits.push({ node:n, t:cp.t, dist:cp.dist, clearance });
+      }
+    });
+    return hits;
+  }
+
+  // Compute an SVG path (and its true midpoint) for a connector between two
+  // anchor points, bending around any node that the straight segment would
+  // otherwise cut through.
+  // Evaluate a quadratic bezier at parameter t.
+  function quadAt(p0, c, p1, t){
+    const mt = 1-t;
+    return {
+      x: mt*mt*p0.x + 2*mt*t*c.x + t*t*p1.x,
+      y: mt*mt*p0.y + 2*mt*t*c.y + t*t*p1.y
+    };
+  }
+
+  // Does this quadratic curve (sampled) stay clear of all given obstruction nodes?
+  function curveClearsObstructions(p1, ctrl, p2, obstructions){
+    const SAMPLES = 24;
+    for(let i=1;i<SAMPLES;i++){
+      const t = i/SAMPLES;
+      const pt = quadAt(p1, ctrl, p2, t);
+      for(const ob of obstructions){
+        const d = Math.hypot(pt.x-ob.node.x, pt.y-ob.node.y);
+        if(d < ob.node.r + 14) return false;
+      }
+    }
+    return true;
+  }
+
+  function computeConnectorPath(p1, p2, excludeIds){
+    const obstructions = findObstructions(p1, p2, excludeIds);
+    if(!obstructions.length){
+      return { d:`M${p1.x},${p1.y} L${p2.x},${p2.y}`, mid:{x:(p1.x+p2.x)/2, y:(p1.y+p2.y)/2}, curved:false };
+    }
+
+    const dx = p2.x-p1.x, dy = p2.y-p1.y;
+    const len = Math.hypot(dx,dy) || 1;
+    const nx = -dy/len, ny = dx/len; // unit normal to the line
+    const midX = (p1.x+p2.x)/2, midY = (p1.y+p2.y)/2;
+
+    // Decide which side to bend toward: the side with the LEAST total
+    // obstruction weight (so we swing away from the busiest cluster).
+    let posWeight = 0, negWeight = 0;
+    obstructions.forEach(ob=>{
+      const toNodeX = ob.node.x - p1.x, toNodeY = ob.node.y - p1.y;
+      const side = (toNodeX*nx + toNodeY*ny);
+      const w = ob.node.r + 16 - ob.dist;
+      if(side >= 0) posWeight += w; else negWeight += w;
+    });
+    const bendSign = posWeight <= negWeight ? -1 : 1;
+
+    // Grow the bend until the sampled curve clears every obstruction, or we
+    // hit a sane cap (so one far-flung outlier can't balloon the curve).
+    const maxBend = Math.max(160, len*0.5);
+    let bend = 40, ctrl = null;
+    for(; bend <= maxBend; bend += 20){
+      const candidate = { x: midX + nx*bend*bendSign, y: midY + ny*bend*bendSign };
+      if(curveClearsObstructions(p1, candidate, p2, obstructions)){ ctrl = candidate; break; }
+    }
+    if(!ctrl) ctrl = { x: midX + nx*maxBend*bendSign, y: midY + ny*maxBend*bendSign };
+
+    const mid = quadAt(p1, ctrl, p2, 0.5);
+    return { d:`M${p1.x},${p1.y} Q${ctrl.x},${ctrl.y} ${p2.x},${p2.y}`, mid, curved:true };
+  }
+
+  function connectorMidpoint(c){
+    const a = c.fromId ? findNode(c.fromId) : null;
+    const b = c.toId ? findNode(c.toId) : null;
+    const p1 = a ? {x:a.x,y:a.y} : c.fromPt;
+    const p2 = b ? {x:b.x,y:b.y} : c.toPt;
+    if(!p1 || !p2) return {x:0, y:0};
+    const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
+    const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
+    const excludeIds = [c.fromId, c.toId].filter(Boolean);
+    return computeConnectorPath(start, end, excludeIds).mid;
+  }
+
+  function colorToMarkerId(color){
+    return "arrowHead-" + String(color || "#c0392b").replace(/[^a-zA-Z0-9]/g, "");
+  }
+  function ensureArrowMarker(color){
+    const id = colorToMarkerId(color);
+    if(svgDefs.querySelector("#"+id)) return id;
+    const marker = svgElCreate("marker", {
+      id, viewBox:"0 0 10 10", refX:"8", refY:"5",
+      markerWidth:"8", markerHeight:"8", orient:"auto-start-reverse"
+    });
+    const path = svgElCreate("path", {d:"M0,0 L10,5 L0,10 z", fill: color || "#c0392b"});
+    marker.appendChild(path);
+    svgDefs.appendChild(marker);
+    return id;
+  }
+
+  function renderConnectors(){
+    layerConnectors.innerHTML = "";
+    state.connectors.forEach(c=>{
+      const a = c.fromId ? findNode(c.fromId) : null;
+      const b = c.toId ? findNode(c.toId) : null;
+      let p1 = a ? {x:a.x,y:a.y} : c.fromPt;
+      let p2 = b ? {x:b.x,y:b.y} : c.toPt;
+      if(!p1 || !p2) return;
+
+      const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
+      const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
+      const excludeIds = [c.fromId, c.toId].filter(Boolean);
+      const path = computeConnectorPath(start, end, excludeIds);
+
+      const g = svgElCreate("g", {class:"cpm-connector", "data-id": c.id});
+      if(selectedId && selectedId.kind==="connector" && selectedId.id===c.id) g.classList.add("selected");
+
+      const connColor = c.color || "#c0392b";
+      const hit = svgElCreate("path", {d:path.d, class:"cpm-connector-hit", fill:"none"});
+      const line = svgElCreate("path", {
+        d:path.d,
+        class:"cpm-connector-line",
+        fill:"none",
+        stroke: connColor,
+        "marker-end": c.kind === "arrow" ? `url(#${ensureArrowMarker(connColor)})` : null
+      });
+      if(c.dashed) line.setAttribute("stroke-dasharray","8 5");
+
+      g.appendChild(hit);
+      g.appendChild(line);
+
+      const midx = path.mid.x, midy = path.mid.y;
+
+      if(c.task){
+        const taskLines = c.task.split("\n");
+        taskLines.forEach((ln,i)=>{
+          const t = svgElCreate("text", {class:"cpm-connector-task", x:midx, y:midy-18-( (taskLines.length-1-i)*16 ), "text-anchor":"middle", "dominant-baseline":"central"});
+          t.textContent = ln;
+          g.appendChild(t);
+        });
+      }
+      if(c.duration){
+        const d = svgElCreate("text", {class:"cpm-connector-duration", x:midx, y:midy+22, "text-anchor":"middle", "dominant-baseline":"central"});
+        d.textContent = c.duration;
+        g.appendChild(d);
+      }
+
+      g.addEventListener("mousedown", (e)=> onConnectorMouseDown(e, c));
+
+      layerConnectors.appendChild(g);
+    });
+  }
+
+  // ---------------------------------------------------------
+  // Rendering: ANNOTATIONS (note / banner / pin / text)
+  // ---------------------------------------------------------
+  function renderAnnotations(){
+    layerAnnotations.innerHTML = "";
+    state.annotations.forEach(a=>{
+      let g;
+      if(a.type === "note") g = renderNoteEl(a);
+      else if(a.type === "banner") g = renderBannerEl(a);
+      else if(a.type === "pin") g = renderPinEl(a);
+      else if(a.type === "text") g = renderTextEl(a);
+      if(g){
+        g.setAttribute("data-id", a.id);
+        if(selectedId && selectedId.kind==="annotation" && selectedId.id===a.id) g.classList.add("selected");
+        g.addEventListener("mousedown", (e)=> onAnnotationMouseDown(e, a));
+        layerAnnotations.appendChild(g);
+      }
+    });
+  }
+
+  function renderNoteEl(a){
+    const g = svgElCreate("g", {class:"cpm-note", transform:`translate(${a.x},${a.y})`});
+    const col = colorToken(a.color);
+    const rect = svgElCreate("rect", {width:a.w, height:a.h, fill:col.fill, stroke:col.border, class:"cpm-note-box", rx:3});
+    g.appendChild(rect);
+    const lines = a.text.split("\n");
+    const fz = a.fontSize || 12.5;
+    lines.forEach((ln,i)=>{
+      const t = svgElCreate("text", {class:"cpm-note-text", x:8, y:16+i*(fz+4), style:`font-size:${fz}px; font-weight:${a.bold?700:400}`});
+      t.textContent = ln;
+      g.appendChild(t);
+    });
+    return g;
+  }
+
+  function renderBannerEl(a){
+    const g = svgElCreate("g", {class:"cpm-banner", transform:`translate(${a.x},${a.y})`});
+    const col = colorToken(a.color);
+    const rect = svgElCreate("rect", {width:a.w, height:a.h, fill:col.fill, stroke:col.border, rx:4, "stroke-width":1.6});
+    g.appendChild(rect);
+    const t = svgElCreate("text", {class:"cpm-banner-text", x:a.w/2, y:a.h/2, style:`font-size:${a.fontSize||18}px; fill:${textColorToken(a.textColor)}`, "text-anchor":"middle", "dominant-baseline":"central"});
+    t.textContent = a.text;
+    g.appendChild(t);
+    return g;
+  }
+
+  function renderPinEl(a){
+    const g = svgElCreate("g", {class:"cpm-pin", transform:`translate(${a.x},${a.y})`});
+    const circle = svgElCreate("circle", {cx:0, cy:0, r:9, fill:"#e91e8c", stroke:"#7a0f4d", "stroke-width":1.6});
+    const stem = svgElCreate("line", {x1:0,y1:7,x2:0,y2:34, stroke:"#e91e8c", "stroke-width":3});
+    g.appendChild(stem);
+    g.appendChild(circle);
+    if(a.text){
+      const t = svgElCreate("text", {class:"cpm-note-text", x:14, y:4, style:`font-size:${a.fontSize||12}px; fill:${textColorToken(a.textColor||'black')}; font-weight:${a.bold?700:600}`});
+      t.textContent = a.text;
+      g.appendChild(t);
+    }
+    return g;
+  }
+
+  function renderTextEl(a){
+    const g = svgElCreate("g", {class:"cpm-text-wrap", transform:`translate(${a.x},${a.y})`});
+    const fo = svgElCreate("foreignObject", {x:0, y:0, width:Math.max(a.w,200), height:Math.max(a.h,40)});
+    const div = document.createElement("div");
+    div.className = "cpm-freetext";
+    div.style.color = textColorToken(a.textColor);
+    div.style.fontSize = (a.fontSize||16)+"px";
+    div.style.fontWeight = a.bold ? "700" : "500";
+    div.style.lineHeight = "1.25";
+    div.textContent = a.text;
+    fo.appendChild(div);
+    g.appendChild(fo);
+    return g;
+  }
+
+  function renderAll(){
+    renderConnectors();
+    renderNodes();
+    renderAnnotations();
+    refreshCount();
+  }
+
+  // ---------------------------------------------------------
+  // Placement (click-to-add)
+  // ---------------------------------------------------------
+  canvasInner.addEventListener("mousedown", (e)=>{
+    if(e.target === canvasInner || e.target === svg || e.target.id === "grid"){
+      handleEmptyMouseDown(e);
+    }
+  });
+
+  function handleEmptyMouseDown(e){
+    if(currentTool === "pan"){ startPan(e); return; }
+    if(currentTool === "select"){ deselectAll(); return; }
+    if(currentTool.startsWith("node-")){
+      const pt = getCanvasPoint(e);
+      placeNode(currentTool.replace("node-",""), pt.x, pt.y);
+      return;
+    }
+    if(currentTool === "note" || currentTool === "banner" || currentTool === "pin" || currentTool === "text"){
+      const pt = getCanvasPoint(e);
+      placeAnnotation(currentTool, pt.x, pt.y);
+      return;
+    }
+    if(currentTool === "connector" || currentTool === "connector-line"){
+      cancelPendingConnector();
+    }
+  }
+
+  function placeNode(type, x, y){
+    const fillDefaults = { circle:"#ffffff", hex:"#7fb56e", diamond:"#f6d34d" };
+    const node = {
+      id: uid(), type, x, y, r: 32,
+      fill: fillDefaults[type] || "#ffffff",
+      label: String(state.nodes.length),
+      sublabel: "", datetime: ""
+    };
+    state.nodes.push(node);
+    renderAll();
+    selectElement("node", node.id);
+    commit();
+    setStatus("Node added");
+    switchToSelectTool();
+  }
+
+  function placeAnnotation(type, x, y){
+    let a;
+    if(type === "note"){
+      a = {id:uid(), type, x, y, w:170, h:64, text:"Insert Blind\n- ...\nDD MMM.YY HH:MM", color:"orange", textColor:"black", fontSize:12.5, bold:false};
+    } else if(type === "banner"){
+      a = {id:uid(), type, x, y, w:260, h:46, text:"Section title", color:"green", textColor:"black", fontSize:18, bold:true};
+    } else if(type === "pin"){
+      a = {id:uid(), type, x, y, w:10, h:34, text:"", color:"pink", textColor:"black", fontSize:12, bold:false};
+    } else if(type === "text"){
+      a = {id:uid(), type, x, y, w:160, h:28, text:"Label text", color:"none", textColor:"red", fontSize:16, bold:true};
+    }
+    state.annotations.push(a);
+    renderAll();
+    selectElement("annotation", a.id);
+    commit();
+    setStatus(type[0].toUpperCase()+type.slice(1)+" added");
+    switchToSelectTool();
+  }
+
+  function switchToSelectTool(){
+    document.querySelectorAll(".tool").forEach(b=>b.classList.remove("active"));
+    document.querySelector('.tool[data-tool="select"]').classList.add("active");
+    currentTool = "select";
+    canvasWrap.classList.remove("tool-pan","tool-place");
+    updateHint();
+  }
+
+  // ---------------------------------------------------------
+  // Selection
+  // ---------------------------------------------------------
+  function selectElement(kind, id){
+    selectedId = {kind, id};
+    renderAll();
+    updateInspector();
+  }
+  function deselectAll(){
+    selectedId = null;
+    renderAll();
+    updateInspector();
+  }
+
+  // Manual double-click tracking. Native "dblclick" is unreliable here because
+  // selecting an element on the first mousedown triggers a full re-render which
+  // replaces the DOM node the second click needs to land on, so the browser
+  // never registers the pair as a double-click. We track it ourselves instead.
+  let lastClickInfo = null; // {kind, id, time}
+  const DBLCLICK_MS = 420;
+  function checkManualDoubleClick(kind, id){
+    const now = Date.now();
+    const isDouble = lastClickInfo && lastClickInfo.kind === kind && lastClickInfo.id === id && (now - lastClickInfo.time) < DBLCLICK_MS;
+    lastClickInfo = isDouble ? null : { kind, id, time: now };
+    return isDouble;
+  }
+
+  // ---------------------------------------------------------
+  // Node interaction: move / connect / erase
+  // ---------------------------------------------------------
+  function onNodeMouseDown(e, node){
+    e.stopPropagation();
+    if(currentTool === "erase"){ deleteNode(node.id); return; }
+    if(currentTool === "connector" || currentTool === "connector-line"){
+      handleConnectorClick(node.id);
+      return;
+    }
+    if(currentTool !== "select") return;
+
+    const isDbl = checkManualDoubleClick("node", node.id);
+    if(isDbl){
+      selectElement("node", node.id);
+      editNodeLabelInline(node);
+      return;
+    }
+
+    selectElement("node", node.id);
+    const start = getCanvasPoint(e);
+    drag = { type:"node", id:node.id, origX:node.x, origY:node.y, startX:start.x, startY:start.y };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+  }
+
+  function onAnnotationMouseDown(e, a){
+    e.stopPropagation();
+    if(currentTool === "erase"){ deleteAnnotation(a.id); return; }
+    if(currentTool !== "select") return;
+
+    if(checkManualDoubleClick("annotation", a.id)){
+      selectElement("annotation", a.id);
+      editAnnotationInline(a);
+      return;
+    }
+
+    selectElement("annotation", a.id);
+    const start = getCanvasPoint(e);
+    drag = { type:"annotation", id:a.id, origX:a.x, origY:a.y, startX:start.x, startY:start.y };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+  }
+
+  function onConnectorMouseDown(e, c){
+    e.stopPropagation();
+    if(currentTool === "erase"){ deleteConnector(c.id); return; }
+    if(currentTool !== "select") return;
+
+    if(checkManualDoubleClick("connector", c.id)){
+      selectElement("connector", c.id);
+      const mid = connectorMidpoint(c);
+      editConnectorInline(c, mid.x, mid.y);
+      return;
+    }
+
+    selectElement("connector", c.id);
+  }
+
+  function onWindowMouseMove(e){
+    if(!drag) return;
+    const pt = getCanvasPoint(e);
+    const dx = pt.x - drag.startX, dy = pt.y - drag.startY;
+
+    if(drag.type === "node"){
+      const n = findNode(drag.id);
+      if(!n) return;
+      n.x = drag.origX + dx;
+      n.y = drag.origY + dy;
+      renderAll();
+    } else if(drag.type === "annotation"){
+      const a = findAnnotation(drag.id);
+      if(!a) return;
+      a.x = drag.origX + dx;
+      a.y = drag.origY + dy;
+      renderAll();
+    } else if(drag.type === "pan"){
+      canvasWrap.scrollLeft = drag.scrollLeft0 - (e.clientX - drag.clientX0);
+      canvasWrap.scrollTop = drag.scrollTop0 - (e.clientY - drag.clientY0);
+    } else if(drag.type === "connect-temp"){
+      drawConnectorPreview(drag.fromId, pt);
+    }
+  }
+
+  function onWindowMouseUp(e){
+    if(drag && (drag.type === "node" || drag.type === "annotation")) commit();
+    if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
+    drag = null;
+    window.removeEventListener("mousemove", onWindowMouseMove);
+    window.removeEventListener("mouseup", onWindowMouseUp);
+  }
+
+  // ---------------------------------------------------------
+  // Connector drawing
+  // ---------------------------------------------------------
+  let pendingConnectorFrom = null;
+
+  function handleConnectorClick(nodeId){
+    if(!pendingConnectorFrom){
+      pendingConnectorFrom = nodeId;
+      setStatus("Now click the target node to finish the connector…");
+    } else {
+      if(pendingConnectorFrom !== nodeId){
+        addConnector(pendingConnectorFrom, nodeId, currentTool === "connector" ? "arrow" : "line");
+      }
+      pendingConnectorFrom = null;
+      setStatus("Connector created");
+    }
+  }
+  function cancelPendingConnector(){
+    pendingConnectorFrom = null;
+    clearConnectorPreview();
+  }
+
+  function startConnectorDrag(nodeId){
+    drag = {type:"connect-temp", fromId: nodeId};
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onConnectHandleMouseUp);
+  }
+
+  function onConnectHandleMouseUp(e){
+    clearConnectorPreview();
+    window.removeEventListener("mousemove", onWindowMouseMove);
+    window.removeEventListener("mouseup", onConnectHandleMouseUp);
+    if(!drag || drag.type !== "connect-temp"){ drag=null; return; }
+    const fromId = drag.fromId;
+    drag = null;
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+    const nodeGroup = targetEl ? targetEl.closest(".cpm-node") : null;
+    if(nodeGroup){
+      const toId = nodeGroup.getAttribute("data-id");
+      if(toId && toId !== fromId) addConnector(fromId, toId, currentTool === "connector-line" ? "line" : "arrow");
+    } else {
+      renderAll();
+    }
+  }
+
+  function drawConnectorPreview(fromId, pt){
+    clearConnectorPreview();
+    const a = findNode(fromId);
+    if(!a) return;
+    const start = nodeAnchorPoint(a, pt.x, pt.y);
+    const path = svgElCreate("path", {d:`M${start.x},${start.y} L${pt.x},${pt.y}`, class:"connector-preview", fill:"none"});
+    layerOverlay.appendChild(path);
+  }
+  function clearConnectorPreview(){ layerOverlay.innerHTML = ""; }
+
+  function addConnector(fromId, toId, kind){
+    const c = { id: uid(), fromId, toId, kind, color: "#c0392b", dashed:false, duration:"", task:"" };
+    state.connectors.push(c);
+    renderAll();
+    selectElement("connector", c.id);
+    commit();
+  }
+
+  // ---------------------------------------------------------
+  // Delete
+  // ---------------------------------------------------------
+  function deleteNode(id){
+    state.nodes = state.nodes.filter(n=>n.id!==id);
+    state.connectors = state.connectors.filter(c=> c.fromId!==id && c.toId!==id);
+    if(selectedId && selectedId.id===id) selectedId=null;
+    renderAll(); updateInspector(); commit();
+    setStatus("Node deleted");
+  }
+  function deleteConnector(id){
+    state.connectors = state.connectors.filter(c=>c.id!==id);
+    if(selectedId && selectedId.id===id) selectedId=null;
+    renderAll(); updateInspector(); commit();
+    setStatus("Connector deleted");
+  }
+  function deleteAnnotation(id){
+    state.annotations = state.annotations.filter(a=>a.id!==id);
+    if(selectedId && selectedId.id===id) selectedId=null;
+    renderAll(); updateInspector(); commit();
+    setStatus("Annotation deleted");
+  }
+  function deleteSelected(){
+    if(!selectedId) return;
+    if(selectedId.kind==="node") deleteNode(selectedId.id);
+    else if(selectedId.kind==="connector") deleteConnector(selectedId.id);
+    else if(selectedId.kind==="annotation") deleteAnnotation(selectedId.id);
+  }
+  $("#btnDeleteSelected").addEventListener("click", deleteSelected);
+
+  // ---------------------------------------------------------
+  // Inline editing (double click)
+  // ---------------------------------------------------------
+  function screenPosFor(canvasX, canvasY){
+    const rect = canvasInner.getBoundingClientRect();
+    return { left: rect.left + canvasX*zoom, top: rect.top + canvasY*zoom };
+  }
+
+  function openInlineEditor(canvasX, canvasY, width, initialValue, onCommit, opts={}){
+    const ta = document.createElement("textarea");
+    ta.className = "inline-edit";
+    const pos = screenPosFor(canvasX, canvasY);
+    ta.style.left = pos.left + "px";
+    ta.style.top = pos.top + "px";
+    ta.style.width = (width||160) + "px";
+    ta.style.fontSize = (opts.fontSize||14) + "px";
+    ta.style.fontWeight = opts.bold ? "700" : "400";
+    ta.value = initialValue || "";
+    document.body.appendChild(ta);
+    setTimeout(()=>{ ta.focus(); ta.select(); }, 0);
+
+    function finish(){
+      onCommit(ta.value);
+      ta.removeEventListener("blur", finish);
+      ta.remove();
+      renderAll();
+      commit();
+    }
+    ta.addEventListener("blur", finish);
+    ta.addEventListener("keydown", (e)=>{
+      if(e.key === "Enter" && !e.shiftKey && opts.singleLine){
+        e.preventDefault();
+        ta.blur();
+      } else if(e.key === "Escape"){
+        ta.removeEventListener("blur", finish);
+        ta.remove();
+      }
+    });
+  }
+
+  function editNodeLabelInline(n){
+    openInlineEditor(n.x - n.r, n.y - 12, n.r*2, n.label, (val)=>{ n.label = val; }, {singleLine:true, fontSize:16});
+  }
+  function editConnectorInline(c, midx, midy){
+    openInlineEditor(midx-70, midy-40, 140, c.task, (val)=>{ c.task = val; }, {singleLine:false, fontSize:13});
+  }
+  function editAnnotationInline(a){
+    if(a.type === "note"){
+      openInlineEditor(a.x, a.y, a.w, a.text, (val)=>{ a.text = val; });
+    } else if(a.type === "banner"){
+      openInlineEditor(a.x+8, a.y+a.h/2-12, a.w-16, a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:18});
+    } else if(a.type === "text"){
+      openInlineEditor(a.x, a.y, Math.max(a.w,120), a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:a.fontSize||16, bold:a.bold});
+    } else if(a.type === "pin"){
+      openInlineEditor(a.x+14, a.y-8, 160, a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:12});
+    }
+  }
+
+  // ---------------------------------------------------------
+  // Inspector binding
+  // ---------------------------------------------------------
+  const inspectorEmpty = $("#inspectorEmpty");
+  const inspectorPanel = $("#inspectorPanel");
+  const panelTitle = $("#panelTitle");
+
+  const fieldEls = {
+    label: document.querySelector('[data-field="label"]'),
+    sublabel: document.querySelector('[data-field="sublabel"]'),
+    datetime: document.querySelector('[data-field="datetime"]'),
+    fillrow: document.querySelector('[data-field="fillrow"]'),
+    duration: document.querySelector('[data-field="duration"]'),
+    task: document.querySelector('[data-field="task"]'),
+    connswatches: document.querySelector('[data-field="connswatches"]'),
+    connstyle: document.querySelector('[data-field="connstyle"]'),
+    notebody: document.querySelector('[data-field="notebody"]'),
+    notecolor: document.querySelector('[data-field="notecolor"]'),
+    textcolor: document.querySelector('[data-field="textcolor"]'),
+    fontsize: document.querySelector('[data-field="fontsize"]'),
+    bold: document.querySelector('[data-field="bold"]')
+  };
+
+  function hideAllFields(){ Object.values(fieldEls).forEach(el=> el.style.display = "none"); }
+  function show(el){ el.style.display = "block"; }
+
+  function updateInspector(){
+    if(!selectedId){
+      inspectorEmpty.style.display = "block";
+      inspectorPanel.style.display = "none";
+      return;
+    }
+    inspectorEmpty.style.display = "none";
+    inspectorPanel.style.display = "block";
+    hideAllFields();
+
+    if(selectedId.kind === "node"){
+      const n = findNode(selectedId.id);
+      if(!n) return;
+      panelTitle.textContent = "Node — " + n.type;
+      show(fieldEls.label); $("#fLabel").value = n.label || "";
+      show(fieldEls.sublabel); $("#fSublabel").value = n.sublabel || "";
+      show(fieldEls.datetime); $("#fDatetime").value = (n.datetime||"").replace(/\\n/g,"\n");
+      show(fieldEls.fillrow); $("#fFill").value = n.fill || "#ffffff"; $("#fSize").value = n.r;
+    }
+    else if(selectedId.kind === "connector"){
+      const c = findConnector(selectedId.id);
+      if(!c) return;
+      panelTitle.textContent = "Connector";
+      show(fieldEls.task); $("#fTask").value = c.task || "";
+      show(fieldEls.duration); $("#fDuration").value = c.duration || "";
+      show(fieldEls.connswatches); syncConnSwatches(c.color || "#c0392b");
+      show(fieldEls.connstyle); $("#fLineColor").value = c.color || "#c0392b"; $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
+    }
+    else if(selectedId.kind === "annotation"){
+      const a = findAnnotation(selectedId.id);
+      if(!a) return;
+      panelTitle.textContent = "Annotation — " + a.type;
+      if(a.type === "note"){
+        show(fieldEls.notebody); $("#fNoteBody").value = a.text;
+        show(fieldEls.notecolor); $("#fNoteColor").value = a.color;
+        show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
+      } else if(a.type === "banner"){
+        show(fieldEls.label); $("#fLabel").value = a.text;
+        show(fieldEls.notecolor); $("#fNoteColor").value = a.color;
+        show(fieldEls.textcolor); $("#fTextColor").value = a.textColor;
+        show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
+      } else if(a.type === "text"){
+        show(fieldEls.label); $("#fLabel").value = a.text;
+        show(fieldEls.textcolor); $("#fTextColor").value = a.textColor;
+        show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
+        show(fieldEls.bold); $("#fBold").checked = !!a.bold;
+      } else if(a.type === "pin"){
+        show(fieldEls.label); $("#fLabel").value = a.text;
+        show(fieldEls.textcolor); $("#fTextColor").value = a.textColor || "black";
+        show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize || 12;
+      }
+    }
+  }
+
+  function bindLive(elId, applyFn){
+    $(elId).addEventListener("input", ()=>{
+      if(!selectedId) return;
+      applyFn();
+      renderAll();
+    });
+    $(elId).addEventListener("change", ()=> commit());
+  }
+
+  bindLive("#fLabel", ()=>{
+    if(selectedId.kind==="node"){
+      findNode(selectedId.id).label = $("#fLabel").value;
+      state.connectors.forEach(c=>{
+        if(c.fromId === selectedId.id) propagateFromConnector(c.id);
+      });
+    }
+    else if(selectedId.kind==="annotation"){ findAnnotation(selectedId.id).text = $("#fLabel").value; }
+  });
+  bindLive("#fSublabel", ()=>{ findNode(selectedId.id).sublabel = $("#fSublabel").value; });
+  bindLive("#fDatetime", ()=>{ findNode(selectedId.id).datetime = $("#fDatetime").value.replace(/\n/g,"\\n"); });
+  bindLive("#fFill", ()=>{ findNode(selectedId.id).fill = $("#fFill").value; });
+  bindLive("#fSize", ()=>{ findNode(selectedId.id).r = parseInt($("#fSize").value,10); });
+
+  // ---------------------------------------------------------
+  // Duration auto-calc: when a connector's duration is a plain number,
+  // set the downstream node's label to (upstream label + duration), and
+  // cascade that forward through any further connectors out of that node.
+  // ---------------------------------------------------------
+  function parseNumericLabel(text){
+    if(text === undefined || text === null) return null;
+    const cleaned = String(text).replace(/[(),]/g, "").trim();
+    if(cleaned === "" || isNaN(cleaned)) return null;
+    return parseFloat(cleaned);
+  }
+
+  function recalcNodeFromIncoming(nodeId){
+    const incoming = state.connectors.filter(c=> c.toId === nodeId && c.fromId);
+    let best = null;
+    incoming.forEach(c=>{
+      const dur = parseNumericLabel(c.duration);
+      if(dur === null) return;
+      const fromNode = findNode(c.fromId);
+      if(!fromNode) return;
+      const fromVal = parseNumericLabel(fromNode.label);
+      if(fromVal === null) return;
+      const candidate = fromVal + dur;
+      if(best === null || candidate > best) best = candidate;
+    });
+    return best;
+  }
+
+  function propagateFromConnector(connectorId, visited){
+    visited = visited || new Set();
+    if(visited.has(connectorId)) return; // guard against cycles
+    visited.add(connectorId);
+
+    const c = findConnector(connectorId);
+    if(!c || !c.fromId || !c.toId) return;
+    const toNode = findNode(c.toId);
+    if(!toNode) return;
+
+    const best = recalcNodeFromIncoming(c.toId);
+    if(best === null) return;
+    const newLabel = Number.isInteger(best) ? String(best) : String(Math.round(best*100)/100);
+    if(toNode.label === newLabel) return; // already correct, avoid needless cascade
+    toNode.label = newLabel;
+
+    // cascade: any connector leaving toNode might also need recalculating
+    state.connectors.forEach(next=>{
+      if(next.fromId === toNode.id) propagateFromConnector(next.id, visited);
+    });
+  }
+
+  bindLive("#fTask", ()=>{ findConnector(selectedId.id).task = $("#fTask").value; });
+  bindLive("#fDuration", ()=>{
+    findConnector(selectedId.id).duration = $("#fDuration").value;
+    propagateFromConnector(selectedId.id);
+  });
+  bindLive("#fLineColor", ()=>{ findConnector(selectedId.id).color = $("#fLineColor").value; syncConnSwatches($("#fLineColor").value); });
+  bindLive("#fLineStyle", ()=>{ findConnector(selectedId.id).dashed = $("#fLineStyle").value === "dashed"; });
+
+  function syncConnSwatches(color){
+    const norm = (color||"").toLowerCase();
+    [$("#connSwatchRed"), $("#connSwatchGreen")].forEach(btn=>{
+      if(!btn) return;
+      btn.classList.toggle("active", btn.dataset.color.toLowerCase() === norm);
+    });
+  }
+  function applyConnColor(color){
+    if(!selectedId || selectedId.kind !== "connector") return;
+    findConnector(selectedId.id).color = color;
+    $("#fLineColor").value = color;
+    syncConnSwatches(color);
+    renderAll(); updateInspector(); commit();
+  }
+  $("#connSwatchRed").addEventListener("click", ()=> applyConnColor("#c0392b"));
+  $("#connSwatchGreen").addEventListener("click", ()=> applyConnColor("#3a9d4e"));
+
+  bindLive("#fNoteBody", ()=>{ findAnnotation(selectedId.id).text = $("#fNoteBody").value; });
+  bindLive("#fNoteColor", ()=>{ findAnnotation(selectedId.id).color = $("#fNoteColor").value; });
+  bindLive("#fTextColor", ()=>{ findAnnotation(selectedId.id).textColor = $("#fTextColor").value; });
+  bindLive("#fFontSize", ()=>{ findAnnotation(selectedId.id).fontSize = parseInt($("#fFontSize").value,10); });
+  bindLive("#fBold", ()=>{ findAnnotation(selectedId.id).bold = $("#fBold").checked; });
+
+  $("#btnBringFront").addEventListener("click", ()=>{
+    if(!selectedId) return;
+    if(selectedId.kind === "node"){
+      const i = state.nodes.findIndex(n=>n.id===selectedId.id);
+      const [n] = state.nodes.splice(i,1); state.nodes.push(n);
+    } else if(selectedId.kind === "annotation"){
+      const i = state.annotations.findIndex(a=>a.id===selectedId.id);
+      const [a] = state.annotations.splice(i,1); state.annotations.push(a);
+    }
+    renderAll(); commit();
+  });
+  $("#btnSendBack").addEventListener("click", ()=>{
+    if(!selectedId) return;
+    if(selectedId.kind === "node"){
+      const i = state.nodes.findIndex(n=>n.id===selectedId.id);
+      const [n] = state.nodes.splice(i,1); state.nodes.unshift(n);
+    } else if(selectedId.kind === "annotation"){
+      const i = state.annotations.findIndex(a=>a.id===selectedId.id);
+      const [a] = state.annotations.splice(i,1); state.annotations.unshift(a);
+    }
+    renderAll(); commit();
+  });
+
+  // ---------------------------------------------------------
+  // Pan
+  // ---------------------------------------------------------
+  function startPan(e){
+    drag = {
+      type:"pan",
+      scrollLeft0: canvasWrap.scrollLeft, scrollTop0: canvasWrap.scrollTop,
+      clientX0: e.clientX, clientY0: e.clientY
+    };
+    canvasWrap.classList.add("panning");
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+  }
+
+  let spaceDown = false;
+  window.addEventListener("keydown", (e)=>{
+    if(e.code === "Space" && !spaceDown && !isTyping(e.target)){
+      spaceDown = true;
+      canvasWrap.classList.add("tool-pan");
+      e.preventDefault();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z" && !isTyping(e.target)){
+      e.preventDefault();
+      if(e.shiftKey) redo(); else undo();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="y" && !isTyping(e.target)){
+      e.preventDefault(); redo();
+    }
+    if((e.key === "Delete" || e.key === "Backspace") && !isTyping(e.target) && selectedId){
+      e.preventDefault();
+      deleteSelected();
+    }
+  });
+  window.addEventListener("keyup", (e)=>{
+    if(e.code === "Space"){
+      spaceDown = false;
+      if(currentTool !== "pan") canvasWrap.classList.remove("tool-pan");
+    }
+  });
+  function isTyping(el){
+    return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+  }
+
+  // ---------------------------------------------------------
+  // Zoom
+  // ---------------------------------------------------------
+  function applyZoom(){
+    canvasInner.style.transform = `scale(${zoom})`;
+    $("#zoomLabel").textContent = Math.round(zoom*100)+"%";
+  }
+  $("#btnZoomIn").addEventListener("click", ()=>{ zoom = clamp(zoom+0.1, 0.3, 2.5); applyZoom(); });
+  $("#btnZoomOut").addEventListener("click", ()=>{ zoom = clamp(zoom-0.1, 0.3, 2.5); applyZoom(); });
+  $("#btnZoomReset").addEventListener("click", ()=>{ zoom = 1; applyZoom(); canvasWrap.scrollLeft=0; canvasWrap.scrollTop=0; });
+
+  canvasWrap.addEventListener("wheel", (e)=>{
+    if(e.ctrlKey || e.metaKey){
+      e.preventDefault();
+      zoom = clamp(zoom + (e.deltaY<0?0.06:-0.06), 0.3, 2.5);
+      applyZoom();
+    }
+  }, {passive:false});
+
+  // ---------------------------------------------------------
+  // Grid toggle
+  // ---------------------------------------------------------
+  $("#btnGrid").addEventListener("click", ()=>{
+    gridOn = !gridOn;
+    canvasInner.classList.toggle("no-grid", !gridOn);
+  });
+
+  // ---------------------------------------------------------
+  // Canvas background color
+  // ---------------------------------------------------------
+  function applyCanvasBg(){
+    const bg = state.canvasBg || "#f3f1ea";
+    canvasInner.style.backgroundColor = bg;
+    const picker = $("#canvasBgColor");
+    if(picker) picker.value = bg;
+  }
+  $("#canvasBgColor").addEventListener("input", (e)=>{
+    state.canvasBg = e.target.value;
+    applyCanvasBg();
+  });
+  $("#canvasBgColor").addEventListener("change", ()=> commit());
+
+  // ---------------------------------------------------------
+  // Undo / redo buttons
+  // ---------------------------------------------------------
+  $("#btnUndo").addEventListener("click", undo);
+  $("#btnRedo").addEventListener("click", redo);
+
+  // ---------------------------------------------------------
+  // Clear
+  // ---------------------------------------------------------
+  $("#btnClear").addEventListener("click", ()=>{
+    if(!confirm("Clear the entire canvas? This cannot be undone after closing this dialog.")) return;
+    const keepBg = state.canvasBg;
+    state = {nodes:[], connectors:[], annotations:[], nextId:1, canvasBg:keepBg};
+    selectedId = null;
+    renderAll(); updateInspector(); applyCanvasBg(); commit();
+    setStatus("Canvas cleared");
+  });
+
+  // ---------------------------------------------------------
+  // New CPM (fresh blank document: canvas + title/subtitle reset)
+  // ---------------------------------------------------------
+  $("#btnNewCpm").addEventListener("click", ()=>{
+    if(!confirm("Start a new CPM diagram? Any unsaved changes to the current canvas will be lost.")) return;
+    state = {nodes:[], connectors:[], annotations:[], nextId:1};
+    selectedId = null;
+    $("#diagramTitle").value = "NEW CPM DIAGRAM";
+    $("#diagramSubtitle").value = "";
+    history = [];
+    historyIndex = -1;
+    renderAll(); updateInspector(); applyCanvasBg(); commit();
+    setStatus("New CPM diagram started");
+  });
+
+  // ---------------------------------------------------------
+  // Save Canvas as a self-contained, directly-editable .html file
+  // ---------------------------------------------------------
+  function saveCanvasAsHtml(){
+    const payload = { title: $("#diagramTitle").value, subtitle: $("#diagramSubtitle").value, state };
+    const filename = (payload.title || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".html";
+
+    pickSaveHandle(filename, "html", "CPM diagram (HTML)", "text/html").then(handle=>{
+      setStatus("Building editable HTML file…");
+      const docClone = document.documentElement.cloneNode(true);
+
+      // strip transient/runtime-only DOM that shouldn't be in a saved snapshot
+      docClone.querySelectorAll(".inline-edit").forEach(el=> el.remove());
+      docClone.querySelectorAll(".connect-handle").forEach(el=> el.remove());
+      docClone.querySelectorAll(".selected").forEach(el=> el.classList.remove("selected"));
+
+      const stateScript = docClone.querySelector("#embeddedState");
+      if(stateScript){
+        stateScript.textContent = JSON.stringify(payload);
+      }
+
+      const html = "<!DOCTYPE html>\n" + docClone.outerHTML;
+      const blob = new Blob([html], {type:"text/html"});
+
+      const finish = handle ? writeBlobToHandle(handle, blob) : Promise.resolve(downloadBlobFallback(blob, filename));
+      finish.then(()=> setStatus("Saved " + filename))
+            .catch(()=> setStatus("Save failed — try again"));
+    }).catch(err=>{
+      if(err && err.name === "AbortError"){ setStatus("Save cancelled"); return; }
+      setStatus("Save failed — try again");
+    });
+  }
+  $("#btnSaveCanvasHtml").addEventListener("click", saveCanvasAsHtml);
+
+  // ---------------------------------------------------------
+  // Import Excel Gantt chart -> auto-build CPM diagram
+  // ---------------------------------------------------------
+  const PHASE_COLUMN_LAYOUT = { colGap: 240, rowGap: 175, startX: 200, startY: 170 };
+
+  function parseExcelDate(val){
+    if(val instanceof Date) return val;
+    if(typeof val === "number"){
+      // Excel serial date (days since 1899-12-30)
+      const ms = Math.round((val - 25569) * 86400 * 1000);
+      return new Date(ms);
+    }
+    if(typeof val === "string"){
+      const s = val.trim();
+      let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+      if(m) return new Date(+m[3], +m[2]-1, +m[1]); // dd/mm/yyyy
+      m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+      if(m) return new Date(+m[1], +m[2]-1, +m[3]); // yyyy-mm-dd
+      const d = new Date(s);
+      if(!isNaN(d.getTime())) return d;
+    }
+    return null;
+  }
+
+  function fmtDateShort(d){
+    if(!d) return "";
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${String(d.getDate()).padStart(2,"0")} ${months[d.getMonth()]}.${String(d.getFullYear()).slice(2)}`;
+  }
+
+  // Find the header row + column indices inside a sheet's 2D array (aoa).
+  function findGanttHeader(aoa){
+    // Order matters: more specific patterns are claimed first so a generic
+    // substring (e.g. "งาน" inside "รหัสงาน") can't steal a column that
+    // really belongs to a later, more specific category.
+    const wants = [
+      ["code",     ["รหัสงาน", "รหัส", "wbs", "task id", "task code"]],
+      ["start",    ["วันเริ่มต้น", "วันเริ่ม", "start date", "start"]],
+      ["end",      ["วันสิ้นสุด", "วันจบ", "end date", "finish", "end"]],
+      ["duration", ["ระยะเวลา", "duration", "days", "no. of days"]],
+      ["progress", ["ความคืบหน้า", "คืบหน้า", "progress", "% complete", "%"]],
+      ["owner",    ["ผู้รับผิดชอบ", "owner", "assign", "responsible"]],
+      ["phase",    ["phase", "เฟส", "ระยะ"]],
+      ["name",     ["ชื่องาน", "ชื่อกิจกรรม", "กิจกรรม", "งาน / กิจกรรม", "task name", "activity", "task", "name", "งาน"]]
+    ];
+    for(let r=0; r<Math.min(aoa.length, 15); r++){
+      const row = aoa[r].map(c=> String(c||"").toLowerCase());
+      const found = {};
+      const claimed = new Set();
+      wants.forEach(([key, kws])=>{
+        let idx = -1;
+        for(let i=0;i<row.length;i++){
+          if(claimed.has(i)) continue;
+          if(kws.some(kw=> row[i].includes(kw.toLowerCase()))){ idx = i; break; }
+        }
+        if(idx >= 0){ found[key] = idx; claimed.add(idx); }
+      });
+      // a usable header needs at minimum a name + start + end column
+      if(found.name !== undefined && found.start !== undefined && found.end !== undefined){
+        return { rowIndex: r, cols: found };
+      }
+    }
+    return null;
+  }
+
+  function extractTasksFromSheet(aoa){
+    const header = findGanttHeader(aoa);
+    if(!header) return null;
+    const { rowIndex, cols } = header;
+    const tasks = [];
+    for(let r=rowIndex+1; r<aoa.length; r++){
+      const row = aoa[r];
+      if(!row || row.every(c=> c===null || c===undefined || String(c).trim()==="")) continue;
+      const name = cols.name !== undefined ? row[cols.name] : null;
+      const start = cols.start !== undefined ? parseExcelDate(row[cols.start]) : null;
+      const end = cols.end !== undefined ? parseExcelDate(row[cols.end]) : null;
+      if(!name || !start || !end) continue; // stop / skip summary or trailing rows
+      const code = cols.code !== undefined ? String(row[cols.code]||"").trim() : "";
+      const phase = cols.phase !== undefined ? String(row[cols.phase]||"").trim() : "";
+      let progress = cols.progress !== undefined ? row[cols.progress] : 0;
+      if(typeof progress === "string") progress = parseFloat(progress.replace("%","")) || 0;
+      if(typeof progress === "number" && progress <= 1) progress = progress * 100;
+      const duration = cols.duration !== undefined ? row[cols.duration] : Math.round((end-start)/86400000)+1;
+      const owner = cols.owner !== undefined ? String(row[cols.owner]||"").trim() : "";
+      // Rows with a code like "1.1" are real tasks; rows with no code are phase-summary rows (skip from CPM nodes, but keep phase label).
+      const isPhaseSummary = !code && !!phase;
+      tasks.push({ code, name: String(name).trim(), phase, start, end, duration, progress: progress||0, owner, isPhaseSummary });
+    }
+    return tasks.filter(t=> !t.isPhaseSummary);
+  }
+
+  function progressFill(p){
+    if(p >= 100) return "#7fb56e";
+    if(p > 0) return "#f3cf4a";
+    return "#ffffff";
+  }
+
+  function buildCpmFromTasks(tasks){
+    if(!tasks.length) return;
+
+    const sorted = [...tasks].sort((a,b)=> a.start - b.start || a.end - b.end);
+    const phases = [];
+    sorted.forEach(t=>{ if(!phases.includes(t.phase)) phases.push(t.phase); });
+
+    // assign a column per phase, in first-seen (chronological) order
+    const colOfPhase = {};
+    phases.forEach((p,i)=> colOfPhase[p] = i);
+
+    // track how many nodes already placed in each column, for vertical stacking
+    const rowsUsedInCol = {};
+
+    state = { nodes:[], connectors:[], annotations:[], nextId:1 };
+
+    // Reserve column 0 for Start; task phase columns begin at column 1.
+    const firstPhaseTaskCount = sorted.filter(t=> colOfPhase[t.phase] === 0).length;
+    const startNode = {
+      id: uid(), type:"hex",
+      x: PHASE_COLUMN_LAYOUT.startX,
+      y: PHASE_COLUMN_LAYOUT.startY + Math.floor((firstPhaseTaskCount-1)/2) * PHASE_COLUMN_LAYOUT.rowGap,
+      r:30, fill:"#7fb56e", label:"Start", sublabel:"", datetime:""
+    };
+    state.nodes.push(startNode);
+
+    const taskNodeId = {};
+    sorted.forEach(t=>{
+      const col = (colOfPhase[t.phase] || 0) + 1;
+      const row = rowsUsedInCol[col] || 0;
+      rowsUsedInCol[col] = row + 1;
+      const x = PHASE_COLUMN_LAYOUT.startX + col * PHASE_COLUMN_LAYOUT.colGap;
+      const y = PHASE_COLUMN_LAYOUT.startY + row * PHASE_COLUMN_LAYOUT.rowGap;
+      const label = t.code ? t.code : "•";
+      const node = {
+        id: uid(), type:"circle", x, y, r: 32,
+        fill: progressFill(t.progress),
+        label,
+        sublabel: t.name.length > 28 ? t.name.slice(0,26)+"…" : t.name,
+        datetime: `${fmtDateShort(t.start)}\\n${fmtDateShort(t.end)}`
+      };
+      state.nodes.push(node);
+      taskNodeId[t.code || t.name] = node.id;
+      t._nodeId = node.id;
+    });
+
+    const usedCols = Object.keys(rowsUsedInCol).map(Number);
+    const lastCol = usedCols.length ? Math.max(...usedCols) : 1;
+    const maxRowCount = Math.max(0, ...Object.values(rowsUsedInCol));
+    const endNode = {
+      id: uid(), type:"hex",
+      x: PHASE_COLUMN_LAYOUT.startX + (lastCol+1) * PHASE_COLUMN_LAYOUT.colGap,
+      y: PHASE_COLUMN_LAYOUT.startY + Math.floor((maxRowCount-1)/2) * PHASE_COLUMN_LAYOUT.rowGap,
+      r:30, fill:"#7fb56e", label:"End", sublabel:"", datetime:""
+    };
+    state.nodes.push(endNode);
+
+    // Dependency inference: for each task, link from the most recent task
+    // (by end date) that finishes on/before this task's start date.
+    // Tasks with no qualifying predecessor link from Start; tasks that are
+    // never a predecessor for anything link to End.
+    const hasSuccessor = new Set();
+    sorted.forEach(t=>{
+      let best = null;
+      sorted.forEach(o=>{
+        if(o===t) return;
+        if(o.end <= t.start){
+          if(!best || o.end > best.end) best = o;
+        }
+      });
+      if(best){
+        addConnectorSilent(best._nodeId, t._nodeId, "");
+        hasSuccessor.add(best._nodeId);
+      } else {
+        addConnectorSilent(startNode.id, t._nodeId, "");
+      }
+    });
+    sorted.forEach(t=>{
+      if(!hasSuccessor.has(t._nodeId)) addConnectorSilent(t._nodeId, endNode.id, "");
+    });
+
+    selectedId = null;
+    renderAll(); updateInspector(); applyCanvasBg(); commit();
+  }
+
+  // like addConnector() but skips the per-call selectElement/commit (we batch one commit at the end)
+  function addConnectorSilent(fromId, toId, durationLabel){
+    const c = { id: uid(), fromId, toId, kind:"arrow", color:"#c0392b", dashed:false, duration: durationLabel!=="" ? String(durationLabel) : "", task:"" };
+    state.connectors.push(c);
+  }
+
+  function importExcelFile(file){
+    if(typeof XLSX === "undefined"){
+      alert("Excel import library failed to load. Check your internet connection and try again.");
+      return;
+    }
+    setStatus("Reading " + file.name + "…");
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:"array", cellDates:true});
+        let tasks = null;
+        let usedSheet = "";
+        // Prefer a sheet literally named like a task-detail sheet, else scan all sheets.
+        const preferredNames = wb.SheetNames.filter(n=> /รายละเอียด|detail|task/i.test(n));
+        const orderedSheets = [...preferredNames, ...wb.SheetNames.filter(n=> !preferredNames.includes(n))];
+        for(const sn of orderedSheets){
+          const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:null});
+          const found = extractTasksFromSheet(aoa);
+          if(found && found.length){ tasks = found; usedSheet = sn; break; }
+        }
+        if(!tasks || !tasks.length){
+          alert("Could not find a recognizable Gantt task table in this file (need columns for task name, start date and end date).");
+          setStatus("Import failed");
+          return;
+        }
+        buildCpmFromTasks(tasks);
+        $("#diagramTitle").value = "CPM — " + file.name.replace(/\.(xlsx|xls)$/i, "");
+        $("#diagramSubtitle").value = `Imported from "${usedSheet}" — ${tasks.length} tasks`;
+        setStatus(`Imported ${tasks.length} tasks from ${file.name}`);
+      } catch(err){
+        console.error(err);
+        alert("Could not read this Excel file. Make sure it's a valid .xlsx Gantt chart export.");
+        setStatus("Import failed");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  $("#btnImportExcel").addEventListener("click", ()=> $("#excelInput").click());
+  $("#excelInput").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(file) importExcelFile(file);
+    e.target.value = "";
+  });
+
+  // ---------------------------------------------------------
+  // Export PNG
+  // ---------------------------------------------------------
+  $("#btnExportPng").addEventListener("click", exportPng);
+
+  function computeContentBounds(){
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    state.nodes.forEach(n=>{
+      // Captions/datetime can extend well beyond the node's own radius,
+      // so estimate extra width from the longest associated text.
+      const textLines = [n.sublabel||"", ...(n.datetime? n.datetime.split("\\n") : [])];
+      const longest = textLines.reduce((m,t)=> Math.max(m, t.length), 0);
+      const textHalfWidth = Math.max(n.r, longest * 4.4);
+      minX = Math.min(minX, n.x - textHalfWidth - 20);
+      minY = Math.min(minY, n.y - n.r - 40);
+      maxX = Math.max(maxX, n.x + textHalfWidth + 20);
+      maxY = Math.max(maxY, n.y + n.r + 50);
+    });
+    state.annotations.forEach(a=>{
+      minX = Math.min(minX, a.x - 10);
+      minY = Math.min(minY, a.y - 10);
+      maxX = Math.max(maxX, a.x + (a.w||20) + 10);
+      maxY = Math.max(maxY, a.y + (a.h||20) + 10);
+    });
+    state.connectors.forEach(c=>{
+      const a = c.fromId ? findNode(c.fromId) : null;
+      const b = c.toId ? findNode(c.toId) : null;
+      [a,b].forEach(n=>{
+        if(n){
+          minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
+          minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
+        }
+      });
+    });
+    if(!isFinite(minX)){ minX=0; minY=0; maxX=1200; maxY=800; }
+    return {minX, minY, maxX, maxY};
+  }
+
+  function exportPng(){
+    const filename = ($("#diagramTitle").value || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".png";
+    pickSaveHandle(filename, "png", "PNG image", "image/png").then(handle=>{
+      runExportPng(handle, filename);
+    }).catch(err=>{
+      if(err && err.name === "AbortError"){ setStatus("Export cancelled"); return; }
+      setStatus("Export failed — try again");
+    });
+  }
+
+  function runExportPng(handle, filename){
+    setStatus("Exporting image…");
+    const bounds = computeContentBounds();
+    const pad = 40;
+    const titleHeight = 90;
+    const w = Math.max(600, bounds.maxX - bounds.minX + pad*2);
+    const h = Math.max(400, bounds.maxY - bounds.minY + pad*2) + titleHeight;
+
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("width", w);
+    clone.setAttribute("height", h);
+    clone.setAttribute("viewBox", `${bounds.minX-pad} ${bounds.minY-pad-titleHeight} ${w} ${h}`);
+
+    const bg = svgElCreate("rect", {x:bounds.minX-pad, y:bounds.minY-pad-titleHeight, width:w, height:h, fill:(state.canvasBg || "#f3f1ea")});
+    clone.insertBefore(bg, clone.firstChild);
+
+    const titleText = svgElCreate("text", {
+      x: bounds.minX-pad+24, y: bounds.minY-pad-titleHeight+38,
+      style:"font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:26px; fill:#1c2530;"
+    });
+    titleText.textContent = $("#diagramTitle").value;
+    clone.appendChild(titleText);
+    const subText = svgElCreate("text", {
+      x: bounds.minX-pad+24, y: bounds.minY-pad-titleHeight+62,
+      style:"font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:14px; fill:#52606d;"
+    });
+    subText.textContent = $("#diagramSubtitle").value;
+    clone.appendChild(subText);
+
+    clone.querySelectorAll(".connect-handle").forEach(h=>h.remove());
+    clone.querySelectorAll(".selected").forEach(elm=>elm.classList.remove("selected"));
+
+    // foreignObject (used for free-text annotations) taints the canvas when
+    // rasterized via drawImage, even with no external resources inside it.
+    // Swap each one out for a plain SVG <text> element before export.
+    clone.querySelectorAll(".cpm-text-wrap").forEach(wrap=>{
+      const fo = wrap.querySelector("foreignObject");
+      const div = fo ? fo.querySelector(".cpm-freetext") : null;
+      if(!div) return;
+      const lines = (div.textContent || "").split("\n");
+      const fontSize = parseFloat(div.style.fontSize) || 16;
+      const replacement = svgElCreate("text", {
+        x: 4, y: fontSize,
+        style:`font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif; font-weight:${div.style.fontWeight||500}; font-size:${fontSize}px; fill:${div.style.color||'#1c2530'};`
+      });
+      lines.forEach((ln,i)=>{
+        const tspan = svgElCreate("tspan", {x:4, dy: i===0 ? 0 : fontSize*1.25});
+        tspan.textContent = ln;
+        replacement.appendChild(tspan);
+      });
+      wrap.replaceChild(replacement, fo);
+    });
+
+    const svgData = new XMLSerializer().serializeToString(clone);
+    const svgBlob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = ()=>{
+      const scaleFactor = 2;
+      const canvasEl = document.createElement("canvas");
+      canvasEl.width = w*scaleFactor;
+      canvasEl.height = h*scaleFactor;
+      const ctx = canvasEl.getContext("2d");
+      ctx.fillStyle = state.canvasBg || "#f3f1ea";
+      ctx.fillRect(0,0,canvasEl.width, canvasEl.height);
+      ctx.scale(scaleFactor, scaleFactor);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvasEl.toBlob((blob)=>{
+        const finish = handle ? writeBlobToHandle(handle, blob) : Promise.resolve(downloadBlobFallback(blob, filename));
+        finish.then(()=>{
+          URL.revokeObjectURL(url);
+          setStatus("Exported " + filename);
+        }).catch(()=>{
+          URL.revokeObjectURL(url);
+          setStatus("Export failed — try again");
+        });
+      }, "image/png");
+    };
+    img.onerror = ()=>{
+      setStatus("Export failed — try again");
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  // ---------------------------------------------------------
+  // Seed example content so the canvas isn't empty on first load
+  // ---------------------------------------------------------
+  function seedExample(){
+    const n0 = {id:uid(), type:"circle", x:140, y:420, r:30, fill:"#ffffff", label:"0", sublabel:"Reduce Feed Gas", datetime:"20 Apr.25\\n04.00"};
+    const n1 = {id:uid(), type:"circle", x:300, y:420, r:30, fill:"#ffffff", label:"1", sublabel:"Warm up process", datetime:"20 Apr.25\\n09.00"};
+    const n2 = {id:uid(), type:"circle", x:460, y:420, r:30, fill:"#f6d34d", label:"8", sublabel:"Stop Expander", datetime:"20 Apr.25\\n13.00"};
+    const n3 = {id:uid(), type:"hex",    x:680, y:420, r:34, fill:"#7fb56e", label:"72", sublabel:"Hand Over 3306", datetime:"23 Apr.25\\n09.00"};
+    state.nodes.push(n0,n1,n2,n3);
+
+    state.connectors.push(
+      {id:uid(), fromId:n0.id, toId:n1.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(1)", task:"Warm up\nprocess"},
+      {id:uid(), fromId:n1.id, toId:n2.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(4)", task:"Stop\nExpander"},
+      {id:uid(), fromId:n2.id, toId:n3.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(42)", task:"Drain, Vent,\nN2 purge"}
+    );
+
+    state.annotations.push(
+      {id:uid(), type:"banner", x:230, y:120, w:280, h:46, text:"Example section banner", color:"green", textColor:"black", fontSize:18, bold:true},
+      {id:uid(), type:"note", x:520, y:200, w:190, h:78, text:"Insert Blind\n3304T02 ON. 6-7\n21 Apr.25  08.30", color:"orange", textColor:"black", fontSize:12, bold:false},
+      {id:uid(), type:"pin", x:560, y:300, w:10, h:34, text:"", color:"pink", textColor:"black", fontSize:12, bold:false},
+      {id:uid(), type:"text", x:90, y:300, w:160, h:28, text:"Flare management", color:"none", textColor:"red", fontSize:17, bold:true}
+    );
+    renderAll();
+    pushHistory();
+    refreshCount();
+  }
+
+  renderAll();
+  pushHistory();
+  applyZoom();
+
+  (function bootstrap(){
+    const embedded = document.getElementById("embeddedState");
+    const raw = embedded ? embedded.textContent.trim() : "";
+    if(raw){
+      try{
+        const payload = JSON.parse(raw);
+        if(payload.title !== undefined) $("#diagramTitle").value = payload.title;
+        if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
+        state = payload.state || payload;
+        selectedId = null;
+        renderAll(); updateInspector(); applyCanvasBg();
+        history = []; historyIndex = -1;
+        pushHistory();
+        setStatus("Loaded saved canvas");
+        return;
+      } catch(err){
+        console.error("Could not parse embedded canvas state, falling back to example.", err);
+      }
+    }
+    seedExample();
+    applyCanvasBg();
+  })();
+
+})();
+
+</script>
+</body>
+</html>
