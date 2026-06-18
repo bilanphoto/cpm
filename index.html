@@ -6,7 +6,7 @@
 <title>CPM Diagram Builder</title>
 <style>
 /* ============================================================
-   CPM Diagram Builder — visual identity
+   CPM Diagram Builder � visual identity
    Direction: control-room / drafting-table industrial tool.
    Steel-blue chrome, drafting-paper canvas, safety-amber accent.
    ============================================================ */
@@ -365,7 +365,7 @@ html,body{
       <div class="brand-mark">CPM</div>
       <div class="brand-text">
         <input id="diagramTitle" value="CPM SHUT DOWN TURNAROUND" spellcheck="false">
-        <input id="diagramSubtitle" value="20 Apr — 5 May 2025" spellcheck="false">
+        <input id="diagramSubtitle" value="20 Apr � 5 May 2025" spellcheck="false">
       </div>
     </div>
 
@@ -374,22 +374,27 @@ html,body{
       <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
       <button class="btn" id="btnNewCpm" title="Start a brand new blank CPM diagram">New CPM</button>
       <div class="sep"></div>
-      <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
-      <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+      <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)">?</button>
+      <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)">?</button>
       <div class="sep"></div>
-      <button class="btn ghost" id="btnZoomOut" title="Zoom out">−</button>
+      <button class="btn ghost" id="btnZoomOut" title="Zoom out">?</button>
       <span id="zoomLabel">100%</span>
       <button class="btn ghost" id="btnZoomIn" title="Zoom in">+</button>
-      <button class="btn ghost" id="btnZoomReset" title="Reset view">⤢</button>
+      <button class="btn ghost" id="btnZoomReset" title="Reset view">?</button>
       <div class="sep"></div>
-      <button class="btn ghost" id="btnGrid" title="Toggle grid">▦</button>
+      <button class="btn ghost" id="btnGrid" title="Toggle grid">?</button>
       <label class="btn ghost bg-color-btn" id="bgColorBtn" title="Canvas background color">
-        🎨
+        ??
         <input type="color" id="canvasBgColor" value="#f3f1ea">
       </label>
-      <button class="btn ghost" id="btnClear" title="Clear canvas">🗑</button>
+      <button class="btn ghost" id="btnClear" title="Clear canvas">??</button>
       <div class="sep"></div>
       <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file">Save</button>
+      <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file">&#128194; Open</button>
+      <input type="file" id="htmlFileInput" accept=".html" style="display:none">
+      <div class="sep"></div>
+      <button class="btn" id="btnCopyEl" title="Copy selected element (Ctrl+C)">&#9000; Copy</button>
+      <button class="btn" id="btnPasteEl" title="Paste copied element (Ctrl+V)">&#9001; Paste</button>
       <button class="btn primary" id="btnExportPng">Export image</button>
     </div>
   </header>
@@ -488,7 +493,7 @@ html,body{
     <aside id="inspector">
       <div class="collapsed-handle"><div class="collapsed-handle-bar"></div></div>
       <div class="inspector-empty" id="inspectorEmpty">
-        <div class="inspector-empty-icon">◇</div>
+        <div class="inspector-empty-icon">?</div>
         <p>Select an element on the canvas to edit its properties, or pick a tool on the left to start drawing.</p>
         <div class="legend">
           <div class="legend-title">Legend reference</div>
@@ -633,7 +638,7 @@ html,body{
 
 <script>
 /* ============================================================
-   CPM Diagram Builder — application logic
+   CPM Diagram Builder � application logic
    Plain JS + inline SVG. No frameworks, no build step.
    ============================================================ */
 
@@ -663,6 +668,10 @@ html,body{
 
   // drag tracking
   let drag = null;
+
+  // clipboard for copy/paste
+  let clipboard = null; // { kind:'node'|'connector'|'annotation', data:{...} }
+
 
   // ---------------------------------------------------------
   // DOM refs
@@ -722,7 +731,7 @@ html,body{
   }
 
   // ---------------------------------------------------------
-  // History (undo/redo) — snapshot based, simple & robust
+  // History (undo/redo) � snapshot based, simple & robust
   // ---------------------------------------------------------
   function snapshot(){ return JSON.stringify(state); }
   function pushHistory(){
@@ -768,8 +777,8 @@ html,body{
       suggestedName,
       types: [{ description, accept: { [mimeType]: ["." + extension] } }]
     }).catch(err=>{
-      if(err && err.name === "AbortError") throw err; // person cancelled — caller should stop
-      return null; // any other failure (unsupported, blocked, etc.) — caller falls back
+      if(err && err.name === "AbortError") throw err; // person cancelled � caller should stop
+      return null; // any other failure (unsupported, blocked, etc.) � caller falls back
     });
   }
 
@@ -1400,7 +1409,7 @@ html,body{
   function handleConnectorClick(nodeId){
     if(!pendingConnectorFrom){
       pendingConnectorFrom = nodeId;
-      setStatus("Now click the target node to finish the connector…");
+      setStatus("Now click the target node to finish the connector�");
     } else {
       if(pendingConnectorFrom !== nodeId){
         addConnector(pendingConnectorFrom, nodeId, currentTool === "connector" ? "arrow" : "line");
@@ -1483,7 +1492,7 @@ html,body{
   }
   function deleteSelected(){
     if(!selection.length) return;
-    const toDelete = selection.slice(); // snapshot — selection mutates as we go
+    const toDelete = selection.slice(); // snapshot � selection mutates as we go
     toDelete.forEach(sel=>{
       if(sel.kind === "node"){
         state.nodes = state.nodes.filter(n=>n.id!==sel.id);
@@ -1501,6 +1510,117 @@ html,body{
   }
   $("#btnDeleteSelected").addEventListener("click", deleteSelected);
   $("#btnDeleteMulti").addEventListener("click", deleteSelected);
+  // ---------------------------------------------------------
+  // Copy / Paste
+  // ---------------------------------------------------------
+  const PASTE_OFFSET = 24;
+
+  function copySelected(){
+    if(!selection.length) return;
+    const sel = selection[0];          // copy first selected item
+    const { kind, id } = sel;
+    let src = null;
+    if(kind === "node")        src = findNode(id);
+    else if(kind === "connector")  src = findConnector(id);
+    else if(kind === "annotation") src = findAnnotation(id);
+    if(!src) return;
+    clipboard = { kind, data: JSON.parse(JSON.stringify(src)) };
+    setStatus("Copied " + kind);
+    updateCopyPasteBtns();
+  }
+
+  function pasteClipboard(){
+    if(!clipboard) return;
+    const { kind, data } = clipboard;
+    const newData = JSON.parse(JSON.stringify(data));
+    newData.id = uid();
+
+    if(kind === "node"){
+      newData.x = (newData.x || 0) + PASTE_OFFSET;
+      newData.y = (newData.y || 0) + PASTE_OFFSET;
+      state.nodes.push(newData);
+      selection = [{ kind:"node", id: newData.id }];
+    } else if(kind === "connector"){
+      const fromNode = findNode(data.fromId);
+      const toNode   = findNode(data.toId);
+      if(fromNode && toNode){
+        const newFrom = { ...JSON.parse(JSON.stringify(fromNode)), id: uid(),
+          x: fromNode.x + PASTE_OFFSET, y: fromNode.y + PASTE_OFFSET };
+        const newTo   = { ...JSON.parse(JSON.stringify(toNode)),   id: uid(),
+          x: toNode.x   + PASTE_OFFSET, y: toNode.y   + PASTE_OFFSET };
+        newData.fromId = newFrom.id;
+        newData.toId   = newTo.id;
+        delete newData.fromPt; delete newData.toPt;
+        state.nodes.push(newFrom, newTo);
+        state.connectors.push(newData);
+      } else {
+        if(newData.fromPt){ newData.fromPt = {x: newData.fromPt.x+PASTE_OFFSET, y: newData.fromPt.y+PASTE_OFFSET}; }
+        if(newData.toPt){   newData.toPt   = {x: newData.toPt.x  +PASTE_OFFSET, y: newData.toPt.y  +PASTE_OFFSET}; }
+        state.connectors.push(newData);
+      }
+      selection = [{ kind:"connector", id: newData.id }];
+    } else if(kind === "annotation"){
+      newData.x = (newData.x || 0) + PASTE_OFFSET;
+      newData.y = (newData.y || 0) + PASTE_OFFSET;
+      state.annotations.push(newData);
+      selection = [{ kind:"annotation", id: newData.id }];
+    }
+
+    // shift so repeated pastes cascade diagonally
+    clipboard = { kind, data: JSON.parse(JSON.stringify(newData)) };
+
+    renderAll(); updateInspector(); commit();
+    setStatus("Pasted " + kind);
+  }
+
+  function updateCopyPasteBtns(){
+    const hasSel = selection.length > 0;
+    const copyBtn  = $("#btnCopyEl");
+    const pasteBtn = $("#btnPasteEl");
+    if(copyBtn)  copyBtn.disabled  = !hasSel;
+    if(pasteBtn) pasteBtn.disabled = !clipboard;
+  }
+
+  $("#btnCopyEl").addEventListener("click",  copySelected);
+  $("#btnPasteEl").addEventListener("click", pasteClipboard);
+
+  // ---------------------------------------------------------
+  // Open a previously-saved CPM .html file
+  // ---------------------------------------------------------
+  function openHtmlFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(e.target.result, "text/html");
+        const stateScript = doc.getElementById("embeddedState");
+        const raw = stateScript ? stateScript.textContent.trim() : "";
+        if(!raw) throw new Error("No embedded state found.");
+        const payload = JSON.parse(raw);
+        if(payload.title    !== undefined) $("#diagramTitle").value    = payload.title;
+        if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
+        state = payload.state || payload;
+        selection = [];
+        history = []; historyIndex = -1;
+        renderAll(); updateInspector(); applyCanvasBg();
+        pushHistory();
+        setStatus("Opened: " + file.name);
+      } catch(err){
+        console.error(err);
+        alert("Could not read this file.\nMake sure it is a CPM diagram file saved from this app.");
+        setStatus("Open failed");
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  $("#btnOpenHtml").addEventListener("click", ()=>$("#htmlFileInput").click());
+  $("#htmlFileInput").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(file) openHtmlFile(file);
+    e.target.value = "";
+  });
+
 
   $("#fMultiFill").addEventListener("input", ()=>{
     const color = $("#fMultiFill").value;
@@ -1643,6 +1763,7 @@ html,body{
   function show(el){ el.style.display = "block"; }
 
   function updateInspector(){
+    updateCopyPasteBtns();
     if(selection.length === 0){
       inspectorEmpty.style.display = "block";
       inspectorPanel.style.display = "none";
@@ -1674,7 +1795,7 @@ html,body{
     if(sel.kind === "node"){
       const n = findNode(sel.id);
       if(!n) return;
-      panelTitle.textContent = "Node — " + n.type;
+      panelTitle.textContent = "Node � " + n.type;
       show(fieldEls.label); $("#fLabel").value = n.label || "";
       show(fieldEls.sublabel); $("#fSublabel").value = n.sublabel || "";
       show(fieldEls.datetime); $("#fDatetime").value = (n.datetime||"").replace(/\\n/g,"\n");
@@ -1692,7 +1813,7 @@ html,body{
     else if(sel.kind === "annotation"){
       const a = findAnnotation(sel.id);
       if(!a) return;
-      panelTitle.textContent = "Annotation — " + a.type;
+      panelTitle.textContent = "Annotation � " + a.type;
       if(a.type === "note"){
         show(fieldEls.notebody); $("#fNoteBody").value = a.text;
         show(fieldEls.notecolor); $("#fNoteColor").value = a.color;
@@ -1879,6 +2000,14 @@ html,body{
       e.preventDefault();
       deleteSelected();
     }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="c" && !isTyping(e.target)){
+      e.preventDefault();
+      copySelected();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="v" && !isTyping(e.target)){
+      e.preventDefault();
+      pasteClipboard();
+    }
   });
   window.addEventListener("keyup", (e)=>{
     if(e.code === "Space"){
@@ -1973,7 +2102,7 @@ html,body{
     const filename = (payload.title || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".html";
 
     pickSaveHandle(filename, "html", "CPM diagram (HTML)", "text/html").then(handle=>{
-      setStatus("Building editable HTML file…");
+      setStatus("Building editable HTML file�");
       const docClone = document.documentElement.cloneNode(true);
 
       // strip transient/runtime-only DOM that shouldn't be in a saved snapshot
@@ -1991,10 +2120,10 @@ html,body{
 
       const finish = handle ? writeBlobToHandle(handle, blob) : Promise.resolve(downloadBlobFallback(blob, filename));
       finish.then(()=> setStatus("Saved " + filename))
-            .catch(()=> setStatus("Save failed — try again"));
+            .catch(()=> setStatus("Save failed � try again"));
     }).catch(err=>{
       if(err && err.name === "AbortError"){ setStatus("Save cancelled"); return; }
-      setStatus("Save failed — try again");
+      setStatus("Save failed � try again");
     });
   }
   $("#btnSaveCanvasHtml").addEventListener("click", saveCanvasAsHtml);
@@ -2032,17 +2161,17 @@ html,body{
   // Find the header row + column indices inside a sheet's 2D array (aoa).
   function findGanttHeader(aoa){
     // Order matters: more specific patterns are claimed first so a generic
-    // substring (e.g. "งาน" inside "รหัสงาน") can't steal a column that
+    // substring (e.g. "???" inside "???????") can't steal a column that
     // really belongs to a later, more specific category.
     const wants = [
-      ["code",     ["รหัสงาน", "รหัส", "wbs", "task id", "task code"]],
-      ["start",    ["วันเริ่มต้น", "วันเริ่ม", "start date", "start"]],
-      ["end",      ["วันสิ้นสุด", "วันจบ", "end date", "finish", "end"]],
-      ["duration", ["ระยะเวลา", "duration", "days", "no. of days"]],
-      ["progress", ["ความคืบหน้า", "คืบหน้า", "progress", "% complete", "%"]],
-      ["owner",    ["ผู้รับผิดชอบ", "owner", "assign", "responsible"]],
-      ["phase",    ["phase", "เฟส", "ระยะ"]],
-      ["name",     ["ชื่องาน", "ชื่อกิจกรรม", "กิจกรรม", "งาน / กิจกรรม", "task name", "activity", "task", "name", "งาน"]]
+      ["code",     ["???????", "????", "wbs", "task id", "task code"]],
+      ["start",    ["???????????", "????????", "start date", "start"]],
+      ["end",      ["??????????", "?????", "end date", "finish", "end"]],
+      ["duration", ["????????", "duration", "days", "no. of days"]],
+      ["progress", ["???????????", "???????", "progress", "% complete", "%"]],
+      ["owner",    ["????????????", "owner", "assign", "responsible"]],
+      ["phase",    ["phase", "???", "????"]],
+      ["name",     ["???????", "???????????", "???????", "??? / ???????", "task name", "activity", "task", "name", "???"]]
     ];
     for(let r=0; r<Math.min(aoa.length, 15); r++){
       const row = aoa[r].map(c=> String(c||"").toLowerCase());
@@ -2129,12 +2258,12 @@ html,body{
       rowsUsedInCol[col] = row + 1;
       const x = PHASE_COLUMN_LAYOUT.startX + col * PHASE_COLUMN_LAYOUT.colGap;
       const y = PHASE_COLUMN_LAYOUT.startY + row * PHASE_COLUMN_LAYOUT.rowGap;
-      const label = t.code ? t.code : "•";
+      const label = t.code ? t.code : "�";
       const node = {
         id: uid(), type:"circle", x, y, r: 32,
         fill: progressFill(t.progress),
         label,
-        sublabel: t.name.length > 28 ? t.name.slice(0,26)+"…" : t.name,
+        sublabel: t.name.length > 28 ? t.name.slice(0,26)+"�" : t.name,
         datetime: `${fmtDateShort(t.start)}\\n${fmtDateShort(t.end)}`
       };
       state.nodes.push(node);
@@ -2192,7 +2321,7 @@ html,body{
       alert("Excel import library failed to load. Check your internet connection and try again.");
       return;
     }
-    setStatus("Reading " + file.name + "…");
+    setStatus("Reading " + file.name + "�");
     const reader = new FileReader();
     reader.onload = (e)=>{
       try{
@@ -2201,7 +2330,7 @@ html,body{
         let tasks = null;
         let usedSheet = "";
         // Prefer a sheet literally named like a task-detail sheet, else scan all sheets.
-        const preferredNames = wb.SheetNames.filter(n=> /รายละเอียด|detail|task/i.test(n));
+        const preferredNames = wb.SheetNames.filter(n=> /??????????|detail|task/i.test(n));
         const orderedSheets = [...preferredNames, ...wb.SheetNames.filter(n=> !preferredNames.includes(n))];
         for(const sn of orderedSheets){
           const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:null});
@@ -2214,8 +2343,8 @@ html,body{
           return;
         }
         buildCpmFromTasks(tasks);
-        $("#diagramTitle").value = "CPM — " + file.name.replace(/\.(xlsx|xls)$/i, "");
-        $("#diagramSubtitle").value = `Imported from "${usedSheet}" — ${tasks.length} tasks`;
+        $("#diagramTitle").value = "CPM � " + file.name.replace(/\.(xlsx|xls)$/i, "");
+        $("#diagramSubtitle").value = `Imported from "${usedSheet}" � ${tasks.length} tasks`;
         setStatus(`Imported ${tasks.length} tasks from ${file.name}`);
       } catch(err){
         console.error(err);
@@ -2277,12 +2406,12 @@ html,body{
       runExportPng(handle, filename);
     }).catch(err=>{
       if(err && err.name === "AbortError"){ setStatus("Export cancelled"); return; }
-      setStatus("Export failed — try again");
+      setStatus("Export failed � try again");
     });
   }
 
   function runExportPng(handle, filename){
-    setStatus("Exporting image…");
+    setStatus("Exporting image�");
     const bounds = computeContentBounds();
     const pad = 40;
     const titleHeight = 90;
@@ -2356,12 +2485,12 @@ html,body{
           setStatus("Exported " + filename);
         }).catch(()=>{
           URL.revokeObjectURL(url);
-          setStatus("Export failed — try again");
+          setStatus("Export failed � try again");
         });
       }, "image/png");
     };
     img.onerror = ()=>{
-      setStatus("Export failed — try again");
+      setStatus("Export failed � try again");
       URL.revokeObjectURL(url);
     };
     img.src = url;
