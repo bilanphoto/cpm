@@ -259,29 +259,8 @@ html,body{
   background:var(--chrome-800);
   border-left:1px solid var(--chrome-line);
   overflow-y:auto;
-  overflow-x:hidden;
   padding:18px 16px;
-  position:relative;
-  transition:flex-basis .2s ease, padding .2s ease;
 }
-#inspector.collapsed{
-  flex:0 0 28px;
-  padding:0;
-  overflow:hidden;
-  cursor:pointer;
-}
-#inspector.collapsed > *{ display:none !important; }
-#inspector.collapsed > .collapsed-handle{ display:flex !important; }
-#inspector .collapsed-handle{
-  display:none;
-  position:absolute; top:0; left:0; right:0; bottom:0;
-  align-items:center; justify-content:center;
-}
-.collapsed-handle-bar{
-  width:4px; height:64px; border-radius:3px;
-  background:var(--chrome-line);
-}
-#inspector.collapsed:hover .collapsed-handle-bar{ background:var(--amber); }
 .inspector-empty{ color:var(--chrome-text-dim); font-size:13px; line-height:1.55; text-align:center; padding-top:20px;}
 .inspector-empty-icon{ font-size:30px; color:var(--chrome-line); margin-bottom:14px; }
 
@@ -370,8 +349,9 @@ html,body{
     </div>
 
     <div class="topbar-actions">
-      <button class="btn" id="btnImportExcel" title="Import a Gantt chart .xlsx and auto-build a CPM diagram">Import Excel</button>
-      <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
+      <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file">Save</button>
+      <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file">Open</button>
+      <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <button class="btn" id="btnNewCpm" title="Start a brand new blank CPM diagram">New CPM</button>
       <div class="sep"></div>
       <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
@@ -389,7 +369,11 @@ html,body{
       </label>
       <button class="btn ghost" id="btnClear" title="Clear canvas">🗑</button>
       <div class="sep"></div>
-      <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file">Save</button>
+      <button class="btn" id="btnCopyEl" title="Copy selected element (Ctrl+C)">⎘ Copy</button>
+      <button class="btn" id="btnPasteEl" title="Paste copied element (Ctrl+V)">⎙ Paste</button>
+      <div class="sep"></div>
+      <button class="btn" id="btnImportExcel" title="Import a Gantt chart .xlsx and auto-build a CPM diagram">Import Excel</button>
+      <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
       <button class="btn primary" id="btnExportPng">Export image</button>
     </div>
   </header>
@@ -486,7 +470,6 @@ html,body{
 
     <!-- ============ RIGHT INSPECTOR ============ -->
     <aside id="inspector">
-      <div class="collapsed-handle"><div class="collapsed-handle-bar"></div></div>
       <div class="inspector-empty" id="inspectorEmpty">
         <div class="inspector-empty-icon">◇</div>
         <p>Select an element on the canvas to edit its properties, or pick a tool on the left to start drawing.</p>
@@ -599,28 +582,6 @@ html,body{
           <button class="btn ghost small" id="btnSendBack">Send to back</button>
         </div>
       </div>
-
-      <div class="inspector-panel" id="inspectorMulti" style="display:none">
-        <div class="panel-section">
-          <div class="panel-title" id="multiTitle">3 selected</div>
-          <button class="btn danger small" id="btnDeleteMulti">Delete all</button>
-        </div>
-        <p class="multi-hint">Editing a property here applies it to every selected element it's relevant to.</p>
-
-        <div class="field" data-field="multiFill">
-          <label>Fill color (nodes)</label>
-          <input type="color" id="fMultiFill">
-        </div>
-        <div class="field" data-field="multiLineColor">
-          <label>Line color (connectors)</label>
-          <input type="color" id="fMultiLineColor">
-        </div>
-
-        <div class="panel-section secondary-section">
-          <button class="btn ghost small" id="btnBringFrontMulti">Bring to front</button>
-          <button class="btn ghost small" id="btnSendBackMulti">Send to back</button>
-        </div>
-      </div>
     </aside>
 
   </div>
@@ -657,12 +618,15 @@ html,body{
   const HISTORY_LIMIT = 80;
 
   let currentTool = "select";
-  let selection = [];        // array of {kind:'node'|'connector'|'annotation', id}
+  let selectedId = null;     // {kind:'node'|'connector'|'annotation', id}
   let zoom = 1;
   let gridOn = true;
 
   // drag tracking
   let drag = null;
+
+  // clipboard for copy/paste
+  let clipboard = null; // { kind:'node'|'connector'|'annotation', data: {...} }
 
   // ---------------------------------------------------------
   // DOM refs
@@ -733,7 +697,7 @@ html,body{
   }
   function restoreSnapshot(s){
     state = JSON.parse(s);
-    selection = [];
+    selectedId = null;
     renderAll();
     updateInspector();
   }
@@ -822,7 +786,7 @@ html,body{
     layerNodes.innerHTML = "";
     state.nodes.forEach(n=>{
       const g = svgElCreate("g", {class:"cpm-node", "data-id": n.id, transform:`translate(${n.x},${n.y})`});
-      if(isSelected("node", n.id)) g.classList.add("selected");
+      if(selectedId && selectedId.kind==="node" && selectedId.id===n.id) g.classList.add("selected");
 
       let shape;
       const r = n.r;
@@ -1023,7 +987,7 @@ html,body{
       const path = computeConnectorPath(start, end, excludeIds);
 
       const g = svgElCreate("g", {class:"cpm-connector", "data-id": c.id});
-      if(isSelected("connector", c.id)) g.classList.add("selected");
+      if(selectedId && selectedId.kind==="connector" && selectedId.id===c.id) g.classList.add("selected");
 
       const connColor = c.color || "#c0392b";
       const hit = svgElCreate("path", {d:path.d, class:"cpm-connector-hit", fill:"none"});
@@ -1074,7 +1038,7 @@ html,body{
       else if(a.type === "text") g = renderTextEl(a);
       if(g){
         g.setAttribute("data-id", a.id);
-        if(isSelected("annotation", a.id)) g.classList.add("selected");
+        if(selectedId && selectedId.kind==="annotation" && selectedId.id===a.id) g.classList.add("selected");
         g.addEventListener("mousedown", (e)=> onAnnotationMouseDown(e, a));
         layerAnnotations.appendChild(g);
       }
@@ -1216,32 +1180,13 @@ html,body{
   // ---------------------------------------------------------
   // Selection
   // ---------------------------------------------------------
-  function isSelected(kind, id){
-    return selection.some(s=> s.kind===kind && s.id===id);
-  }
-  function currentSingle(){
-    return selection.length === 1 ? selection[0] : null;
-  }
-  function findInSelection(kind, id){
-    return selection.findIndex(s=> s.kind===kind && s.id===id);
-  }
-  // Replace the whole selection with a single item (plain click, no modifier).
   function selectElement(kind, id){
-    selection = [{kind, id}];
-    renderAll();
-    updateInspector();
-  }
-  // Add/remove a single item from the existing selection (shift/ctrl click).
-  function toggleSelection(kind, id){
-    lastClickInfo = null; // a modifier-click should never be mistaken for half of a double-click
-    const idx = findInSelection(kind, id);
-    if(idx >= 0) selection.splice(idx, 1);
-    else selection.push({kind, id});
+    selectedId = {kind, id};
     renderAll();
     updateInspector();
   }
   function deselectAll(){
-    selection = [];
+    selectedId = null;
     renderAll();
     updateInspector();
   }
@@ -1271,12 +1216,6 @@ html,body{
     }
     if(currentTool !== "select") return;
 
-    const modifier = e.shiftKey || e.ctrlKey || e.metaKey;
-    if(modifier){
-      toggleSelection("node", node.id);
-      return; // don't start a drag on a modifier-click; that's purely for building the selection
-    }
-
     const isDbl = checkManualDoubleClick("node", node.id);
     if(isDbl){
       selectElement("node", node.id);
@@ -1284,8 +1223,11 @@ html,body{
       return;
     }
 
-    if(!isSelected("node", node.id)) selectElement("node", node.id);
-    startGroupDrag(e);
+    selectElement("node", node.id);
+    const start = getCanvasPoint(e);
+    drag = { type:"node", id:node.id, origX:node.x, origY:node.y, startX:start.x, startY:start.y };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
   }
 
   function onAnnotationMouseDown(e, a){
@@ -1293,32 +1235,23 @@ html,body{
     if(currentTool === "erase"){ deleteAnnotation(a.id); return; }
     if(currentTool !== "select") return;
 
-    const modifier = e.shiftKey || e.ctrlKey || e.metaKey;
-    if(modifier){
-      toggleSelection("annotation", a.id);
-      return;
-    }
-
     if(checkManualDoubleClick("annotation", a.id)){
       selectElement("annotation", a.id);
       editAnnotationInline(a);
       return;
     }
 
-    if(!isSelected("annotation", a.id)) selectElement("annotation", a.id);
-    startGroupDrag(e);
+    selectElement("annotation", a.id);
+    const start = getCanvasPoint(e);
+    drag = { type:"annotation", id:a.id, origX:a.x, origY:a.y, startX:start.x, startY:start.y };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
   }
 
   function onConnectorMouseDown(e, c){
     e.stopPropagation();
     if(currentTool === "erase"){ deleteConnector(c.id); return; }
     if(currentTool !== "select") return;
-
-    const modifier = e.shiftKey || e.ctrlKey || e.metaKey;
-    if(modifier){
-      toggleSelection("connector", c.id);
-      return;
-    }
 
     if(checkManualDoubleClick("connector", c.id)){
       selectElement("connector", c.id);
@@ -1328,24 +1261,6 @@ html,body{
     }
 
     selectElement("connector", c.id);
-  }
-
-  function startGroupDrag(e){
-    const start = getCanvasPoint(e);
-    const items = [];
-    selection.forEach(sel=>{
-      if(sel.kind === "node"){
-        const n = findNode(sel.id);
-        if(n) items.push({kind:"node", id:n.id, origX:n.x, origY:n.y});
-      } else if(sel.kind === "annotation"){
-        const a = findAnnotation(sel.id);
-        if(a) items.push({kind:"annotation", id:a.id, origX:a.x, origY:a.y});
-      }
-    });
-    if(!items.length) return;
-    drag = { type:"group", items, startX:start.x, startY:start.y };
-    window.addEventListener("mousemove", onWindowMouseMove);
-    window.addEventListener("mouseup", onWindowMouseUp);
   }
 
   function onWindowMouseMove(e){
@@ -1365,17 +1280,6 @@ html,body{
       a.x = drag.origX + dx;
       a.y = drag.origY + dy;
       renderAll();
-    } else if(drag.type === "group"){
-      drag.items.forEach(item=>{
-        if(item.kind === "node"){
-          const n = findNode(item.id);
-          if(n){ n.x = item.origX + dx; n.y = item.origY + dy; }
-        } else if(item.kind === "annotation"){
-          const a = findAnnotation(item.id);
-          if(a){ a.x = item.origX + dx; a.y = item.origY + dy; }
-        }
-      });
-      renderAll();
     } else if(drag.type === "pan"){
       canvasWrap.scrollLeft = drag.scrollLeft0 - (e.clientX - drag.clientX0);
       canvasWrap.scrollTop = drag.scrollTop0 - (e.clientY - drag.clientY0);
@@ -1385,7 +1289,7 @@ html,body{
   }
 
   function onWindowMouseUp(e){
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group")) commit();
+    if(drag && (drag.type === "node" || drag.type === "annotation")) commit();
     if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
@@ -1458,98 +1362,109 @@ html,body{
   // ---------------------------------------------------------
   // Delete
   // ---------------------------------------------------------
-  function removeFromSelection(kind, id){
-    const idx = findInSelection(kind, id);
-    if(idx >= 0) selection.splice(idx, 1);
-  }
   function deleteNode(id){
     state.nodes = state.nodes.filter(n=>n.id!==id);
     state.connectors = state.connectors.filter(c=> c.fromId!==id && c.toId!==id);
-    removeFromSelection("node", id);
+    if(selectedId && selectedId.id===id) selectedId=null;
     renderAll(); updateInspector(); commit();
     setStatus("Node deleted");
   }
   function deleteConnector(id){
     state.connectors = state.connectors.filter(c=>c.id!==id);
-    removeFromSelection("connector", id);
+    if(selectedId && selectedId.id===id) selectedId=null;
     renderAll(); updateInspector(); commit();
     setStatus("Connector deleted");
   }
   function deleteAnnotation(id){
     state.annotations = state.annotations.filter(a=>a.id!==id);
-    removeFromSelection("annotation", id);
+    if(selectedId && selectedId.id===id) selectedId=null;
     renderAll(); updateInspector(); commit();
     setStatus("Annotation deleted");
   }
   function deleteSelected(){
-    if(!selection.length) return;
-    const toDelete = selection.slice(); // snapshot — selection mutates as we go
-    toDelete.forEach(sel=>{
-      if(sel.kind === "node"){
-        state.nodes = state.nodes.filter(n=>n.id!==sel.id);
-        state.connectors = state.connectors.filter(c=> c.fromId!==sel.id && c.toId!==sel.id);
-      } else if(sel.kind === "connector"){
-        state.connectors = state.connectors.filter(c=>c.id!==sel.id);
-      } else if(sel.kind === "annotation"){
-        state.annotations = state.annotations.filter(a=>a.id!==sel.id);
-      }
-    });
-    const count = toDelete.length;
-    selection = [];
-    renderAll(); updateInspector(); commit();
-    setStatus(count > 1 ? (count + " elements deleted") : "Element deleted");
+    if(!selectedId) return;
+    if(selectedId.kind==="node") deleteNode(selectedId.id);
+    else if(selectedId.kind==="connector") deleteConnector(selectedId.id);
+    else if(selectedId.kind==="annotation") deleteAnnotation(selectedId.id);
   }
   $("#btnDeleteSelected").addEventListener("click", deleteSelected);
-  $("#btnDeleteMulti").addEventListener("click", deleteSelected);
 
-  $("#fMultiFill").addEventListener("input", ()=>{
-    const color = $("#fMultiFill").value;
-    selection.forEach(sel=>{
-      if(sel.kind === "node"){
-        const n = findNode(sel.id);
-        if(n) n.fill = color;
-      }
-    });
-    renderAll();
-  });
-  $("#fMultiFill").addEventListener("change", ()=> commit());
+  // ---------------------------------------------------------
+  // Copy / Paste
+  // ---------------------------------------------------------
+  const PASTE_OFFSET = 24; // px offset per paste so items don't stack exactly
 
-  $("#fMultiLineColor").addEventListener("input", ()=>{
-    const color = $("#fMultiLineColor").value;
-    selection.forEach(sel=>{
-      if(sel.kind === "connector"){
-        const c = findConnector(sel.id);
-        if(c) c.color = color;
-      }
-    });
-    renderAll();
-  });
-  $("#fMultiLineColor").addEventListener("change", ()=> commit());
+  function copySelected(){
+    if(!selectedId) return;
+    const { kind, id } = selectedId;
+    let src = null;
+    if(kind === "node")        src = findNode(id);
+    else if(kind === "connector")  src = findConnector(id);
+    else if(kind === "annotation") src = findAnnotation(id);
+    if(!src) return;
+    clipboard = { kind, data: JSON.parse(JSON.stringify(src)) };
+    setStatus("Copied " + kind);
+    updateCopyPasteBtns();
+  }
 
-  $("#btnBringFrontMulti").addEventListener("click", ()=>{
-    selection.forEach(sel=>{
-      if(sel.kind === "node"){
-        const i = state.nodes.findIndex(n=>n.id===sel.id);
-        if(i>=0){ const [n] = state.nodes.splice(i,1); state.nodes.push(n); }
-      } else if(sel.kind === "annotation"){
-        const i = state.annotations.findIndex(a=>a.id===sel.id);
-        if(i>=0){ const [a] = state.annotations.splice(i,1); state.annotations.push(a); }
+  function pasteClipboard(){
+    if(!clipboard) return;
+    const { kind, data } = clipboard;
+    const newData = JSON.parse(JSON.stringify(data));
+    newData.id = uid();
+
+    if(kind === "node"){
+      newData.x = (newData.x || 0) + PASTE_OFFSET;
+      newData.y = (newData.y || 0) + PASTE_OFFSET;
+      state.nodes.push(newData);
+      selectedId = { kind:"node", id: newData.id };
+    } else if(kind === "connector"){
+      // connectors reference fromId/toId — paste as a standalone floating connector
+      // (detached: both endpoints become free-floating points offset from originals)
+      const fromNode = findNode(data.fromId);
+      const toNode   = findNode(data.toId);
+      if(fromNode && toNode){
+        // duplicate both nodes + connector
+        const newFrom = { ...JSON.parse(JSON.stringify(fromNode)), id: uid(),
+          x: fromNode.x + PASTE_OFFSET, y: fromNode.y + PASTE_OFFSET };
+        const newTo   = { ...JSON.parse(JSON.stringify(toNode)),   id: uid(),
+          x: toNode.x   + PASTE_OFFSET, y: toNode.y   + PASTE_OFFSET };
+        newData.fromId = newFrom.id;
+        newData.toId   = newTo.id;
+        delete newData.fromPt; delete newData.toPt;
+        state.nodes.push(newFrom, newTo);
+        state.connectors.push(newData);
+        selectedId = { kind:"connector", id: newData.id };
+      } else {
+        // floating connector — just paste with offset free points
+        if(newData.fromPt){ newData.fromPt = {x: newData.fromPt.x+PASTE_OFFSET, y: newData.fromPt.y+PASTE_OFFSET}; }
+        if(newData.toPt){   newData.toPt   = {x: newData.toPt.x  +PASTE_OFFSET, y: newData.toPt.y  +PASTE_OFFSET}; }
+        state.connectors.push(newData);
+        selectedId = { kind:"connector", id: newData.id };
       }
-    });
-    renderAll(); commit();
-  });
-  $("#btnSendBackMulti").addEventListener("click", ()=>{
-    selection.forEach(sel=>{
-      if(sel.kind === "node"){
-        const i = state.nodes.findIndex(n=>n.id===sel.id);
-        if(i>=0){ const [n] = state.nodes.splice(i,1); state.nodes.unshift(n); }
-      } else if(sel.kind === "annotation"){
-        const i = state.annotations.findIndex(a=>a.id===sel.id);
-        if(i>=0){ const [a] = state.annotations.splice(i,1); state.annotations.unshift(a); }
-      }
-    });
-    renderAll(); commit();
-  });
+    } else if(kind === "annotation"){
+      newData.x = (newData.x || 0) + PASTE_OFFSET;
+      newData.y = (newData.y || 0) + PASTE_OFFSET;
+      state.annotations.push(newData);
+      selectedId = { kind:"annotation", id: newData.id };
+    }
+
+    // shift clipboard offset so repeated Ctrl+V cascades diagonally
+    clipboard = { kind, data: JSON.parse(JSON.stringify(newData)) };
+    // restore original id in clipboard data for next paste
+    clipboard.data.id = newData.id; // next paste will get a new uid()
+
+    renderAll(); updateInspector(); commit();
+    setStatus("Pasted " + kind);
+  }
+
+  function updateCopyPasteBtns(){
+    $("#btnCopyEl").disabled  = !selectedId;
+    $("#btnPasteEl").disabled = !clipboard;
+  }
+
+  $("#btnCopyEl").addEventListener("click",  copySelected);
+  $("#btnPasteEl").addEventListener("click", pasteClipboard);
 
   // ---------------------------------------------------------
   // Inline editing (double click)
@@ -1612,16 +1527,9 @@ html,body{
   // ---------------------------------------------------------
   // Inspector binding
   // ---------------------------------------------------------
-  const inspectorAside = $("#inspector");
   const inspectorEmpty = $("#inspectorEmpty");
   const inspectorPanel = $("#inspectorPanel");
-  const inspectorMulti = $("#inspectorMulti");
   const panelTitle = $("#panelTitle");
-  const multiTitle = $("#multiTitle");
-
-  function setPanelExpanded(expanded){
-    inspectorAside.classList.toggle("collapsed", !expanded);
-  }
 
   const fieldEls = {
     label: document.querySelector('[data-field="label"]'),
@@ -1643,36 +1551,18 @@ html,body{
   function show(el){ el.style.display = "block"; }
 
   function updateInspector(){
-    if(selection.length === 0){
+    updateCopyPasteBtns();
+    if(!selectedId){
       inspectorEmpty.style.display = "block";
       inspectorPanel.style.display = "none";
-      inspectorMulti.style.display = "none";
-      setPanelExpanded(false);
       return;
     }
-    setPanelExpanded(true);
-
-    if(selection.length > 1){
-      inspectorEmpty.style.display = "none";
-      inspectorPanel.style.display = "none";
-      inspectorMulti.style.display = "block";
-      multiTitle.textContent = selection.length + " selected";
-
-      const hasNodes = selection.some(s=> s.kind === "node");
-      const hasConnectors = selection.some(s=> s.kind === "connector");
-      document.querySelector('[data-field="multiFill"]').style.display = hasNodes ? "block" : "none";
-      document.querySelector('[data-field="multiLineColor"]').style.display = hasConnectors ? "block" : "none";
-      return;
-    }
-
     inspectorEmpty.style.display = "none";
     inspectorPanel.style.display = "block";
-    inspectorMulti.style.display = "none";
     hideAllFields();
 
-    const sel = selection[0];
-    if(sel.kind === "node"){
-      const n = findNode(sel.id);
+    if(selectedId.kind === "node"){
+      const n = findNode(selectedId.id);
       if(!n) return;
       panelTitle.textContent = "Node — " + n.type;
       show(fieldEls.label); $("#fLabel").value = n.label || "";
@@ -1680,8 +1570,8 @@ html,body{
       show(fieldEls.datetime); $("#fDatetime").value = (n.datetime||"").replace(/\\n/g,"\n");
       show(fieldEls.fillrow); $("#fFill").value = n.fill || "#ffffff"; $("#fSize").value = n.r;
     }
-    else if(sel.kind === "connector"){
-      const c = findConnector(sel.id);
+    else if(selectedId.kind === "connector"){
+      const c = findConnector(selectedId.id);
       if(!c) return;
       panelTitle.textContent = "Connector";
       show(fieldEls.task); $("#fTask").value = c.task || "";
@@ -1689,8 +1579,8 @@ html,body{
       show(fieldEls.connswatches); syncConnSwatches(c.color || "#c0392b");
       show(fieldEls.connstyle); $("#fLineColor").value = c.color || "#c0392b"; $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
     }
-    else if(sel.kind === "annotation"){
-      const a = findAnnotation(sel.id);
+    else if(selectedId.kind === "annotation"){
+      const a = findAnnotation(selectedId.id);
       if(!a) return;
       panelTitle.textContent = "Annotation — " + a.type;
       if(a.type === "note"){
@@ -1717,7 +1607,7 @@ html,body{
 
   function bindLive(elId, applyFn){
     $(elId).addEventListener("input", ()=>{
-      if(!currentSingle()) return;
+      if(!selectedId) return;
       applyFn();
       renderAll();
     });
@@ -1725,19 +1615,18 @@ html,body{
   }
 
   bindLive("#fLabel", ()=>{
-    const sel = currentSingle();
-    if(sel.kind==="node"){
-      findNode(sel.id).label = $("#fLabel").value;
+    if(selectedId.kind==="node"){
+      findNode(selectedId.id).label = $("#fLabel").value;
       state.connectors.forEach(c=>{
-        if(c.fromId === sel.id) propagateFromConnector(c.id);
+        if(c.fromId === selectedId.id) propagateFromConnector(c.id);
       });
     }
-    else if(sel.kind==="annotation"){ findAnnotation(sel.id).text = $("#fLabel").value; }
+    else if(selectedId.kind==="annotation"){ findAnnotation(selectedId.id).text = $("#fLabel").value; }
   });
-  bindLive("#fSublabel", ()=>{ findNode(currentSingle().id).sublabel = $("#fSublabel").value; });
-  bindLive("#fDatetime", ()=>{ findNode(currentSingle().id).datetime = $("#fDatetime").value.replace(/\n/g,"\\n"); });
-  bindLive("#fFill", ()=>{ findNode(currentSingle().id).fill = $("#fFill").value; });
-  bindLive("#fSize", ()=>{ findNode(currentSingle().id).r = parseInt($("#fSize").value,10); });
+  bindLive("#fSublabel", ()=>{ findNode(selectedId.id).sublabel = $("#fSublabel").value; });
+  bindLive("#fDatetime", ()=>{ findNode(selectedId.id).datetime = $("#fDatetime").value.replace(/\n/g,"\\n"); });
+  bindLive("#fFill", ()=>{ findNode(selectedId.id).fill = $("#fFill").value; });
+  bindLive("#fSize", ()=>{ findNode(selectedId.id).r = parseInt($("#fSize").value,10); });
 
   // ---------------------------------------------------------
   // Duration auto-calc: when a connector's duration is a plain number,
@@ -1789,14 +1678,13 @@ html,body{
     });
   }
 
-  bindLive("#fTask", ()=>{ findConnector(currentSingle().id).task = $("#fTask").value; });
+  bindLive("#fTask", ()=>{ findConnector(selectedId.id).task = $("#fTask").value; });
   bindLive("#fDuration", ()=>{
-    const id = currentSingle().id;
-    findConnector(id).duration = $("#fDuration").value;
-    propagateFromConnector(id);
+    findConnector(selectedId.id).duration = $("#fDuration").value;
+    propagateFromConnector(selectedId.id);
   });
-  bindLive("#fLineColor", ()=>{ findConnector(currentSingle().id).color = $("#fLineColor").value; syncConnSwatches($("#fLineColor").value); });
-  bindLive("#fLineStyle", ()=>{ findConnector(currentSingle().id).dashed = $("#fLineStyle").value === "dashed"; });
+  bindLive("#fLineColor", ()=>{ findConnector(selectedId.id).color = $("#fLineColor").value; syncConnSwatches($("#fLineColor").value); });
+  bindLive("#fLineStyle", ()=>{ findConnector(selectedId.id).dashed = $("#fLineStyle").value === "dashed"; });
 
   function syncConnSwatches(color){
     const norm = (color||"").toLowerCase();
@@ -1806,9 +1694,8 @@ html,body{
     });
   }
   function applyConnColor(color){
-    const sel = currentSingle();
-    if(!sel || sel.kind !== "connector") return;
-    findConnector(sel.id).color = color;
+    if(!selectedId || selectedId.kind !== "connector") return;
+    findConnector(selectedId.id).color = color;
     $("#fLineColor").value = color;
     syncConnSwatches(color);
     renderAll(); updateInspector(); commit();
@@ -1816,14 +1703,13 @@ html,body{
   $("#connSwatchRed").addEventListener("click", ()=> applyConnColor("#c0392b"));
   $("#connSwatchGreen").addEventListener("click", ()=> applyConnColor("#3a9d4e"));
 
-  bindLive("#fNoteBody", ()=>{ findAnnotation(currentSingle().id).text = $("#fNoteBody").value; });
-  bindLive("#fNoteColor", ()=>{ findAnnotation(currentSingle().id).color = $("#fNoteColor").value; });
-  bindLive("#fTextColor", ()=>{ findAnnotation(currentSingle().id).textColor = $("#fTextColor").value; });
-  bindLive("#fFontSize", ()=>{ findAnnotation(currentSingle().id).fontSize = parseInt($("#fFontSize").value,10); });
-  bindLive("#fBold", ()=>{ findAnnotation(currentSingle().id).bold = $("#fBold").checked; });
+  bindLive("#fNoteBody", ()=>{ findAnnotation(selectedId.id).text = $("#fNoteBody").value; });
+  bindLive("#fNoteColor", ()=>{ findAnnotation(selectedId.id).color = $("#fNoteColor").value; });
+  bindLive("#fTextColor", ()=>{ findAnnotation(selectedId.id).textColor = $("#fTextColor").value; });
+  bindLive("#fFontSize", ()=>{ findAnnotation(selectedId.id).fontSize = parseInt($("#fFontSize").value,10); });
+  bindLive("#fBold", ()=>{ findAnnotation(selectedId.id).bold = $("#fBold").checked; });
 
   $("#btnBringFront").addEventListener("click", ()=>{
-    const selectedId = currentSingle();
     if(!selectedId) return;
     if(selectedId.kind === "node"){
       const i = state.nodes.findIndex(n=>n.id===selectedId.id);
@@ -1835,7 +1721,6 @@ html,body{
     renderAll(); commit();
   });
   $("#btnSendBack").addEventListener("click", ()=>{
-    const selectedId = currentSingle();
     if(!selectedId) return;
     if(selectedId.kind === "node"){
       const i = state.nodes.findIndex(n=>n.id===selectedId.id);
@@ -1875,9 +1760,17 @@ html,body{
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="y" && !isTyping(e.target)){
       e.preventDefault(); redo();
     }
-    if((e.key === "Delete" || e.key === "Backspace") && !isTyping(e.target) && selection.length){
+    if((e.key === "Delete" || e.key === "Backspace") && !isTyping(e.target) && selectedId){
       e.preventDefault();
       deleteSelected();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="c" && !isTyping(e.target)){
+      e.preventDefault();
+      copySelected();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="v" && !isTyping(e.target)){
+      e.preventDefault();
+      pasteClipboard();
     }
   });
   window.addEventListener("keyup", (e)=>{
@@ -1945,7 +1838,7 @@ html,body{
     if(!confirm("Clear the entire canvas? This cannot be undone after closing this dialog.")) return;
     const keepBg = state.canvasBg;
     state = {nodes:[], connectors:[], annotations:[], nextId:1, canvasBg:keepBg};
-    selection = [];
+    selectedId = null;
     renderAll(); updateInspector(); applyCanvasBg(); commit();
     setStatus("Canvas cleared");
   });
@@ -1956,7 +1849,7 @@ html,body{
   $("#btnNewCpm").addEventListener("click", ()=>{
     if(!confirm("Start a new CPM diagram? Any unsaved changes to the current canvas will be lost.")) return;
     state = {nodes:[], connectors:[], annotations:[], nextId:1};
-    selection = [];
+    selectedId = null;
     $("#diagramTitle").value = "NEW CPM DIAGRAM";
     $("#diagramSubtitle").value = "";
     history = [];
@@ -1998,6 +1891,43 @@ html,body{
     });
   }
   $("#btnSaveCanvasHtml").addEventListener("click", saveCanvasAsHtml);
+
+  // ---------------------------------------------------------
+  // Open a previously-saved CPM .html file
+  // ---------------------------------------------------------
+  function openHtmlFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(e.target.result, "text/html");
+        const stateScript = doc.getElementById("embeddedState");
+        const raw = stateScript ? stateScript.textContent.trim() : "";
+        if(!raw) throw new Error("No embedded state found in this file.");
+        const payload = JSON.parse(raw);
+        if(payload.title !== undefined) $("#diagramTitle").value = payload.title;
+        if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
+        state = payload.state || payload;
+        selectedId = null;
+        history = []; historyIndex = -1;
+        renderAll(); updateInspector(); applyCanvasBg();
+        pushHistory();
+        setStatus("Opened: " + file.name);
+      } catch(err){
+        console.error(err);
+        alert("Could not read this file.\nMake sure it is a CPM diagram file saved from this app.");
+        setStatus("Open failed");
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  $("#btnOpenHtml").addEventListener("click", ()=>$("#htmlFileInput").click());
+  $("#htmlFileInput").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(file) openHtmlFile(file);
+    e.target.value = "";
+  });
 
   // ---------------------------------------------------------
   // Import Excel Gantt chart -> auto-build CPM diagram
@@ -2177,7 +2107,7 @@ html,body{
       if(!hasSuccessor.has(t._nodeId)) addConnectorSilent(t._nodeId, endNode.id, "");
     });
 
-    selection = [];
+    selectedId = null;
     renderAll(); updateInspector(); applyCanvasBg(); commit();
   }
 
@@ -2407,7 +2337,7 @@ html,body{
         if(payload.title !== undefined) $("#diagramTitle").value = payload.title;
         if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
         state = payload.state || payload;
-        selection = [];
+        selectedId = null;
         renderAll(); updateInspector(); applyCanvasBg();
         history = []; historyIndex = -1;
         pushHistory();
@@ -2419,7 +2349,6 @@ html,body{
     }
     seedExample();
     applyCanvasBg();
-    updateInspector();
   })();
 
 })();
