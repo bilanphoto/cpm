@@ -1099,14 +1099,14 @@ html,body{
       g.appendChild(label);
 
       if(n.sublabel){
-        const sub = svgElCreate("text", {class:"cpm-node-sublabel", x:0, y:-(r+14), "text-anchor":"middle", "dominant-baseline":"central"});
+        const sub = svgElCreate("text", {class:"cpm-node-sublabel", x:0, y:-(r+14), "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.sublabelColor || '#1c2530'}`});
         sub.textContent = n.sublabel;
         g.appendChild(sub);
       }
       if(n.datetime){
         const lines = n.datetime.split("\\n");
         lines.forEach((ln,i)=>{
-          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:0, y:r+22+i*16, "text-anchor":"middle", "dominant-baseline":"central"});
+          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:0, y:r+22+i*16, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.datetimeColor || '#1d4ed8'}`});
           dt.textContent = ln;
           g.appendChild(dt);
         });
@@ -1474,17 +1474,81 @@ html,body{
     return g;
   }
 
+  function getPinDateTime(a) {
+    if (!a.datetimeDate) return null;
+    const timeStr = a.datetimeTime || "00:00";
+    return new Date(`${a.datetimeDate}T${timeStr}`);
+  }
+
+  function formatPinDateTimeText(a) {
+    if (!a.datetimeDate) return "";
+    const dtObj = getPinDateTime(a);
+    if (!dtObj || isNaN(dtObj.getTime())) return "";
+    return formatNodeDateTimeText(dtObj);
+  }
+
   function renderPinEl(a){
     const g = svgElCreate("g", {class:"cpm-pin", transform:`translate(${a.x},${a.y})`});
+    
+    // Pin body
+    const bodyG = svgElCreate("g", {class:"cpm-pin-body", cursor:"move"});
     const circle = svgElCreate("circle", {cx:0, cy:0, r:9, fill:"#e91e8c", stroke:"#7a0f4d", "stroke-width":1.6});
     const stem = svgElCreate("line", {x1:0,y1:7,x2:0,y2:34, stroke:"#e91e8c", "stroke-width":3});
-    g.appendChild(stem);
-    g.appendChild(circle);
+    bodyG.appendChild(stem);
+    bodyG.appendChild(circle);
+    g.appendChild(bodyG);
+
+    // Text & DateTime Group
+    const tx = a.textOffsetX !== undefined ? a.textOffsetX : 14;
+    const ty = a.textOffsetY !== undefined ? a.textOffsetY : 4;
+    
+    const textGroup = svgElCreate("g", {
+      class: "cpm-pin-text-group",
+      transform: `translate(${tx}, ${ty})`
+    });
+
+    let hasContent = false;
+    let currentY = 0;
+    const fz = a.fontSize || 12;
+
     if(a.text){
-      const t = svgElCreate("text", {class:"cpm-note-text", x:14, y:4, style:`font-size:${a.fontSize||12}px; fill:${textColorToken(a.textColor||'black')}; font-weight:${a.bold?700:600}`});
+      const t = svgElCreate("text", {
+        class: "cpm-note-text",
+        x: 0,
+        y: currentY,
+        style: `font-size:${fz}px; fill:${textColorToken(a.textColor||'black')}; font-weight:${a.bold?700:600}; pointer-events:all; cursor:move;`
+      });
       t.textContent = a.text;
-      g.appendChild(t);
+      textGroup.appendChild(t);
+      hasContent = true;
+      currentY += fz + 4;
     }
+
+    const dtText = formatPinDateTimeText(a);
+    if(dtText){
+      const lines = dtText.split("\\n");
+      lines.forEach((ln, i)=>{
+        const dt = svgElCreate("text", {
+          class: "cpm-node-datetime",
+          x: 0,
+          y: currentY,
+          style: `font-size:${fz}px; fill:${a.datetimeColor || '#1d4ed8'}; font-weight:600; text-anchor:start; dominant-baseline:auto; pointer-events:all; cursor:move;`
+        });
+        dt.textContent = ln;
+        textGroup.appendChild(dt);
+        hasContent = true;
+        currentY += fz + 4;
+      });
+    }
+
+    if(hasContent){
+      textGroup.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        startPinTextDrag(e, a);
+      });
+      g.appendChild(textGroup);
+    }
+
     return g;
   }
 
@@ -1722,6 +1786,22 @@ html,body{
     window.addEventListener("mouseup", onWindowMouseUp);
   }
 
+  function startPinTextDrag(e, a){
+    if (currentTool !== "select") return;
+    selectElement("annotation", a.id);
+    const start = getCanvasPoint(e);
+    drag = {
+      type: "pin-text",
+      id: a.id,
+      startX: start.x,
+      startY: start.y,
+      origOffsetX: a.textOffsetX !== undefined ? a.textOffsetX : 14,
+      origOffsetY: a.textOffsetY !== undefined ? a.textOffsetY : 4
+    };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+  }
+
   function onWindowMouseMove(e){
     if(!drag) return;
     const pt = getCanvasPoint(e);
@@ -1757,12 +1837,19 @@ html,body{
       drawConnectorPreview(drag.fromId, pt);
     } else if(drag.type === "connect-temp-from-conn"){
       drawConnectorPreviewFromConnector(drag.fromConnectorId, pt);
+    } else if(drag.type === "pin-text"){
+      const a = findAnnotation(drag.id);
+      if(a){
+        a.textOffsetX = drag.origOffsetX + dx;
+        a.textOffsetY = drag.origOffsetY + dy;
+        renderAll();
+      }
     }
 
   }
 
   function onWindowMouseUp(e){
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group")) commit();
+    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text")) commit();
     if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
@@ -2266,7 +2353,9 @@ html,body{
     } else if(a.type === "text"){
       openInlineEditor(a.x, a.y, Math.max(a.w,120), a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:a.fontSize||16, bold:a.bold});
     } else if(a.type === "pin"){
-      openInlineEditor(a.x+14, a.y-8, 160, a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:12});
+      const tx = a.textOffsetX !== undefined ? a.textOffsetX : 14;
+      const ty = a.textOffsetY !== undefined ? a.textOffsetY : 4;
+      openInlineEditor(a.x + tx, a.y + ty - 12, 160, a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:12});
     }
   }
 
@@ -2414,9 +2503,23 @@ html,body{
         show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
         show(fieldEls.bold); $("#fBold").checked = !!a.bold;
       } else if(a.type === "pin"){
+        $("#labelFieldName").textContent = "Text";
         show(fieldEls.label); $("#fLabel").value = a.text;
         show(fieldEls.textcolor); $("#fTextColor").value = a.textColor || "black";
         show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize || 12;
+        
+        show(fieldEls.datetime);
+        const autoCheckbox = $("#fNodeAutoTime");
+        const dateInput = $("#fNodeDate");
+        const timeInput = $("#fNodeTime");
+        const colorInput = $("#fDatetimeColor");
+        autoCheckbox.disabled = true;
+        autoCheckbox.checked = false;
+        dateInput.disabled = false;
+        timeInput.disabled = false;
+        dateInput.value = a.datetimeDate || "";
+        timeInput.value = a.datetimeTime || "";
+        colorInput.value = a.datetimeColor || "#1d4ed8";
       }
     }
   }
@@ -2442,16 +2545,46 @@ html,body{
   });
   bindLive("#fSublabel", ()=>{ findNode(currentSingle().id).sublabel = $("#fSublabel").value; });
   bindLive("#fSublabelColor", ()=>{ findNode(currentSingle().id).sublabelColor = $("#fSublabelColor").value; });
-  bindLive("#fDatetimeColor", ()=>{ findNode(currentSingle().id).datetimeColor = $("#fDatetimeColor").value; });
+  bindLive("#fDatetimeColor", ()=>{
+    const sel = currentSingle();
+    if (!sel) return;
+    if (sel.kind === "node") {
+      findNode(sel.id).datetimeColor = $("#fDatetimeColor").value;
+    } else if (sel.kind === "annotation") {
+      findAnnotation(sel.id).datetimeColor = $("#fDatetimeColor").value;
+    }
+  });
   bindLive("#fNodeDate", ()=>{
-    const n = findNode(currentSingle().id);
-    n.datetimeDate = $("#fNodeDate").value;
-    recalculateDiagramTimes();
+    const sel = currentSingle();
+    if (!sel) return;
+    if (sel.kind === "node") {
+      const n = findNode(sel.id);
+      if (n) {
+        n.datetimeDate = $("#fNodeDate").value;
+        recalculateDiagramTimes();
+      }
+    } else if (sel.kind === "annotation") {
+      const a = findAnnotation(sel.id);
+      if (a) {
+        a.datetimeDate = $("#fNodeDate").value;
+      }
+    }
   });
   bindLive("#fNodeTime", ()=>{
-    const n = findNode(currentSingle().id);
-    n.datetimeTime = $("#fNodeTime").value;
-    recalculateDiagramTimes();
+    const sel = currentSingle();
+    if (!sel) return;
+    if (sel.kind === "node") {
+      const n = findNode(sel.id);
+      if (n) {
+        n.datetimeTime = $("#fNodeTime").value;
+        recalculateDiagramTimes();
+      }
+    } else if (sel.kind === "annotation") {
+      const a = findAnnotation(sel.id);
+      if (a) {
+        a.datetimeTime = $("#fNodeTime").value;
+      }
+    }
   });
   $("#fNodeAutoTime").addEventListener("change", ()=>{
     const sel = currentSingle();
