@@ -1147,6 +1147,11 @@ html,body{
     return { x: node.x + (dx/dist)*r, y: node.y + (dy/dist)*r };
   }
 
+  function snap(val) {
+    if (!gridOn) return val;
+    return Math.round(val / 20) * 20;
+  }
+
   // Closest point on segment AB to point P, plus the parametric t (0..1) and distance.
   function closestPointOnSegment(px,py, ax,ay, bx,by){
     const abx = bx-ax, aby = by-ay;
@@ -1519,12 +1524,12 @@ html,body{
     if(currentTool === "select"){ deselectAll(); return; }
     if(currentTool.startsWith("node-")){
       const pt = getCanvasPoint(e);
-      placeNode(currentTool.replace("node-",""), pt.x, pt.y);
+      placeNode(currentTool.replace("node-",""), snap(pt.x), snap(pt.y));
       return;
     }
     if(currentTool === "note" || currentTool === "banner" || currentTool === "pin" || currentTool === "text"){
       const pt = getCanvasPoint(e);
-      placeAnnotation(currentTool, pt.x, pt.y);
+      placeAnnotation(currentTool, snap(pt.x), snap(pt.y));
       return;
     }
     if(currentTool === "connector" || currentTool === "connector-line"){
@@ -1725,23 +1730,23 @@ html,body{
     if(drag.type === "node"){
       const n = findNode(drag.id);
       if(!n) return;
-      n.x = drag.origX + dx;
-      n.y = drag.origY + dy;
+      n.x = snap(drag.origX + dx);
+      n.y = snap(drag.origY + dy);
       renderAll();
     } else if(drag.type === "annotation"){
       const a = findAnnotation(drag.id);
       if(!a) return;
-      a.x = drag.origX + dx;
-      a.y = drag.origY + dy;
+      a.x = snap(drag.origX + dx);
+      a.y = snap(drag.origY + dy);
       renderAll();
     } else if(drag.type === "group"){
       drag.items.forEach(item=>{
         if(item.kind === "node"){
           const n = findNode(item.id);
-          if(n){ n.x = item.origX + dx; n.y = item.origY + dy; }
+          if(n){ n.x = snap(item.origX + dx); n.y = snap(item.origY + dy); }
         } else if(item.kind === "annotation"){
           const a = findAnnotation(item.id);
-          if(a){ a.x = item.origX + dx; a.y = item.origY + dy; }
+          if(a){ a.x = snap(item.origX + dx); a.y = snap(item.origY + dy); }
         }
       });
       renderAll();
@@ -1958,67 +1963,163 @@ html,body{
 
   function copySelected(){
     if(!selection.length) return;
-    const { kind, id } = selection[0];
-    let src = null;
-    if(kind === "node")        src = findNode(id);
-    else if(kind === "connector")  src = findConnector(id);
-    else if(kind === "annotation") src = findAnnotation(id);
-    if(!src) return;
-    clipboard = { kind, data: JSON.parse(JSON.stringify(src)) };
-    setStatus("Copied " + kind);
+    const items = [];
+    selection.forEach(sel => {
+      let data = null;
+      if (sel.kind === "node") data = findNode(sel.id);
+      else if (sel.kind === "connector") data = findConnector(sel.id);
+      else if (sel.kind === "annotation") data = findAnnotation(sel.id);
+      
+      if (data) {
+        items.push({
+          kind: sel.kind,
+          id: sel.id,
+          data: JSON.parse(JSON.stringify(data))
+        });
+      }
+    });
+
+    if (items.length === 0) return;
+    
+    clipboard = items;
+    setStatus("Copied " + items.length + " elements");
     updateCopyPasteBtns();
   }
 
   function pasteClipboard(){
-    if(!clipboard) return;
-    const { kind, data } = clipboard;
-    const newData = JSON.parse(JSON.stringify(data));
-    newData.id = uid();
+    if(!clipboard || !clipboard.length) return;
 
-    if(kind === "node"){
-      newData.x = (newData.x || 0) + PASTE_OFFSET;
-      newData.y = (newData.y || 0) + PASTE_OFFSET;
-      state.nodes.push(newData);
-      selection = [{ kind:"node", id: newData.id }];
-    } else if(kind === "connector"){
-      const fromNode = findNode(data.fromId);
-      const toNode   = findNode(data.toId);
-      if(fromNode && toNode){
-        const newFrom = { ...JSON.parse(JSON.stringify(fromNode)), id: uid(),
-          x: fromNode.x + PASTE_OFFSET, y: fromNode.y + PASTE_OFFSET };
-        const newTo   = { ...JSON.parse(JSON.stringify(toNode)), id: uid(),
-          x: toNode.x + PASTE_OFFSET, y: toNode.y + PASTE_OFFSET };
-        newData.fromId = newFrom.id;
-        newData.toId   = newTo.id;
-        delete newData.fromPt; delete newData.toPt;
-        state.nodes.push(newFrom, newTo);
-        state.connectors.push(newData);
-      } else {
-        if(newData.fromPt){ newData.fromPt = {x:newData.fromPt.x+PASTE_OFFSET,y:newData.fromPt.y+PASTE_OFFSET}; }
-        if(newData.toPt){   newData.toPt   = {x:newData.toPt.x+PASTE_OFFSET,  y:newData.toPt.y+PASTE_OFFSET};   }
-        state.connectors.push(newData);
+    const nodeIdMap = {};
+    const connectorIdMap = {};
+
+    const nodesToPaste = [];
+    const annotationsToPaste = [];
+    const connectorsToPaste = [];
+
+    clipboard.forEach(item => {
+      const copy = JSON.parse(JSON.stringify(item.data));
+      if (item.kind === "node") {
+        nodesToPaste.push(copy);
+      } else if (item.kind === "annotation") {
+        annotationsToPaste.push(copy);
+      } else if (item.kind === "connector") {
+        connectorsToPaste.push(copy);
       }
-      selection = [{ kind:"connector", id: newData.id }];
-    } else if(kind === "annotation"){
-      newData.x = (newData.x || 0) + PASTE_OFFSET;
-      newData.y = (newData.y || 0) + PASTE_OFFSET;
-      state.annotations.push(newData);
-      selection = [{ kind:"annotation", id: newData.id }];
-    }
+    });
 
-    // next Ctrl+V cascades +24px further
-    clipboard = { kind, data: JSON.parse(JSON.stringify(newData)) };
+    const copiedNodeIds = new Set(nodesToPaste.map(n => n.id));
+    const extraNodesMap = {};
 
-    renderAll(); updateInspector(); commit();
-    setStatus("Pasted " + kind);
+    connectorsToPaste.forEach(c => {
+      if (c.fromId && !copiedNodeIds.has(c.fromId) && !extraNodesMap[c.fromId]) {
+        const originalNode = findNode(c.fromId);
+        if (originalNode) {
+          extraNodesMap[c.fromId] = JSON.parse(JSON.stringify(originalNode));
+        }
+      }
+      if (c.toId && !copiedNodeIds.has(c.toId) && !extraNodesMap[c.toId]) {
+        const originalNode = findNode(c.toId);
+        if (originalNode) {
+          extraNodesMap[c.toId] = JSON.parse(JSON.stringify(originalNode));
+        }
+      }
+    });
+
+    Object.values(extraNodesMap).forEach(extraNode => {
+      nodesToPaste.push(extraNode);
+    });
+
+    const pastedNodes = [];
+    nodesToPaste.forEach(n => {
+      const newId = uid();
+      nodeIdMap[n.id] = newId;
+      n.id = newId;
+      n.x = (n.x || 0) + PASTE_OFFSET;
+      n.y = (n.y || 0) + PASTE_OFFSET;
+      state.nodes.push(n);
+      pastedNodes.push(n);
+    });
+
+    const pastedAnnotations = [];
+    annotationsToPaste.forEach(a => {
+      a.id = uid();
+      a.x = (a.x || 0) + PASTE_OFFSET;
+      a.y = (a.y || 0) + PASTE_OFFSET;
+      state.annotations.push(a);
+      pastedAnnotations.push(a);
+    });
+
+    const pastedConnectors = [];
+    connectorsToPaste.forEach(c => {
+      const newId = uid();
+      connectorIdMap[c.id] = newId;
+      c.id = newId;
+
+      if (c.fromPt) {
+        c.fromPt = { x: c.fromPt.x + PASTE_OFFSET, y: c.fromPt.y + PASTE_OFFSET };
+      }
+      if (c.toPt) {
+        c.toPt = { x: c.toPt.x + PASTE_OFFSET, y: c.toPt.y + PASTE_OFFSET };
+      }
+
+      pastedConnectors.push(c);
+    });
+
+    pastedConnectors.forEach(c => {
+      if (c.fromId) {
+        if (nodeIdMap[c.fromId]) {
+          c.fromId = nodeIdMap[c.fromId];
+        }
+      }
+      if (c.toId) {
+        if (nodeIdMap[c.toId]) {
+          c.toId = nodeIdMap[c.toId];
+        }
+      }
+      if (c.fromConnectorId) {
+        if (connectorIdMap[c.fromConnectorId]) {
+          c.fromConnectorId = connectorIdMap[c.fromConnectorId];
+        }
+      }
+      if (c.toConnectorId) {
+        if (connectorIdMap[c.toConnectorId]) {
+          c.toConnectorId = connectorIdMap[c.toConnectorId];
+        }
+      }
+
+      state.connectors.push(c);
+    });
+
+    selection = [];
+    pastedNodes.forEach(n => selection.push({ kind: "node", id: n.id }));
+    pastedAnnotations.forEach(a => selection.push({ kind: "annotation", id: a.id }));
+    pastedConnectors.forEach(c => selection.push({ kind: "connector", id: c.id }));
+
+    const newClipboard = [];
+    pastedNodes.forEach(n => {
+      newClipboard.push({ kind: "node", id: n.id, data: JSON.parse(JSON.stringify(n)) });
+    });
+    pastedAnnotations.forEach(a => {
+      newClipboard.push({ kind: "annotation", id: a.id, data: JSON.parse(JSON.stringify(a)) });
+    });
+    pastedConnectors.forEach(c => {
+      newClipboard.push({ kind: "connector", id: c.id, data: JSON.parse(JSON.stringify(c)) });
+    });
+    clipboard = newClipboard;
+
+    renderAll();
+    updateInspector();
+    commit();
+    setStatus("Pasted " + (pastedNodes.length + pastedAnnotations.length + pastedConnectors.length) + " elements");
   }
 
   function updateCopyPasteBtns(){
     const copyBtn  = $("#btnCopyEl");
     const pasteBtn = $("#btnPasteEl");
     if(copyBtn)  copyBtn.disabled  = selection.length === 0;
-    if(pasteBtn) pasteBtn.disabled = !clipboard;
+    if(pasteBtn) pasteBtn.disabled = !clipboard || clipboard.length === 0;
   }
+
 
   $("#btnCopyEl").addEventListener("click",  copySelected);
   $("#btnPasteEl").addEventListener("click", pasteClipboard);
