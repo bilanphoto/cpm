@@ -215,6 +215,13 @@ html,body{
 }
 .cpm-node:hover .connect-handle, .cpm-node.selected .connect-handle{ opacity:0.9; }
 
+.connect-handle-connector{
+  fill:var(--amber); stroke:#1a1305; stroke-width:1.2; opacity:0;
+  cursor:crosshair; transition:opacity .1s;
+}
+.cpm-connector:hover .connect-handle-connector, .cpm-connector.selected .connect-handle-connector{ opacity:0.9; }
+
+
 /* connector visuals */
 .cpm-connector-line{ stroke-width:3; fill:none; cursor:pointer; }
 .cpm-connector-hit{ stroke:transparent; stroke-width:16; fill:none; cursor:pointer; }
@@ -513,18 +520,37 @@ html,body{
 
         <!-- generic label -->
         <div class="field" data-field="label">
-          <label>Label</label>
+          <label id="labelFieldName">Label</label>
           <input type="text" id="fLabel">
         </div>
 
         <!-- node specific -->
-        <div class="field" data-field="sublabel">
-          <label>Caption (above node)</label>
-          <input type="text" id="fSublabel">
+        <div class="field two-col" data-field="sublabel">
+          <div>
+            <label>Caption (above node)</label>
+            <input type="text" id="fSublabel">
+          </div>
+          <div>
+            <label>Caption color</label>
+            <input type="color" id="fSublabelColor" value="#1c2530" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
+          </div>
         </div>
-        <div class="field" data-field="datetime">
-          <label>Date / time (below node)</label>
-          <input type="text" id="fDatetime">
+        <div class="field two-col" data-field="datetime">
+          <div>
+            <label>Date / time (below node)</label>
+            <div style="display: flex; gap: 4px; margin-bottom: 4px;">
+              <input type="date" id="fNodeDate" style="flex: 1; font-size: 12px; padding: 6px 4px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: var(--radius-sm);">
+              <input type="time" id="fNodeTime" style="flex: 1; font-size: 12px; padding: 6px 4px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: var(--radius-sm);">
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <input type="checkbox" id="fNodeAutoTime">
+              <label for="fNodeAutoTime" style="font-size: 11px; margin: 0; cursor: pointer; user-select: none;">Auto-calculate</label>
+            </div>
+          </div>
+          <div>
+            <label>Date/Time color</label>
+            <input type="color" id="fDatetimeColor" value="#1d4ed8" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
+          </div>
         </div>
         <div class="field two-col" data-field="fillrow">
           <div>
@@ -538,9 +564,18 @@ html,body{
         </div>
 
         <!-- connector specific -->
-        <div class="field" data-field="duration">
-          <label>Duration label, e.g. (24)</label>
-          <input type="text" id="fDuration">
+        <div class="field two-col" data-field="duration">
+          <div>
+            <label>Duration label, e.g. (24)</label>
+            <input type="text" id="fDuration">
+          </div>
+          <div>
+            <label>Duration unit</label>
+            <select id="fDurationUnit" style="width: 100%; height: 38px; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); background: var(--chrome-800); color: var(--chrome-text); padding: 0 8px;">
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </div>
         </div>
         <div class="field" data-field="task">
           <label>Task text (above line)</label>
@@ -802,6 +837,219 @@ html,body{
   }
 
   // ---------------------------------------------------------
+  // Date/Time Calculation & CPM Helpers
+  // ---------------------------------------------------------
+  const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function parseDatetimeString(str) {
+    if (!str) return { date: "", time: "" };
+    const cleanStr = str.replace(/\\n/g, "\n");
+    const parts = cleanStr.split("\n");
+    let datePart = parts[0] || "";
+    let timePart = parts[1] || "";
+    
+    let parsedDate = "";
+    let dateMatch = datePart.match(/(\d+)\s+([a-zA-Z]+)\.(\d+)/);
+    if (!dateMatch) {
+      dateMatch = datePart.match(/(\d+)\s+([a-zA-Z]+)/);
+      if (dateMatch) {
+        const day = parseInt(dateMatch[1]);
+        const monthStr = dateMatch[2];
+        const monthIdx = MONTHS_SHORT.indexOf(monthStr);
+        if (monthIdx !== -1) {
+          const year = new Date().getFullYear();
+          const dateObj = new Date(year, monthIdx, day);
+          parsedDate = formatDateISO(dateObj);
+        }
+      }
+    } else {
+      const day = parseInt(dateMatch[1]);
+      const monthStr = dateMatch[2];
+      const yearShort = parseInt(dateMatch[3]);
+      const monthIdx = MONTHS_SHORT.indexOf(monthStr);
+      if (monthIdx !== -1) {
+        const year = 2000 + yearShort;
+        const dateObj = new Date(year, monthIdx, day);
+        parsedDate = formatDateISO(dateObj);
+      }
+    }
+    
+    let parsedTime = "";
+    const timeMatch = timePart.match(/(\d+)\.(\d+)/);
+    if (timeMatch) {
+      const hrs = timeMatch[1].padStart(2, '0');
+      const mins = timeMatch[2].padStart(2, '0');
+      parsedTime = `${hrs}:${mins}`;
+    }
+    
+    return { date: parsedDate, time: parsedTime };
+  }
+
+  function getNodeDateTime(n) {
+    if (!n.datetimeDate) return null;
+    const timeStr = n.datetimeTime || "00:00";
+    return new Date(`${n.datetimeDate}T${timeStr}`);
+  }
+
+  function addDuration(date, duration, unit) {
+    const d = new Date(date.getTime());
+    if (unit === "days") {
+      d.setDate(d.getDate() + duration);
+    } else {
+      d.setTime(d.getTime() + duration * 60 * 60 * 1000);
+    }
+    return d;
+  }
+
+  function formatDateISO(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function formatTimeISO(date) {
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  function formatNodeDateTimeText(date) {
+    const d = date.getDate();
+    const m = MONTHS_SHORT[date.getMonth()];
+    const y = String(date.getFullYear()).slice(-2);
+    const hrs = String(date.getHours()).padStart(2, '0');
+    const mins = String(date.getMinutes()).padStart(2, '0');
+    return `${d} ${m}.${y}\\n${hrs}.${mins}`;
+  }
+
+  function hasPredecessors(nodeId) {
+    return state.connectors.some(c => c.toId === nodeId);
+  }
+
+  function initNodesDatetimeFields(nodes) {
+    nodes.forEach(n => {
+      if (n.datetime && (!n.datetimeDate || !n.datetimeTime)) {
+        const parsed = parseDatetimeString(n.datetime);
+        n.datetimeDate = parsed.date;
+        n.datetimeTime = parsed.time;
+      }
+      if (n.autoDateTime === undefined) {
+        n.autoDateTime = hasPredecessors(n.id);
+      }
+    });
+  }
+
+  function recalculateDiagramTimes() {
+    const nodeTimes = {};
+    const connTimes = {}; // { id: { start, end } }
+
+    // Start with manual node times
+    state.nodes.forEach(n => {
+      const isAuto = n.autoDateTime !== false;
+      const hasPrev = state.connectors.some(c => c.toId === n.id);
+      if (!hasPrev || !isAuto) {
+        nodeTimes[n.id] = getNodeDateTime(n) || new Date();
+      }
+    });
+
+    // Iterative relaxation
+    let changed = true;
+    let iter = 0;
+    const maxIter = (state.nodes.length + state.connectors.length) * 5 + 50;
+
+    while (changed && iter < maxIter) {
+      changed = false;
+      iter++;
+
+      // Update connectors
+      state.connectors.forEach(c => {
+        let startTime = null;
+
+        if (c.fromId) {
+          if (nodeTimes[c.fromId]) {
+            startTime = nodeTimes[c.fromId];
+          }
+        } else if (c.fromConnectorId) {
+          const parent = connTimes[c.fromConnectorId];
+          if (parent && parent.start) {
+            const parentConn = findConnector(c.fromConnectorId);
+            if (parentConn) {
+              const parentDurationStr = parentConn.duration || "";
+              const match = parentDurationStr.match(/\d+(\.\d+)?/);
+              const parentDur = match ? parseFloat(match[0]) : 0;
+              const parentUnit = parentConn.durationUnit || "hours";
+              
+              const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
+              startTime = addDuration(parent.start, parentDur * t, parentUnit);
+            }
+          }
+        }
+
+        if (startTime) {
+          const durationStr = c.duration || "";
+          const match = durationStr.match(/\d+(\.\d+)?/);
+          const duration = match ? parseFloat(match[0]) : 0;
+          const unit = c.durationUnit || "hours";
+          const endTime = addDuration(startTime, duration, unit);
+
+          const existing = connTimes[c.id];
+          if (!existing || existing.start.getTime() !== startTime.getTime() || existing.end.getTime() !== endTime.getTime()) {
+            connTimes[c.id] = { start: startTime, end: endTime };
+            changed = true;
+          }
+        }
+      });
+
+      // Update auto nodes
+      state.nodes.forEach(n => {
+        const isAuto = n.autoDateTime !== false;
+        if (!isAuto) return;
+
+        // Find incoming connectors
+        const incoming = state.connectors.filter(c => c.toId === n.id);
+        if (incoming.length === 0) return; // start node
+
+        let maxTime = null;
+        incoming.forEach(c => {
+          const ct = connTimes[c.id];
+          if (ct && ct.end) {
+            if (!maxTime || ct.end > maxTime) {
+              maxTime = ct.end;
+            }
+          }
+        });
+
+        if (maxTime) {
+          const oldTime = nodeTimes[n.id];
+          if (!oldTime || oldTime.getTime() !== maxTime.getTime()) {
+            nodeTimes[n.id] = maxTime;
+            changed = true;
+          }
+        }
+      });
+    }
+
+    // Write back
+    state.nodes.forEach(n => {
+      const isAuto = n.autoDateTime !== false;
+      const hasPrev = state.connectors.some(c => c.toId === n.id);
+      if (hasPrev && isAuto && nodeTimes[n.id]) {
+        const calcDate = nodeTimes[n.id];
+        n.datetimeDate = formatDateISO(calcDate);
+        n.datetimeTime = formatTimeISO(calcDate);
+        n.datetime = formatNodeDateTimeText(calcDate);
+      } else {
+        const manualDate = getNodeDateTime(n);
+        if (manualDate) {
+          n.datetime = formatNodeDateTimeText(manualDate);
+        }
+      }
+    });
+  }
+
+
+  // ---------------------------------------------------------
   // Tool selection
   // ---------------------------------------------------------
   document.querySelectorAll(".tool").forEach(btn=>{
@@ -955,7 +1203,7 @@ html,body{
   function computeConnectorPath(p1, p2, excludeIds){
     const obstructions = findObstructions(p1, p2, excludeIds);
     if(!obstructions.length){
-      return { d:`M${p1.x},${p1.y} L${p2.x},${p2.y}`, mid:{x:(p1.x+p2.x)/2, y:(p1.y+p2.y)/2}, curved:false };
+      return { d:`M${p1.x},${p1.y} L${p2.x},${p2.y}`, mid:{x:(p1.x+p2.x)/2, y:(p1.y+p2.y)/2}, curved:false, ctrl:null };
     }
 
     const dx = p2.x-p1.x, dy = p2.y-p1.y;
@@ -985,20 +1233,112 @@ html,body{
     if(!ctrl) ctrl = { x: midX + nx*maxBend*bendSign, y: midY + ny*maxBend*bendSign };
 
     const mid = quadAt(p1, ctrl, p2, 0.5);
-    return { d:`M${p1.x},${p1.y} Q${ctrl.x},${ctrl.y} ${p2.x},${p2.y}`, mid, curved:true };
+    return { d:`M${p1.x},${p1.y} Q${ctrl.x},${ctrl.y} ${p2.x},${p2.y}`, mid, curved:true, ctrl };
   }
 
-  function connectorMidpoint(c){
+
+  function resolveConnectorEndpoint(c, direction, visited = new Set()) {
+    if (!c) return { x: 0, y: 0 };
+    if (visited.has(c.id)) return { x: 0, y: 0 };
+
+    if (direction === "from") {
+      if (c.fromId) {
+        const node = findNode(c.fromId);
+        return node ? { x: node.x, y: node.y } : (c.fromPt || { x: 0, y: 0 });
+      } else if (c.fromConnectorId) {
+        const parent = findConnector(c.fromConnectorId);
+        const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
+        const nextVisited = new Set(visited);
+        nextVisited.add(c.id);
+        return parent ? connectorPointAtT(parent, t, nextVisited) : (c.fromPt || { x: 0, y: 0 });
+      } else {
+        return c.fromPt || { x: 0, y: 0 };
+      }
+    } else { // "to"
+      if (c.toId) {
+        const node = findNode(c.toId);
+        return node ? { x: node.x, y: node.y } : (c.toPt || { x: 0, y: 0 });
+      } else if (c.toConnectorId) {
+        const parent = findConnector(c.toConnectorId);
+        const t = c.toConnectorT !== undefined && c.toConnectorT !== null ? c.toConnectorT : 0.5;
+        const nextVisited = new Set(visited);
+        nextVisited.add(c.id);
+        return parent ? connectorPointAtT(parent, t, nextVisited) : (c.toPt || { x: 0, y: 0 });
+      } else {
+        return c.toPt || { x: 0, y: 0 };
+      }
+    }
+  }
+
+  function connectorPointAtT(c, t, visited = new Set()) {
+    if (!c) return { x: 0, y: 0 };
+    if (visited.has(c.id)) return { x: 0, y: 0 };
+    
+    const p1 = resolveConnectorEndpoint(c, "from", visited);
+    const p2 = resolveConnectorEndpoint(c, "to", visited);
+
     const a = c.fromId ? findNode(c.fromId) : null;
     const b = c.toId ? findNode(c.toId) : null;
-    const p1 = a ? {x:a.x,y:a.y} : c.fromPt;
-    const p2 = b ? {x:b.x,y:b.y} : c.toPt;
-    if(!p1 || !p2) return {x:0, y:0};
+
     const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
     const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
-    const excludeIds = [c.fromId, c.toId].filter(Boolean);
-    return computeConnectorPath(start, end, excludeIds).mid;
+
+    const excludeIds = [];
+    if (c.fromId) excludeIds.push(c.fromId);
+    if (c.toId) excludeIds.push(c.toId);
+
+    const path = computeConnectorPath(start, end, excludeIds);
+    if (!path.curved) {
+      return {
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t
+      };
+    } else {
+      return quadAt(start, path.ctrl, end, t);
+    }
   }
+
+  function connectorMidpoint(c, visited = new Set()){
+    return connectorPointAtT(c, 0.5, visited);
+  }
+
+  function closestPointOnConnector(px, py, c) {
+    const p1 = resolveConnectorEndpoint(c, "from");
+    const p2 = resolveConnectorEndpoint(c, "to");
+    const a = c.fromId ? findNode(c.fromId) : null;
+    const b = c.toId ? findNode(c.toId) : null;
+
+    const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
+    const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
+
+    const excludeIds = [];
+    if(c.fromId) excludeIds.push(c.fromId);
+    if(c.toId) excludeIds.push(c.toId);
+
+    const path = computeConnectorPath(start, end, excludeIds);
+
+    if (!path.curved) {
+      return closestPointOnSegment(px, py, start.x, start.y, end.x, end.y);
+    } else {
+      let bestT = 0;
+      let minDist = Infinity;
+      let bestPt = { x: 0, y: 0 };
+      const SAMPLES = 50;
+      for (let i = 0; i <= SAMPLES; i++) {
+        const t = i / SAMPLES;
+        const pt = quadAt(start, path.ctrl, end, t);
+        const dist = Math.hypot(px - pt.x, py - pt.y);
+        if (dist < minDist) {
+          minDist = dist;
+          bestT = t;
+          bestPt = pt;
+        }
+      }
+      return { t: bestT, x: bestPt.x, y: bestPt.y, dist: minDist };
+    }
+  }
+
+
 
   function colorToMarkerId(color){
     return "arrowHead-" + String(color || "#c0392b").replace(/[^a-zA-Z0-9]/g, "");
@@ -1019,15 +1359,20 @@ html,body{
   function renderConnectors(){
     layerConnectors.innerHTML = "";
     state.connectors.forEach(c=>{
+      const p1 = resolveConnectorEndpoint(c, "from");
+      const p2 = resolveConnectorEndpoint(c, "to");
+      if(!p1 || !p2) return;
+
       const a = c.fromId ? findNode(c.fromId) : null;
       const b = c.toId ? findNode(c.toId) : null;
-      let p1 = a ? {x:a.x,y:a.y} : c.fromPt;
-      let p2 = b ? {x:b.x,y:b.y} : c.toPt;
-      if(!p1 || !p2) return;
 
       const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
       const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
-      const excludeIds = [c.fromId, c.toId].filter(Boolean);
+
+      const excludeIds = [];
+      if(c.fromId) excludeIds.push(c.fromId);
+      if(c.toId) excludeIds.push(c.toId);
+
       const path = computeConnectorPath(start, end, excludeIds);
 
       const g = svgElCreate("g", {class:"cpm-connector", "data-id": c.id});
@@ -1063,11 +1408,20 @@ html,body{
         g.appendChild(d);
       }
 
+      // Add connection handle in the middle of the connector
+      const h = svgElCreate("circle", {cx:midx, cy:midy, r:6, class:"connect-handle-connector"});
+      h.addEventListener("mousedown", (e)=>{
+        e.stopPropagation();
+        startConnectorDragFromConnectorAtT(c.id, 0.5);
+      });
+      g.appendChild(h);
+
       g.addEventListener("mousedown", (e)=> onConnectorMouseDown(e, c));
 
       layerConnectors.appendChild(g);
     });
   }
+
 
   // ---------------------------------------------------------
   // Rendering: ANNOTATIONS (note / banner / pin / text)
@@ -1320,6 +1674,12 @@ html,body{
   function onConnectorMouseDown(e, c){
     e.stopPropagation();
     if(currentTool === "erase"){ deleteConnector(c.id); return; }
+    if(currentTool === "connector" || currentTool === "connector-line"){
+      const pt = getCanvasPoint(e);
+      const closest = closestPointOnConnector(pt.x, pt.y, c);
+      startConnectorDragFromConnectorAtT(c.id, closest.t);
+      return;
+    }
     if(currentTool !== "select") return;
 
     const modifier = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -1337,6 +1697,7 @@ html,body{
 
     selectElement("connector", c.id);
   }
+
 
   function startGroupDrag(e){
     const start = getCanvasPoint(e);
@@ -1389,7 +1750,10 @@ html,body{
       canvasWrap.scrollTop = drag.scrollTop0 - (e.clientY - drag.clientY0);
     } else if(drag.type === "connect-temp"){
       drawConnectorPreview(drag.fromId, pt);
+    } else if(drag.type === "connect-temp-from-conn"){
+      drawConnectorPreviewFromConnector(drag.fromConnectorId, pt);
     }
+
   }
 
   function onWindowMouseUp(e){
@@ -1428,18 +1792,53 @@ html,body{
     window.addEventListener("mouseup", onConnectHandleMouseUp);
   }
 
+  function startConnectorDragFromConnectorAtT(connectorId, t){
+    drag = {type:"connect-temp-from-conn", fromConnectorId: connectorId, fromConnectorT: t};
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onConnectHandleMouseUp);
+  }
+
   function onConnectHandleMouseUp(e){
     clearConnectorPreview();
     window.removeEventListener("mousemove", onWindowMouseMove);
     window.removeEventListener("mouseup", onConnectHandleMouseUp);
-    if(!drag || drag.type !== "connect-temp"){ drag=null; return; }
+    if(!drag || (drag.type !== "connect-temp" && drag.type !== "connect-temp-from-conn")){ drag=null; return; }
+
+    const isFromNode = drag.type === "connect-temp";
     const fromId = drag.fromId;
+    const fromConnectorId = drag.fromConnectorId;
+    const fromConnectorT = drag.fromConnectorT;
     drag = null;
+
     const targetEl = document.elementFromPoint(e.clientX, e.clientY);
     const nodeGroup = targetEl ? targetEl.closest(".cpm-node") : null;
+    const connGroup = targetEl ? targetEl.closest(".cpm-connector") : null;
+
+    const kind = currentTool === "connector-line" ? "line" : "arrow";
+    const dropPt = getCanvasPoint(e);
+
     if(nodeGroup){
       const toId = nodeGroup.getAttribute("data-id");
-      if(toId && toId !== fromId) addConnector(fromId, toId, currentTool === "connector-line" ? "line" : "arrow");
+      if(toId){
+        if(isFromNode){
+          if(toId !== fromId) addConnector(fromId, toId, kind);
+        } else {
+          addConnector(null, toId, kind, fromConnectorId, null, fromConnectorT, null);
+        }
+      }
+    } else if(connGroup){
+      const toConnectorId = connGroup.getAttribute("data-id");
+      if(toConnectorId){
+        const parent = findConnector(toConnectorId);
+        const closest = closestPointOnConnector(dropPt.x, dropPt.y, parent);
+        if(isFromNode){
+          addConnector(fromId, null, kind, null, toConnectorId, null, closest.t);
+        } else {
+          if(toConnectorId !== fromConnectorId) {
+            addConnector(null, null, kind, fromConnectorId, toConnectorId, fromConnectorT, closest.t);
+          }
+        }
+      }
     } else {
       renderAll();
     }
@@ -1453,33 +1852,74 @@ html,body{
     const path = svgElCreate("path", {d:`M${start.x},${start.y} L${pt.x},${pt.y}`, class:"connector-preview", fill:"none"});
     layerOverlay.appendChild(path);
   }
+
+  function drawConnectorPreviewFromConnector(fromConnectorId, pt, t){
+    clearConnectorPreview();
+    const c = findConnector(fromConnectorId);
+    if(!c) return;
+    const start = connectorPointAtT(c, t);
+    const path = svgElCreate("path", {d:`M${start.x},${start.y} L${pt.x},${pt.y}`, class:"connector-preview", fill:"none"});
+    layerOverlay.appendChild(path);
+  }
+
   function clearConnectorPreview(){ layerOverlay.innerHTML = ""; }
 
-  function addConnector(fromId, toId, kind){
-    const c = { id: uid(), fromId, toId, kind, color: "#c0392b", dashed:false, duration:"", task:"" };
+  function addConnector(fromId, toId, kind, fromConnectorId = null, toConnectorId = null, fromConnectorT = null, toConnectorT = null){
+    const c = {
+      id: uid(),
+      fromId: fromId || null,
+      toId: toId || null,
+      fromConnectorId: fromConnectorId || null,
+      toConnectorId: toConnectorId || null,
+      fromConnectorT: fromConnectorT !== null ? fromConnectorT : (fromConnectorId ? 0.5 : null),
+      toConnectorT: toConnectorT !== null ? toConnectorT : (toConnectorId ? 0.5 : null),
+      kind,
+      color: "#c0392b",
+      dashed:false,
+      duration:"",
+      task:""
+    };
     state.connectors.push(c);
     renderAll();
     selectElement("connector", c.id);
     commit();
   }
 
+
+
   // ---------------------------------------------------------
   // Delete
   // ---------------------------------------------------------
+  function pruneOrphanedConnectors(){
+    let changed = true;
+    while(changed){
+      const len = state.connectors.length;
+      state.connectors = state.connectors.filter(c=>{
+        if(c.fromId && !state.nodes.some(n=>n.id===c.fromId)) return false;
+        if(c.toId && !state.nodes.some(n=>n.id===c.toId)) return false;
+        if(c.fromConnectorId && !state.connectors.some(pc=>pc.id===c.fromConnectorId)) return false;
+        if(c.toConnectorId && !state.connectors.some(pc=>pc.id===c.toConnectorId)) return false;
+        return true;
+      });
+      if(state.connectors.length === len) changed = false;
+    }
+  }
+
   function removeFromSelection(kind, id){
     const idx = findInSelection(kind, id);
     if(idx >= 0) selection.splice(idx, 1);
   }
   function deleteNode(id){
     state.nodes = state.nodes.filter(n=>n.id!==id);
-    state.connectors = state.connectors.filter(c=> c.fromId!==id && c.toId!==id);
     removeFromSelection("node", id);
+    pruneOrphanedConnectors();
     renderAll(); updateInspector(); commit();
     setStatus("Node deleted");
   }
   function deleteConnector(id){
     state.connectors = state.connectors.filter(c=>c.id!==id);
     removeFromSelection("connector", id);
+    pruneOrphanedConnectors();
     renderAll(); updateInspector(); commit();
     setStatus("Connector deleted");
   }
@@ -1495,18 +1935,19 @@ html,body{
     toDelete.forEach(sel=>{
       if(sel.kind === "node"){
         state.nodes = state.nodes.filter(n=>n.id!==sel.id);
-        state.connectors = state.connectors.filter(c=> c.fromId!==sel.id && c.toId!==sel.id);
       } else if(sel.kind === "connector"){
         state.connectors = state.connectors.filter(c=>c.id!==sel.id);
       } else if(sel.kind === "annotation"){
         state.annotations = state.annotations.filter(a=>a.id!==sel.id);
       }
     });
+    pruneOrphanedConnectors();
     const count = toDelete.length;
     selection = [];
     renderAll(); updateInspector(); commit();
     setStatus(count > 1 ? (count + " elements deleted") : "Element deleted");
   }
+
   $("#btnDeleteSelected").addEventListener("click", deleteSelected);
   $("#btnDeleteMulti").addEventListener("click", deleteSelected);
 
@@ -1598,6 +2039,8 @@ html,body{
         if(payload.title    !== undefined) $("#diagramTitle").value    = payload.title;
         if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
         state = payload.state || payload;
+        initNodesDatetimeFields(state.nodes);
+        recalculateDiagramTimes();
         selection = [];
         history = []; historyIndex = -1;
         renderAll(); updateInspector(); applyCanvasBg();
@@ -1808,17 +2251,44 @@ html,body{
       const n = findNode(sel.id);
       if(!n) return;
       panelTitle.textContent = "Node — " + n.type;
+      $("#labelFieldName").textContent = "Time (Hr)";
       show(fieldEls.label); $("#fLabel").value = n.label || "";
-      show(fieldEls.sublabel); $("#fSublabel").value = n.sublabel || "";
-      show(fieldEls.datetime); $("#fDatetime").value = (n.datetime||"").replace(/\\n/g,"\n");
-      show(fieldEls.fillrow); $("#fFill").value = n.fill || "#ffffff"; $("#fSize").value = n.r;
+      
+      show(fieldEls.sublabel);
+      $("#fSublabel").value = n.sublabel || "";
+      $("#fSublabelColor").value = n.sublabelColor || "#1c2530";
+      
+      show(fieldEls.datetime);
+      const hasPreds = hasPredecessors(n.id);
+      const autoCheckbox = $("#fNodeAutoTime");
+      const dateInput = $("#fNodeDate");
+      const timeInput = $("#fNodeTime");
+      const colorInput = $("#fDatetimeColor");
+      
+      if (hasPreds) {
+        autoCheckbox.disabled = false;
+        if (n.autoDateTime === undefined) n.autoDateTime = true;
+      } else {
+        autoCheckbox.disabled = true;
+        n.autoDateTime = false;
+      }
+      
+      autoCheckbox.checked = n.autoDateTime;
+      dateInput.value = n.datetimeDate || "";
+      timeInput.value = n.datetimeTime || "";
+      colorInput.value = n.datetimeColor || "#1d4ed8";
+      
+      dateInput.disabled = n.autoDateTime;
+      timeInput.disabled = n.autoDateTime;
     }
     else if(sel.kind === "connector"){
       const c = findConnector(sel.id);
       if(!c) return;
       panelTitle.textContent = "Connector";
       show(fieldEls.task); $("#fTask").value = c.task || "";
-      show(fieldEls.duration); $("#fDuration").value = c.duration || "";
+      show(fieldEls.duration);
+      $("#fDuration").value = c.duration || "";
+      $("#fDurationUnit").value = c.durationUnit || "hours";
       show(fieldEls.connswatches); syncConnSwatches(c.color || "#c0392b");
       show(fieldEls.connstyle); $("#fLineColor").value = c.color || "#c0392b"; $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
     }
@@ -1831,11 +2301,13 @@ html,body{
         show(fieldEls.notecolor); $("#fNoteColor").value = a.color;
         show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
       } else if(a.type === "banner"){
+        $("#labelFieldName").textContent = "Label";
         show(fieldEls.label); $("#fLabel").value = a.text;
         show(fieldEls.notecolor); $("#fNoteColor").value = a.color;
         show(fieldEls.textcolor); $("#fTextColor").value = a.textColor;
         show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
       } else if(a.type === "text"){
+        $("#labelFieldName").textContent = "Text";
         show(fieldEls.label); $("#fLabel").value = a.text;
         show(fieldEls.textcolor); $("#fTextColor").value = a.textColor;
         show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
@@ -1868,7 +2340,30 @@ html,body{
     else if(sel.kind==="annotation"){ findAnnotation(sel.id).text = $("#fLabel").value; }
   });
   bindLive("#fSublabel", ()=>{ findNode(currentSingle().id).sublabel = $("#fSublabel").value; });
-  bindLive("#fDatetime", ()=>{ findNode(currentSingle().id).datetime = $("#fDatetime").value.replace(/\n/g,"\\n"); });
+  bindLive("#fSublabelColor", ()=>{ findNode(currentSingle().id).sublabelColor = $("#fSublabelColor").value; });
+  bindLive("#fDatetimeColor", ()=>{ findNode(currentSingle().id).datetimeColor = $("#fDatetimeColor").value; });
+  bindLive("#fNodeDate", ()=>{
+    const n = findNode(currentSingle().id);
+    n.datetimeDate = $("#fNodeDate").value;
+    recalculateDiagramTimes();
+  });
+  bindLive("#fNodeTime", ()=>{
+    const n = findNode(currentSingle().id);
+    n.datetimeTime = $("#fNodeTime").value;
+    recalculateDiagramTimes();
+  });
+  $("#fNodeAutoTime").addEventListener("change", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "node") return;
+    const n = findNode(sel.id);
+    n.autoDateTime = $("#fNodeAutoTime").checked;
+    $("#fNodeDate").disabled = n.autoDateTime;
+    $("#fNodeTime").disabled = n.autoDateTime;
+    recalculateDiagramTimes();
+    renderAll();
+    commit();
+  });
+
   bindLive("#fFill", ()=>{ findNode(currentSingle().id).fill = $("#fFill").value; });
   bindLive("#fSize", ()=>{ findNode(currentSingle().id).r = parseInt($("#fSize").value,10); });
 
@@ -1885,14 +2380,32 @@ html,body{
   }
 
   function recalcNodeFromIncoming(nodeId){
-    const incoming = state.connectors.filter(c=> c.toId === nodeId && c.fromId);
+    const incoming = state.connectors.filter(c=> c.toId === nodeId);
     let best = null;
     incoming.forEach(c=>{
       const dur = parseNumericLabel(c.duration);
       if(dur === null) return;
-      const fromNode = findNode(c.fromId);
-      if(!fromNode) return;
-      const fromVal = parseNumericLabel(fromNode.label);
+
+      let fromVal = null;
+      if (c.fromId) {
+        const fromNode = findNode(c.fromId);
+        if(fromNode) fromVal = parseNumericLabel(fromNode.label);
+      } else if (c.fromConnectorId) {
+        const parentConn = findConnector(c.fromConnectorId);
+        if (parentConn) {
+          let parentStartVal = null;
+          if (parentConn.fromId) {
+            const parentFromNode = findNode(parentConn.fromId);
+            if (parentFromNode) parentStartVal = parseNumericLabel(parentFromNode.label);
+          }
+          if (parentStartVal !== null) {
+            const parentDur = parseNumericLabel(parentConn.duration) || 0;
+            const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
+            fromVal = parentStartVal + parentDur * t;
+          }
+        }
+      }
+
       if(fromVal === null) return;
       const candidate = fromVal + dur;
       if(best === null || candidate > best) best = candidate;
@@ -1906,27 +2419,48 @@ html,body{
     visited.add(connectorId);
 
     const c = findConnector(connectorId);
-    if(!c || !c.fromId || !c.toId) return;
-    const toNode = findNode(c.toId);
-    if(!toNode) return;
+    if(!c) return;
 
-    const best = recalcNodeFromIncoming(c.toId);
-    if(best === null) return;
-    const newLabel = Number.isInteger(best) ? String(best) : String(Math.round(best*100)/100);
-    if(toNode.label === newLabel) return; // already correct, avoid needless cascade
-    toNode.label = newLabel;
+    if (c.toId) {
+      const toNode = findNode(c.toId);
+      if(toNode) {
+        const best = recalcNodeFromIncoming(c.toId);
+        if(best !== null) {
+          const newLabel = Number.isInteger(best) ? String(best) : String(Math.round(best*100)/100);
+          if(toNode.label !== newLabel) {
+            toNode.label = newLabel;
+            // cascade: any connector leaving toNode might also need recalculating
+            state.connectors.forEach(next=>{
+              if(next.fromId === toNode.id) propagateFromConnector(next.id, visited);
+            });
+          }
+        }
+      }
+    }
 
-    // cascade: any connector leaving toNode might also need recalculating
-    state.connectors.forEach(next=>{
-      if(next.fromId === toNode.id) propagateFromConnector(next.id, visited);
+    // Also propagate to any connector that connects from this connector
+    state.connectors.forEach(next => {
+      if (next.fromConnectorId === c.id) {
+        propagateFromConnector(next.id, visited);
+      }
+      if (next.toConnectorId === c.id) {
+        propagateFromConnector(next.id, visited);
+      }
     });
   }
+
 
   bindLive("#fTask", ()=>{ findConnector(currentSingle().id).task = $("#fTask").value; });
   bindLive("#fDuration", ()=>{
     const id = currentSingle().id;
     findConnector(id).duration = $("#fDuration").value;
     propagateFromConnector(id);
+    recalculateDiagramTimes();
+  });
+  bindLive("#fDurationUnit", ()=>{
+    const id = currentSingle().id;
+    findConnector(id).durationUnit = $("#fDurationUnit").value;
+    recalculateDiagramTimes();
   });
   bindLive("#fLineColor", ()=>{ findConnector(currentSingle().id).color = $("#fLineColor").value; syncConnSwatches($("#fLineColor").value); });
   bindLive("#fLineStyle", ()=>{ findConnector(currentSingle().id).dashed = $("#fLineStyle").value === "dashed"; });
@@ -2118,6 +2652,7 @@ html,body{
       // strip transient/runtime-only DOM that shouldn't be in a saved snapshot
       docClone.querySelectorAll(".inline-edit").forEach(el=> el.remove());
       docClone.querySelectorAll(".connect-handle").forEach(el=> el.remove());
+      docClone.querySelectorAll(".connect-handle-connector").forEach(el=> el.remove());
       docClone.querySelectorAll(".selected").forEach(el=> el.classList.remove("selected"));
 
       const stateScript = docClone.querySelector("#embeddedState");
@@ -2397,18 +2932,17 @@ html,body{
       maxY = Math.max(maxY, a.y + (a.h||20) + 10);
     });
     state.connectors.forEach(c=>{
-      const a = c.fromId ? findNode(c.fromId) : null;
-      const b = c.toId ? findNode(c.toId) : null;
-      [a,b].forEach(n=>{
-        if(n){
-          minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
-          minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
-        }
+      const p1 = resolveConnectorEndpoint(c, "from");
+      const p2 = resolveConnectorEndpoint(c, "to");
+      [p1, p2].forEach(p => {
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
       });
     });
     if(!isFinite(minX)){ minX=0; minY=0; maxX=1200; maxY=800; }
     return {minX, minY, maxX, maxY};
   }
+
 
   function exportPng(){
     const filename = ($("#diagramTitle").value || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".png";
@@ -2450,6 +2984,7 @@ html,body{
     clone.appendChild(subText);
 
     clone.querySelectorAll(".connect-handle").forEach(h=>h.remove());
+    clone.querySelectorAll(".connect-handle-connector").forEach(h=>h.remove());
     clone.querySelectorAll(".selected").forEach(elm=>elm.classList.remove("selected"));
 
     // foreignObject (used for free-text annotations) taints the canvas when
@@ -2513,14 +3048,21 @@ html,body{
     const n0 = {id:uid(), type:"circle", x:140, y:420, r:30, fill:"#ffffff", label:"0", sublabel:"Reduce Feed Gas", datetime:"20 Apr.25\\n04.00"};
     const n1 = {id:uid(), type:"circle", x:300, y:420, r:30, fill:"#ffffff", label:"1", sublabel:"Warm up process", datetime:"20 Apr.25\\n09.00"};
     const n2 = {id:uid(), type:"circle", x:460, y:420, r:30, fill:"#f6d34d", label:"8", sublabel:"Stop Expander", datetime:"20 Apr.25\\n13.00"};
-    const n3 = {id:uid(), type:"hex",    x:680, y:420, r:34, fill:"#7fb56e", label:"72", sublabel:"Hand Over 3306", datetime:"23 Apr.25\\n09.00"};
-    state.nodes.push(n0,n1,n2,n3);
+    const n3 = {id:uid(), type:"hex",    x:760, y:420, r:34, fill:"#7fb56e", label:"72", sublabel:"Hand Over 3306", datetime:"23 Apr.25\\n09.00"};
+    const n4 = {id:uid(), type:"circle", x:610, y:580, r:30, fill:"#ffffff", label:"68", sublabel:"Stop Hot Oil Pump"};
+    
+    state.nodes.push(n0,n1,n2,n3,n4);
 
-    state.connectors.push(
-      {id:uid(), fromId:n0.id, toId:n1.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(1)", task:"Warm up\nprocess"},
-      {id:uid(), fromId:n1.id, toId:n2.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(4)", task:"Stop\nExpander"},
-      {id:uid(), fromId:n2.id, toId:n3.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(42)", task:"Drain, Vent,\nN2 purge"}
-    );
+    const c1 = {id:uid(), fromId:n0.id, toId:n1.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(1)", task:"Warm up\nprocess"};
+    const c2 = {id:uid(), fromId:n1.id, toId:n2.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(4)", task:"Stop\nExpander"};
+    const c3 = {id:uid(), fromId:n2.id, toId:n3.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(42)", task:"Drain, Vent, N2\nand Circulate Hot Oil"};
+    const c4 = {id:uid(), fromConnectorId:c3.id, toId:n4.id, kind:"arrow", color:"#c0392b", dashed:false, duration:"(4)", task:"Drain"};
+
+    state.connectors.push(c1, c2, c3, c4);
+
+    initNodesDatetimeFields(state.nodes);
+    recalculateDiagramTimes();
+
 
     state.annotations.push(
       {id:uid(), type:"banner", x:230, y:120, w:280, h:46, text:"Example section banner", color:"green", textColor:"black", fontSize:18, bold:true},
@@ -2546,6 +3088,8 @@ html,body{
         if(payload.title !== undefined) $("#diagramTitle").value = payload.title;
         if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
         state = payload.state || payload;
+        initNodesDatetimeFields(state.nodes);
+        recalculateDiagramTimes();
         selection = [];
         renderAll(); updateInspector(); applyCanvasBg();
         history = []; historyIndex = -1;
