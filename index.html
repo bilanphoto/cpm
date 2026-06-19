@@ -413,11 +413,8 @@ html,body{
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-  window.FirebaseLib = { initializeApp, getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp };
-</script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -3459,7 +3456,7 @@ html,body{
     appId: "1:719162288760:web:5f31851580f0cbcc1c9b8d"
   }, null, 2);
 
-  const savedCollabUsername = localStorage.getItem("cpm_collab_username") || "";
+  const savedCollabUsername = localStorage.getItem("cpm_collab_username") || "Guest_" + Math.random().toString(36).substring(2, 6);
   const savedCollabConfig = localStorage.getItem("cpm_collab_config") || defaultFirebaseConfig;
   collabUsernameInput.value = savedCollabUsername;
   collabFirebaseConfigInput.value = savedCollabConfig;
@@ -3548,18 +3545,24 @@ html,body{
   });
 
   // Main connect function
+  // Main connect function
   async function connectToFirebase(config, username) {
     const statusText = collabStatusArea.querySelector(".status-text");
     statusText.textContent = "Connecting...";
 
     try {
-      if (!window.FirebaseLib) {
+      if (typeof firebase === "undefined" || !firebase.firestore) {
         throw new Error("Firebase library not loaded. Check internet connection.");
       }
-      const { initializeApp, getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp } = window.FirebaseLib;
       
-      const app = initializeApp(config);
-      collabDb = getFirestore(app);
+      // Initialize if not already initialized
+      let app;
+      if (firebase.apps.length === 0) {
+        app = firebase.initializeApp(config);
+      } else {
+        app = firebase.app();
+      }
+      collabDb = firebase.firestore();
 
       // Determine Room ID
       const hash = window.location.hash || "";
@@ -3572,10 +3575,10 @@ html,body{
       }
 
       // Check if board already exists in database
-      const boardDocRef = doc(collabDb, "cpm_boards", collabRoomId);
-      const boardSnap = await getDoc(boardDocRef);
+      const boardDocRef = collabDb.collection("cpm_boards").doc(collabRoomId);
+      const boardSnap = await boardDocRef.get();
       
-      if (boardSnap.exists()) {
+      if (boardSnap.exists) {
         const remoteData = boardSnap.data();
         if (remoteData && remoteData.state) {
           applyRemoteState(remoteData.state);
@@ -3584,19 +3587,19 @@ html,body{
         if (remoteData && remoteData.subtitle !== undefined) $("#diagramSubtitle").value = remoteData.subtitle;
       } else {
         // Create document with current state
-        await setDoc(boardDocRef, {
+        await boardDocRef.set({
           state: JSON.stringify(state),
           title: $("#diagramTitle").value,
           subtitle: $("#diagramSubtitle").value,
-          updatedAt: serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedBy: myClientId,
           authorName: username
         });
       }
 
       // Subscribe to real-time updates
-      collabUnsubscribe = onSnapshot(boardDocRef, (snap) => {
-        if (!snap.exists()) return;
+      collabUnsubscribe = boardDocRef.onSnapshot((snap) => {
+        if (!snap.exists) return;
         const data = snap.data();
         if (data && data.updatedBy !== myClientId) {
           if (data.title !== undefined) $("#diagramTitle").value = data.title;
@@ -3609,6 +3612,8 @@ html,body{
             }
           }
         }
+      }, (err) => {
+        console.error("Firestore onSnapshot error: ", err);
       });
 
       isCollabActive = true;
@@ -3659,14 +3664,13 @@ html,body{
   // Push local state update
   async function pushLocalStateUpdate() {
     if (!isCollabActive || !collabDb || !collabRoomId) return;
-    const { doc, setDoc, serverTimestamp } = window.FirebaseLib;
     try {
-      const boardDocRef = doc(collabDb, "cpm_boards", collabRoomId);
-      await setDoc(boardDocRef, {
+      const boardDocRef = collabDb.collection("cpm_boards").doc(collabRoomId);
+      await boardDocRef.set({
         state: JSON.stringify(state),
         title: $("#diagramTitle").value,
         subtitle: $("#diagramSubtitle").value,
-        updatedAt: serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedBy: myClientId,
         authorName: localStorage.getItem("cpm_collab_username") || "Someone"
       });
@@ -3701,22 +3705,27 @@ html,body{
     }
   });
 
-  // Check on load with short delay
+  // Check on load with auto-retry until Firebase is ready
   const initCollabHash = window.location.hash || "";
   if (initCollabHash.includes("room=") && savedCollabConfig && savedCollabUsername) {
-    setTimeout(() => {
-      let parsedConfig;
-      try {
-        parsedConfig = JSON.parse(savedCollabConfig.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3').replace(/'/g, '"'));
-      } catch(e) {
+    function tryAutoConnect() {
+      if (typeof firebase !== "undefined" && firebase.firestore) {
+        let parsedConfig;
         try {
-          parsedConfig = new Function("return " + savedCollabConfig)();
-        } catch(e2) {}
+          parsedConfig = JSON.parse(savedCollabConfig.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3').replace(/'/g, '"'));
+        } catch(e) {
+          try {
+            parsedConfig = new Function("return " + savedCollabConfig)();
+          } catch(e2) {}
+        }
+        if (parsedConfig) {
+          connectToFirebase(parsedConfig, savedCollabUsername);
+        }
+      } else {
+        setTimeout(tryAutoConnect, 100);
       }
-      if (parsedConfig) {
-        connectToFirebase(parsedConfig, savedCollabUsername);
-      }
-    }, 500);
+    }
+    tryAutoConnect();
   }
 
   (function bootstrap(){
