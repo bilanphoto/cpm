@@ -358,9 +358,66 @@ html,body{
   outline:none; background:#fff; color:#1c2530; resize:none;
 }
 
+/* Collaboration modal styles */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(18, 26, 33, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+.modal-content {
+  background: #ffffff;
+  width: 480px;
+  max-width: 90%;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.08);
+  overflow: hidden;
+  animation: slideUp 0.2s ease-out;
+}
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #edf2f7;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 {
+  margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: #1c2530;
+}
+.modal-close {
+  background: none; border: none; font-size: 22px; cursor: pointer; color: #a0aec0; transition: color 0.15s;
+}
+.modal-close:hover { color: #4a5568; }
+.modal-body { padding: 20px; font-family: var(--font-body); }
+
+/* Pulser indicator for active sharing */
+.pulse-green {
+  background: #2ec4b6 !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 0 rgba(46, 196, 182, 0.7);
+  animation: pulse 1.6s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(46, 196, 182, 0.7); }
+  70% { transform: scale(1.02); box-shadow: 0 0 0 8px rgba(46, 196, 182, 0); }
+  100% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(46, 196, 182, 0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; }
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  window.FirebaseLib = { initializeApp, getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp };
+</script>
 </head>
 <body>
 
@@ -403,6 +460,7 @@ html,body{
       <button class="btn" id="btnCopyEl" title="Copy selected element (Ctrl+C)">Copy</button>
       <button class="btn" id="btnPasteEl" title="Paste copied element (Ctrl+V)">Paste</button>
       <button class="btn primary" id="btnExportPng">Export image</button>
+      <button class="btn" id="btnShareCollab" title="Share and collaborate in real-time (Firebase)">🔗 Share</button>
     </div>
   </header>
 
@@ -670,6 +728,48 @@ html,body{
     <span id="statusRight">Elements: <b id="elCount">0</b></span>
   </footer>
 </div>
+  <!-- ============ COLLABORATION SHARING MODAL ============ -->
+  <div id="collabModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Real-time Collaboration</h3>
+        <button class="modal-close" id="collabModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:#5c6b73; margin-bottom:14px; line-height:1.4;">
+          Connect to a Firebase Firestore database to invite others to view and edit this diagram in real-time.
+        </p>
+        
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-weight:600; font-size:12.5px; display:block; margin-bottom:6px;">Your Name / Username</label>
+          <input type="text" id="collabUsername" placeholder="e.g., John Doe" style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; color:#1c2530;" spellcheck="false">
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="font-weight:600; font-size:12.5px; display:block; margin-bottom:6px;">Firebase Web App Configuration (JSON Object)</label>
+          <textarea id="collabFirebaseConfig" placeholder='{&#10;  "apiKey": "AIzaSy...",&#10;  "authDomain": "...",&#10;  "projectId": "...",&#10;  "appId": "..."&#10;}' style="width:100%; height:120px; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-family:var(--font-mono); font-size:11.5px; resize:none; color:#1c2530;" spellcheck="false"></textarea>
+        </div>
+
+        <div id="collabStatusArea" style="padding:10px 12px; border-radius:4px; margin-bottom:16px; font-size:12.5px; font-weight:500; display:flex; align-items:center; gap:8px; background:#f4f6f8; color:#3a4b53;">
+          <span class="status-dot" style="width:8px; height:8px; border-radius:50%; background:#888; display:inline-block;"></span>
+          <span class="status-text">Disconnected</span>
+        </div>
+
+        <div id="collabShareArea" style="display:none; margin-bottom:16px;">
+          <label style="font-weight:600; font-size:12.5px; display:block; margin-bottom:6px;">Shareable Link</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="collabShareLink" readonly style="flex:1; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#f9fafb; color:#1c2530;" onclick="this.select()">
+            <button class="btn" id="btnCopyShareLink">Copy Link</button>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn ghost" id="btnCollabDisconnect" style="display:none; border-color:#e74c3c; color:#e74c3c;">Disconnect</button>
+          <button class="btn primary" id="btnCollabConnect">Connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <script>
 /* ============================================================
@@ -792,7 +892,13 @@ html,body{
     restoreSnapshot(history[historyIndex]);
     setStatus("Redo");
   }
-  function commit(){ pushHistory(); refreshCount(); }
+  function commit(){
+    pushHistory();
+    refreshCount();
+    if (isCollabActive) {
+      pushLocalStateUpdate();
+    }
+  }
 
   function setStatus(msg){ statusLeft.textContent = msg; }
 
@@ -1849,11 +1955,18 @@ html,body{
   }
 
   function onWindowMouseUp(e){
+    const wasDragging = drag !== null;
     if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text")) commit();
     if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
     window.removeEventListener("mouseup", onWindowMouseUp);
+
+    // Apply any remote state update that was queued during drag
+    if(wasDragging && typeof remoteUpdatePending === "string") {
+      applyRemoteState(remoteUpdatePending);
+      remoteUpdatePending = false;
+    }
   }
 
   // ---------------------------------------------------------
@@ -3312,6 +3425,299 @@ html,body{
   renderAll();
   pushHistory();
   applyZoom();
+
+  // ---------------------------------------------------------
+  // Real-time Collaboration (Firebase)
+  // ---------------------------------------------------------
+  let isCollabActive = false;
+  let collabRoomId = null;
+  let collabUnsubscribe = null;
+  let myClientId = Math.random().toString(36).substring(2, 15);
+  let collabDb = null;
+  let remoteUpdatePending = false;
+
+  // UI elements
+  const collabModal = document.getElementById("collabModal");
+  const collabModalClose = document.getElementById("collabModalClose");
+  const btnShareCollab = document.getElementById("btnShareCollab");
+  const collabUsernameInput = document.getElementById("collabUsername");
+  const collabFirebaseConfigInput = document.getElementById("collabFirebaseConfig");
+  const btnCollabConnect = document.getElementById("btnCollabConnect");
+  const btnCollabDisconnect = document.getElementById("btnCollabDisconnect");
+  const collabStatusArea = document.getElementById("collabStatusArea");
+  const collabShareArea = document.getElementById("collabShareArea");
+  const collabShareLinkInput = document.getElementById("collabShareLink");
+  const btnCopyShareLink = document.getElementById("btnCopyShareLink");
+
+  // Load saved configuration from localStorage
+  const defaultFirebaseConfig = JSON.stringify({
+    apiKey: "AIzaSyBrIVbLs2NVf5AGBhtDULw4ZeMCEjZo8ew",
+    authDomain: "cpm-create.firebaseapp.com",
+    projectId: "cpm-create",
+    storageBucket: "cpm-create.firebasestorage.app",
+    messagingSenderId: "719162288760",
+    appId: "1:719162288760:web:5f31851580f0cbcc1c9b8d"
+  }, null, 2);
+
+  const savedCollabUsername = localStorage.getItem("cpm_collab_username") || "";
+  const savedCollabConfig = localStorage.getItem("cpm_collab_config") || defaultFirebaseConfig;
+  collabUsernameInput.value = savedCollabUsername;
+  collabFirebaseConfigInput.value = savedCollabConfig;
+
+  // Toggle modal visibility
+  btnShareCollab.addEventListener("click", () => {
+    collabModal.style.display = "flex";
+    updateCollabUI();
+  });
+  collabModalClose.addEventListener("click", () => collabModal.style.display = "none");
+  window.addEventListener("click", (e) => {
+    if (e.target === collabModal) collabModal.style.display = "none";
+  });
+
+  // Update collab UI
+  function updateCollabUI() {
+    const statusDot = collabStatusArea.querySelector(".status-dot");
+    const statusText = collabStatusArea.querySelector(".status-text");
+    
+    if (isCollabActive) {
+      statusDot.style.background = "#2ec4b6";
+      statusText.textContent = "Connected to room: " + collabRoomId;
+      btnShareCollab.classList.add("pulse-green");
+      btnShareCollab.textContent = "🟢 Shared";
+      btnCollabConnect.style.display = "none";
+      btnCollabDisconnect.style.display = "block";
+      collabShareArea.style.display = "block";
+      collabShareLinkInput.value = window.location.origin + window.location.pathname + "#room=" + collabRoomId;
+    } else {
+      statusDot.style.background = "#888";
+      statusText.textContent = "Disconnected";
+      btnShareCollab.classList.remove("pulse-green");
+      btnShareCollab.textContent = "🔗 Share";
+      btnCollabConnect.style.display = "block";
+      btnCollabDisconnect.style.display = "none";
+      collabShareArea.style.display = "none";
+    }
+  }
+
+  // Connect handler
+  btnCollabConnect.addEventListener("click", () => {
+    const username = collabUsernameInput.value.trim();
+    const configStr = collabFirebaseConfigInput.value.trim();
+    if (!username) {
+      alert("Please enter your name.");
+      return;
+    }
+    if (!configStr) {
+      alert("Please enter your Firebase Web App configuration.");
+      return;
+    }
+
+    let config;
+    try {
+      config = JSON.parse(configStr.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3').replace(/'/g, '"'));
+    } catch(err) {
+      try {
+        config = new Function("return " + configStr)();
+      } catch (err2) {
+        alert("Invalid Firebase Configuration format. Please paste a valid JSON object.");
+        return;
+      }
+    }
+
+    if (!config || typeof config !== "object") {
+      alert("Invalid Firebase Configuration format.");
+      return;
+    }
+
+    localStorage.setItem("cpm_collab_username", username);
+    localStorage.setItem("cpm_collab_config", configStr);
+
+    connectToFirebase(config, username);
+  });
+
+  // Disconnect handler
+  btnCollabDisconnect.addEventListener("click", () => {
+    disconnectFromFirebase();
+  });
+
+  // Copy share link helper
+  btnCopyShareLink.addEventListener("click", () => {
+    collabShareLinkInput.select();
+    document.execCommand("copy");
+    alert("Share link copied to clipboard!");
+  });
+
+  // Main connect function
+  async function connectToFirebase(config, username) {
+    const statusText = collabStatusArea.querySelector(".status-text");
+    statusText.textContent = "Connecting...";
+
+    try {
+      if (!window.FirebaseLib) {
+        throw new Error("Firebase library not loaded. Check internet connection.");
+      }
+      const { initializeApp, getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp } = window.FirebaseLib;
+      
+      const app = initializeApp(config);
+      collabDb = getFirestore(app);
+
+      // Determine Room ID
+      const hash = window.location.hash || "";
+      const match = hash.match(/room=([a-zA-Z0-9_-]+)/);
+      if (match) {
+        collabRoomId = match[1];
+      } else {
+        collabRoomId = Math.random().toString(36).substring(2, 14);
+        window.location.hash = "room=" + collabRoomId;
+      }
+
+      // Check if board already exists in database
+      const boardDocRef = doc(collabDb, "cpm_boards", collabRoomId);
+      const boardSnap = await getDoc(boardDocRef);
+      
+      if (boardSnap.exists()) {
+        const remoteData = boardSnap.data();
+        if (remoteData && remoteData.state) {
+          applyRemoteState(remoteData.state);
+        }
+        if (remoteData && remoteData.title !== undefined) $("#diagramTitle").value = remoteData.title;
+        if (remoteData && remoteData.subtitle !== undefined) $("#diagramSubtitle").value = remoteData.subtitle;
+      } else {
+        // Create document with current state
+        await setDoc(boardDocRef, {
+          state: JSON.stringify(state),
+          title: $("#diagramTitle").value,
+          subtitle: $("#diagramSubtitle").value,
+          updatedAt: serverTimestamp(),
+          updatedBy: myClientId,
+          authorName: username
+        });
+      }
+
+      // Subscribe to real-time updates
+      collabUnsubscribe = onSnapshot(boardDocRef, (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (data && data.updatedBy !== myClientId) {
+          if (data.title !== undefined) $("#diagramTitle").value = data.title;
+          if (data.subtitle !== undefined) $("#diagramSubtitle").value = data.subtitle;
+          if (data.state) {
+            if (drag !== null) {
+              remoteUpdatePending = data.state;
+            } else {
+              applyRemoteState(data.state);
+            }
+          }
+        }
+      });
+
+      isCollabActive = true;
+      updateCollabUI();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to Firebase: " + err.message);
+      disconnectFromFirebase();
+    }
+  }
+
+  function disconnectFromFirebase() {
+    if (collabUnsubscribe) {
+      collabUnsubscribe();
+      collabUnsubscribe = null;
+    }
+    isCollabActive = false;
+    collabRoomId = null;
+    collabDb = null;
+    remoteUpdatePending = false;
+    
+    // Remove hash from URL
+    window.location.hash = "";
+    
+    updateCollabUI();
+  }
+
+  function applyRemoteState(stateJson) {
+    try {
+      const remoteState = JSON.parse(stateJson);
+      if (remoteState && Array.isArray(remoteState.nodes)) {
+        state = remoteState;
+        
+        // Re-run setup fields if needed
+        initNodesDatetimeFields(state.nodes);
+        recalculateDiagramTimes();
+        
+        // Clear selection to avoid stale references
+        selection = [];
+        renderAll();
+        updateInspector();
+      }
+    } catch (e) {
+      console.error("Error applying remote state: ", e);
+    }
+  }
+
+  // Push local state update
+  async function pushLocalStateUpdate() {
+    if (!isCollabActive || !collabDb || !collabRoomId) return;
+    const { doc, setDoc, serverTimestamp } = window.FirebaseLib;
+    try {
+      const boardDocRef = doc(collabDb, "cpm_boards", collabRoomId);
+      await setDoc(boardDocRef, {
+        state: JSON.stringify(state),
+        title: $("#diagramTitle").value,
+        subtitle: $("#diagramSubtitle").value,
+        updatedAt: serverTimestamp(),
+        updatedBy: myClientId,
+        authorName: localStorage.getItem("cpm_collab_username") || "Someone"
+      });
+    } catch (err) {
+      console.error("Error saving state to Firestore: ", err);
+    }
+  }
+
+  // Change listeners for diagram Title/Subtitle to sync changes
+  $("#diagramTitle").addEventListener("change", () => {
+    if (isCollabActive) pushLocalStateUpdate();
+  });
+  $("#diagramSubtitle").addEventListener("change", () => {
+    if (isCollabActive) pushLocalStateUpdate();
+  });
+
+  // Check on load if we should auto-connect from hash and saved config
+  window.addEventListener("hashchange", () => {
+    const hash = window.location.hash || "";
+    if (hash.includes("room=") && !isCollabActive && savedCollabConfig && savedCollabUsername) {
+      let parsedConfig;
+      try {
+        parsedConfig = JSON.parse(savedCollabConfig.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3').replace(/'/g, '"'));
+      } catch(e) {
+        try {
+          parsedConfig = new Function("return " + savedCollabConfig)();
+        } catch(e2) {}
+      }
+      if (parsedConfig) {
+        connectToFirebase(parsedConfig, savedCollabUsername);
+      }
+    }
+  });
+
+  // Check on load with short delay
+  const initCollabHash = window.location.hash || "";
+  if (initCollabHash.includes("room=") && savedCollabConfig && savedCollabUsername) {
+    setTimeout(() => {
+      let parsedConfig;
+      try {
+        parsedConfig = JSON.parse(savedCollabConfig.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3').replace(/'/g, '"'));
+      } catch(e) {
+        try {
+          parsedConfig = new Function("return " + savedCollabConfig)();
+        } catch(e2) {}
+      }
+      if (parsedConfig) {
+        connectToFirebase(parsedConfig, savedCollabUsername);
+      }
+    }, 500);
+  }
 
   (function bootstrap(){
     const embedded = document.getElementById("embeddedState");
