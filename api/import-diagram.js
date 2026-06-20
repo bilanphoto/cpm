@@ -40,32 +40,47 @@ export default async function handler(req, res) {
     const prompt = `You are a critical path method (CPM) diagram analysis expert. 
 Analyze the uploaded image of a CPM diagram and reconstruct it into our structured diagram format.
 
-Extract all elements and map them to our canvas coordinates:
-- The canvas width is 3000px and height is 1800px.
-- Make sure to distribute nodes (circles, hexagons, diamonds) appropriately on this 3000x1800 space with at least 150px of padding from all sides.
-- Do NOT overlap nodes. Space them out so connectors can be drawn clearly.
+A CPM diagram consists of:
+1. Nodes (circles, hexagons, diamonds) representing events/milestones.
+2. Connectors (arrow lines) representing tasks between nodes.
+3. Annotations (banners, note boxes, text) representing headers or task lists.
+
+Follow these strict rules to ensure high accuracy:
+
+--- DETECTION RULES ---
+1. **Nodes vs. Durations**:
+   - Nodes are actual shapes (circles, hexagons, diamonds). The number inside the shape is the node's "label".
+   - Durations are numbers in parentheses (e.g. '(20)', '(52)', '(4)') written near the connector lines. 
+   - **CRITICAL**: Do NOT create a node for a duration value in parentheses. For example, if a line has '(20)' below it, do NOT create a node named '20'.
+
+2. **Vertical & Horizontal Alignment (Grids)**:
+   - Identify the horizontal rows (swimlanes) in the diagram. Nodes in the same horizontal path should have almost identical y-coordinates.
+   - Vertically aligned nodes (e.g. all nodes labeled '13' that align vertically, or the '72' hand-over milestones) MUST have the exact same x-coordinate.
+   - Align nodes vertically if they align in the image to keep the diagram clean.
+
+3. **Color Codes**:
+   - Process nodes (circles) are usually white ("#ffffff") or yellow ("#f6d34d" / "#f1c40f").
+   - Milestone nodes (hexagons) are usually green ("#7fb56e" / "#2ecc71") or yellow.
+   - Identify node fill colors accurately as hex strings.
+
+4. **Connectors (Arrows)**:
+   - Determine which node connects to which by following the arrow lines.
+   - For each connector, identify the 'task' name (text above the line) and 'duration' (number in parentheses below or near the line, e.g. '(20)', '(52)', '(4)').
+   - Keep durations formatted like '(20)'.
+   - Vertical lines connecting nodes of the same value are usually dummy tasks (dashed or solid). Ensure these are captured as connectors.
+
+5. **Annotations (Text & Note Boxes)**:
+   - Identify all banners (e.g., 'Change Cold box 3304E07' in the yellow-green box at the top, or 'CPM SHUT DOWN TURNAROUND GSP#3' at the very top).
+   - Identify all note boxes (e.g., 'Task list' on the right, containing lists like '1. Line side draw corrosion...').
+   - **CRITICAL**: You MUST extract the actual text content inside these boxes and set it in the 'text' field. Do not leave the text empty.
+   - For annotation colors, choose from the following color tokens: 'orange', 'green', 'yellow', 'peach', 'white', 'none', 'pink'. Do NOT output raw hex color strings.
+   - For annotation text colors, choose from: 'black', 'red', 'blue', 'green'.
+
+--- COORDINATES MAPPING ---
+- The output canvas is 3000px wide and 1800px high.
+- Map the coordinates proportionally to this 3000x1800 space.
 - Circle nodes should have radius r around 30px, hex milestones around 34px.
-- Identify:
-  1. Nodes:
-     - type: "circle" (for process nodes), "hex" (for hand-over milestones/hexagons), or "diamond" (for hold/mode points/diamonds).
-     - label: the number inside the node (usually the earliest start time or step number).
-     - sublabel: the caption text above/below the node.
-     - datetime: any date/time text displayed near the node (e.g., '20 Apr.25\\n04.00').
-     - fill: the fill color of the node (e.g., "#ffffff" for process nodes, "#7fb56e" for green hexagons, "#f6d34d" for yellow hexagons/circles).
-  2. Connectors:
-     - fromIndex: 0-based index of the source node in your generated "nodes" array.
-     - toIndex: 0-based index of the target node in your generated "nodes" array.
-     - kind: always "arrow".
-     - color: stroke color of the line (e.g., "#c0392b" for red lines).
-     - dashed: true if the line is dashed/dotted, false if solid.
-     - task: the task name text (usually written above the line).
-     - duration: the duration text (usually written below the line, e.g. '(1)', '(4)', '(42)').
-  3. Annotations:
-     - type: "note" (for note boxes), "banner" (for section banners), or "text" (for free-text).
-     - x, y: positions.
-     - w, h: width and height.
-     - color: fill/border color of the note.
-     - text: text content inside.
+- Space elements out to prevent text or nodes from overlapping.
 
 Ensure all positions are numbers (integers or floats). Return the result matching the response schema.`;
 
@@ -131,10 +146,13 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
                   y: { type: "NUMBER" },
                   w: { type: "NUMBER" },
                   h: { type: "NUMBER" },
-                  color: { type: "STRING" },
-                  text: { type: "STRING" }
+                  color: { type: "STRING", enum: ["orange", "green", "yellow", "peach", "white", "none", "pink"] },
+                  textColor: { type: "STRING", enum: ["black", "red", "blue", "green"] },
+                  text: { type: "STRING" },
+                  fontSize: { type: "NUMBER" },
+                  bold: { type: "BOOLEAN" }
                 },
-                required: ["type", "x", "y"]
+                required: ["type", "x", "y", "w", "h", "text", "color"]
               }
             }
           }
