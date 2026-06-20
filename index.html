@@ -4638,14 +4638,40 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
 
   function applyImportedData(parsedData) {
     const nodeIdMap = {};
+    
+    // Find max row and col to distribute nodes dynamically
+    let maxRow = 0;
+    let maxCol = 0;
+    (parsedData.nodes || []).forEach(n => {
+      if (n.row !== undefined && n.row > maxRow) maxRow = n.row;
+      if (n.col !== undefined && n.col > maxCol) maxCol = n.col;
+    });
+
     const newNodes = (parsedData.nodes || []).map((n, idx) => {
       const newId = uid();
       nodeIdMap[idx] = newId;
+      
+      let targetX = n.x;
+      let targetY = n.y;
+      
+      if (n.row !== undefined && n.col !== undefined) {
+        const startX = 200;
+        const endX = 2800;
+        const startY = 300;
+        const endY = 1500;
+        
+        const rowFactor = maxRow > 0 ? (endY - startY) / maxRow : 260;
+        const colFactor = maxCol > 0 ? (endX - startX) / maxCol : 210;
+        
+        targetX = startX + n.col * colFactor;
+        targetY = startY + n.row * rowFactor;
+      }
+
       return {
         id: newId,
         type: n.type || "circle",
-        x: snap(n.x),
-        y: snap(n.y),
+        x: snap(targetX),
+        y: snap(targetY),
         r: n.r || 30,
         fill: n.fill || "#ffffff",
         label: n.label || "",
