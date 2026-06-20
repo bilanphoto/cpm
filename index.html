@@ -108,6 +108,55 @@ html,body{
   white-space:nowrap; flex:0 0 auto;
 }
 .btn:hover{ background:var(--chrome-600); border-color:#46566a; }
+
+/* Dropdown Menu Container */
+.dropdown {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: var(--chrome-700);
+  min-width: 140px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.3);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--radius-sm);
+  z-index: 1000;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+/* Buttons inside the dropdown */
+.dropdown-item {
+  color: var(--chrome-text);
+  padding: 8px 16px;
+  text-decoration: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.dropdown-item:hover {
+  background-color: var(--chrome-600);
+}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {
+  display: block;
+}
 .btn:active{ transform:translateY(1px); }
 .btn.primary{ background:var(--amber); border-color:var(--amber-deep); color:#1a1305; }
 .btn.primary:hover{ background:#f0a456; }
@@ -460,11 +509,6 @@ html,body{
       <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
       <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
       <div class="sep"></div>
-      <button class="btn ghost" id="btnZoomOut" title="Zoom out">−</button>
-      <span id="zoomLabel">100%</span>
-      <button class="btn ghost" id="btnZoomIn" title="Zoom in">+</button>
-      <button class="btn ghost" id="btnZoomReset" title="Reset view">⤢</button>
-      <div class="sep"></div>
       <button class="btn ghost" id="btnGrid" title="Toggle grid">▦</button>
       <label class="btn ghost bg-color-btn" id="bgColorBtn" title="Canvas background color">
         🎨
@@ -477,9 +521,14 @@ html,body{
       <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI">📷 Import Image</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <div class="sep"></div>
-      <button class="btn" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
-      <button class="btn" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy</button>
-      <button class="btn" id="btnPasteEl" title="Paste copied elements (Ctrl+V / ⌘V)">Paste</button>
+      <div class="dropdown">
+        <button class="btn" id="btnEditDropdown">Edit ▼</button>
+        <div class="dropdown-content">
+          <button class="dropdown-item" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
+          <button class="dropdown-item" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy</button>
+          <button class="dropdown-item" id="btnPasteEl" title="Paste copied elements (Ctrl+V / ⌘V)">Paste</button>
+        </div>
+      </div>
       <button class="btn primary" id="btnExportPng">Export image</button>
       <button class="btn" id="btnShareCollab" title="Share and collaborate in real-time (Firebase)">🔗 Share</button>
     </div>
@@ -3596,11 +3645,12 @@ html,body{
   // ---------------------------------------------------------
   function applyZoom(){
     canvasInner.style.transform = `scale(${zoom})`;
-    $("#zoomLabel").textContent = Math.round(zoom*100)+"%";
+    const lbl = $("#zoomLabel");
+    if(lbl) lbl.textContent = Math.round(zoom*100)+"%";
   }
-  $("#btnZoomIn").addEventListener("click", ()=>{ zoom = clamp(zoom+0.1, 0.3, 2.5); applyZoom(); });
-  $("#btnZoomOut").addEventListener("click", ()=>{ zoom = clamp(zoom-0.1, 0.3, 2.5); applyZoom(); });
-  $("#btnZoomReset").addEventListener("click", ()=>{ zoom = 1; applyZoom(); canvasWrap.scrollLeft=0; canvasWrap.scrollTop=0; });
+  const zIn = $("#btnZoomIn");   if(zIn) zIn.addEventListener("click", ()=>{ zoom = clamp(zoom+0.1, 0.3, 2.5); applyZoom(); });
+  const zOut = $("#btnZoomOut"); if(zOut) zOut.addEventListener("click", ()=>{ zoom = clamp(zoom-0.1, 0.3, 2.5); applyZoom(); });
+  const zRst = $("#btnZoomReset"); if(zRst) zRst.addEventListener("click", ()=>{ zoom = 1; applyZoom(); canvasWrap.scrollLeft=0; canvasWrap.scrollTop=0; });
 
   canvasWrap.addEventListener("wheel", (e)=>{
     if(e.ctrlKey || e.metaKey){
@@ -3735,17 +3785,16 @@ html,body{
   // Find the header row + column indices inside a sheet's 2D array (aoa).
   function findGanttHeader(aoa){
     // Order matters: more specific patterns are claimed first so a generic
-    // substring (e.g. "???" inside "???????") can't steal a column that
-    // really belongs to a later, more specific category.
+    // substring can't steal a column that really belongs to a later, more specific category.
     const wants = [
-      ["code",     ["???????", "????", "wbs", "task id", "task code"]],
-      ["start",    ["???????????", "????????", "start date", "start"]],
-      ["end",      ["??????????", "?????", "end date", "finish", "end"]],
-      ["duration", ["????????", "duration", "days", "no. of days"]],
-      ["progress", ["???????????", "???????", "progress", "% complete", "%"]],
-      ["owner",    ["????????????", "owner", "assign", "responsible"]],
-      ["phase",    ["phase", "???", "????"]],
-      ["name",     ["???????", "???????????", "???????", "??? / ???????", "task name", "activity", "task", "name", "???"]]
+      ["code",     ["wbs", "task id", "task code", "รหัส", "ลำดับ", "ที่"]],
+      ["start",    ["start date", "start", "วันเริ่มต้น", "เริ่ม", "วันที่เริ่ม", "เริ่มแผน"]],
+      ["end",      ["end date", "finish", "end", "วันสิ้นสุด", "เสร็จ", "สิ้นสุด", "วันที่สิ้นสุด", "เสร็จสิ้น"]],
+      ["duration", ["duration", "days", "no. of days", "ระยะเวลา", "วัน", "จำนวนวัน"]],
+      ["progress", ["progress", "% complete", "%", "ความก้าวหน้า", "ความคืบหน้า"]],
+      ["owner",    ["owner", "assign", "responsible", "ผู้รับผิดชอบ", "ผู้ปฏิบัติงาน"]],
+      ["phase",    ["phase", "group", "category", "กลุ่ม", "ช่วง", "ขั้นตอน"]],
+      ["name",     ["task name", "activity", "task", "name", "ชื่องาน", "กิจกรรม", "รายละเอียด"]]
     ];
     for(let r=0; r<Math.min(aoa.length, 15); r++){
       const row = aoa[r].map(c=> String(c||"").toLowerCase());
