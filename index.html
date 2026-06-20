@@ -691,6 +691,13 @@ html,body{
             </select>
           </div>
         </div>
+        <div class="field" data-field="connthickness">
+          <label>Line Thickness (ความหนาเส้น)</label>
+          <select id="fLineThickness">
+            <option value="normal">Normal (ปกติ)</option>
+            <option value="thick">Thick 2x (หนา 2 เท่า)</option>
+          </select>
+        </div>
 
         <!-- note / banner / text specific -->
         <div class="field" data-field="notebody">
@@ -1509,15 +1516,22 @@ html,body{
 
 
 
-  function colorToMarkerId(color){
-    return "arrowHead-" + String(color || "#c0392b").replace(/[^a-zA-Z0-9]/g, "");
+  function colorToMarkerId(color, strokeWidth = 3){
+    const cleanColor = String(color || "#c0392b").replace(/[^a-zA-Z0-9]/g, "");
+    const cleanWidth = String(strokeWidth).replace(".", "_");
+    return `arrowHead-${cleanColor}-${cleanWidth}`;
   }
-  function ensureArrowMarker(color){
-    const id = colorToMarkerId(color);
+  function ensureArrowMarker(color, strokeWidth = 3){
+    const id = colorToMarkerId(color, strokeWidth);
     if(svgDefs.querySelector("#"+id)) return id;
+    
+    // Maintain absolute arrowhead size at 24px in userSpace.
+    // mSize * strokeWidth = 24px => mSize = 24 / strokeWidth.
+    const mSize = 24 / strokeWidth;
+    
     const marker = svgElCreate("marker", {
       id, viewBox:"0 0 10 10", refX:"8", refY:"5",
-      markerWidth:"8", markerHeight:"8", orient:"auto-start-reverse"
+      markerWidth: mSize, markerHeight: mSize, orient:"auto-start-reverse"
     });
     const path = svgElCreate("path", {d:"M0,0 L10,5 L0,10 z", fill: color || "#c0392b"});
     marker.appendChild(path);
@@ -1549,14 +1563,16 @@ html,body{
 
       const connColor = c.color || "#c0392b";
       const hit = svgElCreate("path", {d:path.d, class:"cpm-connector-hit", fill:"none"});
+      const strokeWidth = c.thick ? 6 : 3;
       const line = svgElCreate("path", {
         d:path.d,
         class:"cpm-connector-line",
         fill:"none",
         stroke: connColor,
-        "marker-end": c.kind === "arrow" ? `url(#${ensureArrowMarker(connColor)})` : null
+        "marker-end": c.kind === "arrow" ? `url(#${ensureArrowMarker(connColor, strokeWidth)})` : null,
+        style: `stroke-width: ${strokeWidth}px;`
       });
-      if(c.dashed) line.setAttribute("stroke-dasharray","8 5");
+      if(c.dashed) line.setAttribute("stroke-dasharray", c.thick ? "12 8" : "8 5");
 
       g.appendChild(hit);
       g.appendChild(line);
@@ -2757,6 +2773,7 @@ html,body{
     task: document.querySelector('[data-field="task"]'),
     connswatches: document.querySelector('[data-field="connswatches"]'),
     connstyle: document.querySelector('[data-field="connstyle"]'),
+    connthickness: document.querySelector('[data-field="connthickness"]'),
     notebody: document.querySelector('[data-field="notebody"]'),
     notecolor: document.querySelector('[data-field="notecolor"]'),
     textcolor: document.querySelector('[data-field="textcolor"]'),
@@ -2843,6 +2860,7 @@ html,body{
       show(fieldEls.lockduration); $("#fConnectorLockDuration").checked = !!c.lockDuration;
       show(fieldEls.connswatches); syncConnSwatches(c.color || "#c0392b");
       show(fieldEls.connstyle); $("#fLineColor").value = c.color || "#c0392b"; $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
+      show(fieldEls.connthickness); $("#fLineThickness").value = c.thick ? "thick" : "normal";
     }
     else if(sel.kind === "annotation"){
       const a = findAnnotation(sel.id);
@@ -3425,6 +3443,7 @@ html,body{
   });
   bindLive("#fLineColor", ()=>{ findConnector(currentSingle().id).color = $("#fLineColor").value; syncConnSwatches($("#fLineColor").value); });
   bindLive("#fLineStyle", ()=>{ findConnector(currentSingle().id).dashed = $("#fLineStyle").value === "dashed"; });
+  bindLive("#fLineThickness", ()=>{ findConnector(currentSingle().id).thick = $("#fLineThickness").value === "thick"; });
 
   function syncConnSwatches(color){
     const norm = (color||"").toLowerCase();
@@ -3928,6 +3947,11 @@ html,body{
     const h = Math.max(400, bounds.maxY - bounds.minY + pad*2) + titleHeight;
 
     const clone = svg.cloneNode(true);
+    const docStyle = document.querySelector("style");
+    if(docStyle){
+      const styleClone = docStyle.cloneNode(true);
+      clone.insertBefore(styleClone, clone.firstChild);
+    }
     clone.setAttribute("width", w);
     clone.setAttribute("height", h);
     clone.setAttribute("viewBox", `${bounds.minX-pad} ${bounds.minY-pad-titleHeight} ${w} ${h}`);
