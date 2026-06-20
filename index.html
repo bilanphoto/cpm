@@ -201,11 +201,11 @@ html,body{
 }
 .cpm-node-sublabel{
   font-family:var(--font-body); font-weight:600; font-size:13px;
-  fill:#1c2530; text-anchor:middle; dominant-baseline:central; pointer-events:none; user-select:none;
+  fill:#1c2530; text-anchor:middle; dominant-baseline:central; pointer-events:auto; user-select:none;
 }
 .cpm-node-datetime{
   font-family:var(--font-mono); font-weight:600; font-size:12px;
-  fill:#1d4ed8; text-anchor:middle; dominant-baseline:central; pointer-events:none; user-select:none;
+  fill:#1d4ed8; text-anchor:middle; dominant-baseline:central; pointer-events:auto; user-select:none;
 }
 .cpm-node.selected .cpm-node-shape{ stroke:var(--amber); stroke-width:3.4; filter:drop-shadow(0 0 4px rgba(232,146,60,0.6)); }
 
@@ -476,8 +476,9 @@ html,body{
       <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file">📂 Open</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <div class="sep"></div>
-      <button class="btn" id="btnCopyEl" title="Copy selected element (Ctrl+C)">Copy</button>
-      <button class="btn" id="btnPasteEl" title="Paste copied element (Ctrl+V)">Paste</button>
+      <button class="btn" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
+      <button class="btn" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy</button>
+      <button class="btn" id="btnPasteEl" title="Paste copied elements (Ctrl+V / ⌘V)">Paste</button>
       <button class="btn primary" id="btnExportPng">Export image</button>
       <button class="btn" id="btnShareCollab" title="Share and collaborate in real-time (Firebase)">🔗 Share</button>
     </div>
@@ -1238,15 +1239,39 @@ html,body{
       g.appendChild(label);
 
       if(n.sublabel){
-        const sub = svgElCreate("text", {class:"cpm-node-sublabel", x:0, y:-(r+14), "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.sublabelColor || '#1c2530'}`});
+        const ox = n.sublabelOffsetX || 0;
+        const oy = n.sublabelOffsetY || 0;
+        const sub = svgElCreate("text", {class:"cpm-node-sublabel", x:ox, y:-(r+14) + oy, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.sublabelColor || '#1c2530'}; cursor:move;`});
         sub.textContent = n.sublabel;
+        sub.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          const isDbl = checkManualDoubleClick("node", n.id);
+          if(isDbl){
+            selectElement("node", n.id);
+            editNodeLabelInline(n);
+            return;
+          }
+          startNodeTextDrag(e, n, "sublabel");
+        });
         g.appendChild(sub);
       }
       if(n.datetime){
+        const ox = n.datetimeOffsetX || 0;
+        const oy = n.datetimeOffsetY || 0;
         const lines = n.datetime.split("\\n");
         lines.forEach((ln,i)=>{
-          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:0, y:r+22+i*16, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.datetimeColor || '#1d4ed8'}`});
+          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:ox, y:r+22+i*16 + oy, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.datetimeColor || '#1d4ed8'}; cursor:move;`});
           dt.textContent = ln;
+          dt.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+            const isDbl = checkManualDoubleClick("node", n.id);
+            if(isDbl){
+              selectElement("node", n.id);
+              editNodeLabelInline(n);
+              return;
+            }
+            startNodeTextDrag(e, n, "datetime");
+          });
           g.appendChild(dt);
         });
       }
@@ -1683,6 +1708,12 @@ html,body{
     if(hasContent){
       textGroup.addEventListener("mousedown", (e) => {
         e.stopPropagation();
+        const isDbl = checkManualDoubleClick("annotation", a.id);
+        if(isDbl){
+          selectElement("annotation", a.id);
+          editAnnotationInline(a);
+          return;
+        }
         startPinTextDrag(e, a);
       });
       g.appendChild(textGroup);
@@ -1941,6 +1972,23 @@ html,body{
     window.addEventListener("mouseup", onWindowMouseUp);
   }
 
+  function startNodeTextDrag(e, n, textKind){
+    if (currentTool !== "select") return;
+    selectElement("node", n.id);
+    const start = getCanvasPoint(e);
+    drag = {
+      type: "node-text",
+      id: n.id,
+      textKind: textKind,
+      startX: start.x,
+      startY: start.y,
+      origOffsetX: textKind === "sublabel" ? (n.sublabelOffsetX || 0) : (n.datetimeOffsetX || 0),
+      origOffsetY: textKind === "sublabel" ? (n.sublabelOffsetY || 0) : (n.datetimeOffsetY || 0)
+    };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+  }
+
   function onWindowMouseMove(e){
     if(!drag) return;
     const pt = getCanvasPoint(e);
@@ -1983,13 +2031,25 @@ html,body{
         a.textOffsetY = drag.origOffsetY + dy;
         renderAll();
       }
+    } else if(drag.type === "node-text"){
+      const n = findNode(drag.id);
+      if(n){
+        if (drag.textKind === "sublabel") {
+          n.sublabelOffsetX = drag.origOffsetX + dx;
+          n.sublabelOffsetY = drag.origOffsetY + dy;
+        } else {
+          n.datetimeOffsetX = drag.origOffsetX + dx;
+          n.datetimeOffsetY = drag.origOffsetY + dy;
+        }
+        renderAll();
+      }
     }
 
   }
 
   function onWindowMouseUp(e){
     const wasDragging = drag !== null;
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text")) commit();
+    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text")) commit();
     if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
@@ -2354,6 +2414,16 @@ html,body{
   }
 
 
+  function selectAll(){
+    selection = [];
+    state.nodes.forEach(n => selection.push({kind:"node", id:n.id}));
+    state.connectors.forEach(c => selection.push({kind:"connector", id:c.id}));
+    state.annotations.forEach(a => selection.push({kind:"annotation", id:a.id}));
+    renderAll();
+    updateInspector();
+  }
+
+  $("#btnSelectAll").addEventListener("click", selectAll);
   $("#btnCopyEl").addEventListener("click",  copySelected);
   $("#btnPasteEl").addEventListener("click", pasteClipboard);
 
@@ -3436,6 +3506,9 @@ html,body{
     if((e.key === "Delete" || e.key === "Backspace") && !isTyping(e.target) && selection.length){
       e.preventDefault();
       deleteSelected();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="a" && !isTyping(e.target)){
+      e.preventDefault(); selectAll();
     }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="c" && !isTyping(e.target)){
       e.preventDefault(); copySelected();
