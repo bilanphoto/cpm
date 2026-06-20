@@ -474,6 +474,7 @@ html,body{
       <div class="sep"></div>
       <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file">Save</button>
       <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file">📂 Open</button>
+      <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI">📷 Import Image</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <div class="sep"></div>
       <button class="btn" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
@@ -805,6 +806,50 @@ html,body{
         <div style="display:flex; justify-content:flex-end; gap:10px;">
           <button class="btn ghost" id="btnCollabDisconnect" style="display:none; border-color:#e74c3c; color:#e74c3c;">Disconnect</button>
           <button class="btn primary" id="btnCollabConnect">Connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ AI IMAGE IMPORT MODAL ============ -->
+  <div id="importModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Import Diagram from Image (ด้วย Gemini AI)</h3>
+        <button class="modal-close" id="importModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:#5c6b73; margin-bottom:14px; line-height:1.4;">
+          Upload a JPG or PNG image of a CPM diagram. Gemini AI will analyze the image and reconstruct the interactive nodes, arrows, and texts.
+        </p>
+        
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-weight:600; font-size:12.5px; display:block; margin-bottom:6px;">
+            Gemini API Key <span style="font-weight:normal; font-size:11px; color:#3a9d4e;">(Optional if secure Vercel Key is set)</span>
+            <span style="font-weight:normal; font-size:11px;">
+              (<a href="https://aistudio.google.com/" target="_blank" style="color:var(--amber); text-decoration:underline;">Get free key from AI Studio</a>)
+            </span>
+          </label>
+          <input type="password" id="importApiKey" placeholder="API Key is secure on Vercel (or enter custom key here)..." style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-family:inherit; color:#1c2530;" spellcheck="false">
+          <div style="display:flex; align-items:center; gap:4px; margin-top:4px;">
+            <input type="checkbox" id="chkSaveApiKey" checked style="cursor:pointer;">
+            <label for="chkSaveApiKey" style="font-size:11px; margin:0; cursor:pointer; user-select:none; color:#5c6b73;">Remember API Key on this browser</label>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="font-weight:600; font-size:12.5px; display:block; margin-bottom:6px;">Select Diagram Image</label>
+          <input type="file" id="importFile" accept="image/png, image/jpeg, image/jpg" style="width:100%; font-family:inherit; font-size:13px; color:#1c2530;">
+        </div>
+
+        <div id="importStatusArea" style="padding:10px 12px; border-radius:4px; margin-bottom:16px; font-size:12.5px; font-weight:500; display:none; align-items:center; gap:8px; background:#f4f6f8; color:#3a4b53;">
+          <span class="status-dot" style="width:8px; height:8px; border-radius:50%; background:#888; display:inline-block;"></span>
+          <span class="status-text">Ready</span>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn ghost" id="btnImportCancel">Cancel</button>
+          <button class="btn primary" id="btnImportSubmit">Analyze & Import</button>
         </div>
       </div>
     </div>
@@ -4114,6 +4159,8 @@ html,body{
   collabModalClose.addEventListener("click", () => collabModal.style.display = "none");
   window.addEventListener("click", (e) => {
     if (e.target === collabModal) collabModal.style.display = "none";
+    const impModal = document.getElementById("importModal");
+    if (e.target === impModal) impModal.style.display = "none";
   });
 
   // Update collab UI
@@ -4371,6 +4418,326 @@ html,body{
       }
     }
     tryAutoConnect();
+  }
+
+  // ---------------------------------------------------------
+  // AI Image Import (Gemini API Integration)
+  // ---------------------------------------------------------
+  const importModal = document.getElementById("importModal");
+  const btnImportImage = document.getElementById("btnImportImage");
+  const importModalClose = document.getElementById("importModalClose");
+  const btnImportCancel = document.getElementById("btnImportCancel");
+  const btnImportSubmit = document.getElementById("btnImportSubmit");
+  const importApiKeyInput = document.getElementById("importApiKey");
+  const chkSaveApiKey = document.getElementById("chkSaveApiKey");
+  const importFileInput = document.getElementById("importFile");
+  const importStatusArea = document.getElementById("importStatusArea");
+
+  // Load saved Gemini API key
+  const savedApiKey = localStorage.getItem("gemini_api_key");
+  if (savedApiKey) {
+    importApiKeyInput.value = savedApiKey;
+  }
+
+  if (btnImportImage) {
+    btnImportImage.addEventListener("click", () => {
+      importModal.style.display = "flex";
+      importStatusArea.style.display = "none";
+    });
+  }
+
+  const closeImport = () => {
+    importModal.style.display = "none";
+  };
+  if (importModalClose) importModalClose.addEventListener("click", closeImport);
+  if (btnImportCancel) btnImportCancel.addEventListener("click", closeImport);
+
+  function setImportStatus(text, type = "info") {
+    importStatusArea.style.display = "flex";
+    const dot = importStatusArea.querySelector(".status-dot");
+    const textEl = importStatusArea.querySelector(".status-text");
+    textEl.textContent = text;
+    
+    if (type === "error") {
+      dot.style.background = "#e74c3c";
+      importStatusArea.style.background = "#fdf2f2";
+      importStatusArea.style.color = "#c0392b";
+    } else if (type === "success") {
+      dot.style.background = "#2ec4b6";
+      importStatusArea.style.background = "#f0fbf9";
+      importStatusArea.style.color = "#1b8379";
+    } else {
+      dot.style.background = "#3498db";
+      importStatusArea.style.background = "#edf6fd";
+      importStatusArea.style.color = "#2980b9";
+    }
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64Str = reader.result.split(",")[1];
+        resolve({ mimeType: file.type, data: base64Str });
+      };
+      reader.onerror = error => reject(error);
+    });
+  }
+
+  async function runGeminiImport(apiKey, imageData) {
+    if (!apiKey) {
+      let response;
+      try {
+        response = await fetch("/api/import-diagram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageData })
+        });
+      } catch (netErr) {
+        throw new Error("Could not connect to Vercel proxy. If you are running this file locally from your computer (file:///), you must provide your Gemini API Key in the input field.");
+      }
+
+      if (!response.ok) {
+        let errMsg = `Server Error: ${response.status}`;
+        try {
+          const errJson = await response.json();
+          errMsg = errJson.error || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+      }
+      return response.json();
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const prompt = `You are a critical path method (CPM) diagram analysis expert. 
+Analyze the uploaded image of a CPM diagram and reconstruct it into our structured diagram format.
+
+Extract all elements and map them to our canvas coordinates:
+- The canvas width is 3000px and height is 1800px.
+- Make sure to distribute nodes (circles, hexagons, diamonds) appropriately on this 3000x1800 space with at least 150px of padding from all sides.
+- Do NOT overlap nodes. Space them out so connectors can be drawn clearly.
+- Circle nodes should have radius r around 30px, hex milestones around 34px.
+- Identify:
+  1. Nodes:
+     - type: "circle" (for process nodes), "hex" (for hand-over milestones/hexagons), or "diamond" (for hold/mode points/diamonds).
+     - label: the number inside the node (usually the earliest start time or step number).
+     - sublabel: the caption text above/below the node.
+     - datetime: any date/time text displayed near the node (e.g., '20 Apr.25\\n04.00').
+     - fill: the fill color of the node (e.g., "#ffffff" for process nodes, "#7fb56e" for green hexagons, "#f6d34d" for yellow hexagons/circles).
+  2. Connectors:
+     - fromIndex: 0-based index of the source node in your generated "nodes" array.
+     - toIndex: 0-based index of the target node in your generated "nodes" array.
+     - kind: always "arrow".
+     - color: stroke color of the line (e.g., "#c0392b" for red lines).
+     - dashed: true if the line is dashed/dotted, false if solid.
+     - task: the task name text (usually written above the line).
+     - duration: the duration text (usually written below the line, e.g. '(1)', '(4)', '(42)').
+  3. Annotations:
+     - type: "note" (for note boxes), "banner" (for section banners), or "text" (for free-text).
+     - x, y: positions.
+     - w, h: width and height.
+     - color: fill/border color of the note.
+     - text: text content inside.
+
+Ensure all positions are numbers (integers or floats). Return the result matching the response schema.`;
+
+    const requestPayload = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: imageData.mimeType,
+                data: imageData.data
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            nodes: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  type: { type: "STRING", enum: ["circle", "hex", "diamond"] },
+                  x: { type: "NUMBER" },
+                  y: { type: "NUMBER" },
+                  r: { type: "NUMBER" },
+                  fill: { type: "STRING" },
+                  label: { type: "STRING" },
+                  sublabel: { type: "STRING" },
+                  datetime: { type: "STRING" }
+                },
+                required: ["type", "x", "y", "r", "fill"]
+              }
+            },
+            connectors: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  fromIndex: { type: "INTEGER" },
+                  toIndex: { type: "INTEGER" },
+                  kind: { type: "STRING", enum: ["arrow", "line"] },
+                  color: { type: "STRING" },
+                  dashed: { type: "BOOLEAN" },
+                  duration: { type: "STRING" },
+                  task: { type: "STRING" }
+                },
+                required: ["fromIndex", "toIndex", "kind"]
+              }
+            },
+            annotations: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  type: { type: "STRING", enum: ["note", "banner", "pin", "text"] },
+                  x: { type: "NUMBER" },
+                  y: { type: "NUMBER" },
+                  w: { type: "NUMBER" },
+                  h: { type: "NUMBER" },
+                  color: { type: "STRING" },
+                  text: { type: "STRING" }
+                },
+                required: ["type", "x", "y"]
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestPayload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API Error: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error("No response candidates from Gemini API.");
+    }
+
+    const textResponse = data.candidates[0].content.parts[0].text;
+    return JSON.parse(textResponse);
+  }
+
+  function applyImportedData(parsedData) {
+    const nodeIdMap = {};
+    const newNodes = (parsedData.nodes || []).map((n, idx) => {
+      const newId = uid();
+      nodeIdMap[idx] = newId;
+      return {
+        id: newId,
+        type: n.type || "circle",
+        x: snap(n.x),
+        y: snap(n.y),
+        r: n.r || 30,
+        fill: n.fill || "#ffffff",
+        label: n.label || "",
+        sublabel: n.sublabel || "",
+        datetime: n.datetime || ""
+      };
+    });
+
+    const newConnectors = (parsedData.connectors || []).map(c => {
+      const fromId = nodeIdMap[c.fromIndex];
+      const toId = nodeIdMap[c.toIndex];
+      return {
+        id: uid(),
+        fromId: fromId || null,
+        toId: toId || null,
+        kind: c.kind || "arrow",
+        color: c.color || "#c0392b",
+        dashed: !!c.dashed,
+        duration: c.duration || "",
+        task: c.task || ""
+      };
+    });
+
+    const newAnnotations = (parsedData.annotations || []).map(a => {
+      return {
+        id: uid(),
+        type: a.type || "note",
+        x: snap(a.x),
+        y: snap(a.y),
+        w: a.w || 150,
+        h: a.h || 80,
+        color: a.color || "#ffffff",
+        text: a.text || ""
+      };
+    });
+
+    state.nodes = newNodes;
+    state.connectors = newConnectors;
+    state.annotations = newAnnotations;
+
+    initNodesDatetimeFields(state.nodes);
+    recalculateDiagramTimes();
+    renderAll();
+    updateInspector();
+    commit();
+  }
+
+  if (btnImportSubmit) {
+    btnImportSubmit.addEventListener("click", async () => {
+      const key = importApiKeyInput.value.trim();
+
+      const file = importFileInput.files[0];
+      if (!file) {
+        setImportStatus("Please select an image file first.", "error");
+        return;
+      }
+
+      if (state.nodes.length > 0 || state.annotations.length > 0 || state.connectors.length > 0) {
+        if (!confirm("This will overwrite your current diagram. Do you want to continue?")) {
+          return;
+        }
+      }
+
+      if (chkSaveApiKey.checked) {
+        localStorage.setItem("gemini_api_key", key);
+      } else {
+        localStorage.removeItem("gemini_api_key");
+      }
+
+      try {
+        btnImportSubmit.disabled = true;
+        setImportStatus("Reading file...", "info");
+        const imageData = await fileToBase64(file);
+
+        setImportStatus("Gemini is analyzing and reconstructing the diagram...", "info");
+        const parsedData = await runGeminiImport(key, imageData);
+
+        applyImportedData(parsedData);
+        setImportStatus("Diagram successfully reconstructed!", "success");
+        
+        setTimeout(() => {
+          closeImport();
+          importFileInput.value = "";
+        }, 1500);
+
+      } catch (err) {
+        console.error(err);
+        setImportStatus(`Import failed: ${err.message}`, "error");
+      } finally {
+        btnImportSubmit.disabled = false;
+      }
+    });
   }
 
   (function bootstrap(){
