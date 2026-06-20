@@ -357,6 +357,28 @@ html,body{
   border:2px solid var(--amber); border-radius:4px; padding:4px 6px;
   outline:none; background:#fff; color:#1c2530; resize:none;
 }
+.inline-connector-edit, .inline-node-edit {
+  position: absolute; z-index: 200; font-family: var(--font-body);
+  border: 2px solid var(--amber); border-radius: 6px; padding: 8px 10px;
+  outline: none; background: #fff; color: #1c2530;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 160px; box-sizing: border-box;
+}
+.inline-connector-edit div, .inline-node-edit div {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.inline-connector-edit label, .inline-node-edit label {
+  font-size: 10px; font-weight: 700; color: #64748b; margin: 0;
+}
+.inline-connector-edit input, .inline-node-edit input {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 4px 6px; font-size: 12px; color: #1e293b;
+  outline: none; box-sizing: border-box;
+}
+.inline-connector-edit input:focus, .inline-node-edit input:focus {
+  border-color: var(--amber);
+}
 
 /* Collaboration modal styles */
 .modal-overlay {
@@ -578,6 +600,12 @@ html,body{
           <label id="labelFieldName">Label</label>
           <input type="text" id="fLabel">
         </div>
+        <div class="field" data-field="locktime" style="display:none; margin-top:-8px; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="fNodeLockTime">
+            <label for="fNodeLockTime" style="font-size:11px; margin:0; cursor:pointer; user-select:none;">Lock Time (Hr) / Preserve value</label>
+          </div>
+        </div>
 
         <!-- node specific -->
         <div class="field two-col" data-field="sublabel">
@@ -630,6 +658,12 @@ html,body{
               <option value="hours">Hours</option>
               <option value="days">Days</option>
             </select>
+          </div>
+        </div>
+        <div class="field" data-field="lockduration" style="display:none; margin-top:-8px; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="fConnectorLockDuration">
+            <label for="fConnectorLockDuration" style="font-size:11px; margin:0; cursor:pointer; user-select:none;">Lock Duration / Preserve value</label>
           </div>
         </div>
         <div class="field" data-field="task">
@@ -1044,6 +1078,12 @@ html,body{
   }
 
   function recalculateDiagramTimes() {
+    state.nodes.forEach(n => {
+      if (state.connectors.some(c => c.toId === n.id)) {
+        n.autoDateTime = true;
+      }
+    });
+
     const nodeTimes = {};
     const connTimes = {}; // { id: { start, end } }
 
@@ -1078,9 +1118,7 @@ html,body{
           if (parent && parent.start) {
             const parentConn = findConnector(c.fromConnectorId);
             if (parentConn) {
-              const parentDurationStr = parentConn.duration || "";
-              const match = parentDurationStr.match(/\d+(\.\d+)?/);
-              const parentDur = match ? parseFloat(match[0]) : 0;
+              const parentDur = parseNumericLabel(parentConn.duration) || 0;
               const parentUnit = parentConn.durationUnit || "hours";
               
               const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
@@ -1090,9 +1128,7 @@ html,body{
         }
 
         if (startTime) {
-          const durationStr = c.duration || "";
-          const match = durationStr.match(/\d+(\.\d+)?/);
-          const duration = match ? parseFloat(match[0]) : 0;
+          const duration = parseNumericLabel(c.duration) || 0;
           const unit = c.durationUnit || "hours";
           const endTime = addDuration(startTime, duration, unit);
 
@@ -2450,10 +2486,152 @@ html,body{
   }
 
   function editNodeLabelInline(n){
-    openInlineEditor(n.x - n.r, n.y - 12, n.r*2, n.label, (val)=>{ n.label = val; }, {singleLine:true, fontSize:16});
+    const container = document.createElement("div");
+    container.className = "inline-node-edit";
+    const pos = screenPosFor(n.x - 80, n.y - n.r - 70);
+    container.style.left = pos.left + "px";
+    container.style.top = pos.top + "px";
+
+    const captionDiv = document.createElement("div");
+    const captionLabel = document.createElement("label");
+    captionLabel.textContent = "Caption";
+    const captionInput = document.createElement("input");
+    captionInput.type = "text";
+    captionInput.value = n.sublabel || "";
+    captionDiv.appendChild(captionLabel);
+    captionDiv.appendChild(captionInput);
+
+    const timeDiv = document.createElement("div");
+    const timeLabel = document.createElement("label");
+    timeLabel.textContent = "Time (Hr)";
+    const timeInput = document.createElement("input");
+    timeInput.type = "text";
+    timeInput.value = n.label || "";
+    timeDiv.appendChild(timeLabel);
+    timeDiv.appendChild(timeInput);
+
+    container.appendChild(captionDiv);
+    container.appendChild(timeDiv);
+    document.body.appendChild(container);
+
+    setTimeout(() => { timeInput.focus(); timeInput.select(); }, 0);
+
+    function finish() {
+      const captionVal = captionInput.value;
+      const timeVal = timeInput.value;
+      
+      n.sublabel = captionVal;
+      updateNodeLabelAndAdjust(n, timeVal);
+      
+      container.removeEventListener("focusout", onFocusOut);
+      container.remove();
+      
+      updateInspector();
+      renderAll();
+      commit();
+    }
+
+    let isRemoving = false;
+    function onFocusOut(e) {
+      setTimeout(() => {
+        if (!container.contains(document.activeElement) && !isRemoving) {
+          isRemoving = true;
+          finish();
+        }
+      }, 50);
+    }
+    
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!isRemoving) {
+          isRemoving = true;
+          finish();
+        }
+      } else if (e.key === "Escape") {
+        container.removeEventListener("focusout", onFocusOut);
+        container.remove();
+      }
+    };
+    captionInput.addEventListener("keydown", handleKeyDown);
+    timeInput.addEventListener("keydown", handleKeyDown);
+
+    container.addEventListener("focusout", onFocusOut);
   }
   function editConnectorInline(c, midx, midy){
-    openInlineEditor(midx-70, midy-40, 140, c.task, (val)=>{ c.task = val; }, {singleLine:false, fontSize:13});
+    const container = document.createElement("div");
+    container.className = "inline-connector-edit";
+    const pos = screenPosFor(midx - 80, midy - 45);
+    container.style.left = pos.left + "px";
+    container.style.top = pos.top + "px";
+
+    const taskDiv = document.createElement("div");
+    const taskLabel = document.createElement("label");
+    taskLabel.textContent = "Task Name";
+    const taskInput = document.createElement("input");
+    taskInput.type = "text";
+    taskInput.value = c.task || "";
+    taskDiv.appendChild(taskLabel);
+    taskDiv.appendChild(taskInput);
+
+    const durDiv = document.createElement("div");
+    const durLabel = document.createElement("label");
+    durLabel.textContent = "Duration";
+    const durInput = document.createElement("input");
+    durInput.type = "text";
+    durInput.value = c.duration || "";
+    durDiv.appendChild(durLabel);
+    durDiv.appendChild(durInput);
+
+    container.appendChild(taskDiv);
+    container.appendChild(durDiv);
+    document.body.appendChild(container);
+
+    setTimeout(() => { taskInput.focus(); taskInput.select(); }, 0);
+
+    function finish() {
+      const taskVal = taskInput.value;
+      const durVal = durInput.value;
+      
+      c.task = taskVal;
+      c.duration = durVal;
+      
+      container.removeEventListener("focusout", onFocusOut);
+      container.remove();
+      
+      propagateFromConnector(c.id);
+      recalculateDiagramTimes();
+      updateInspector();
+      renderAll();
+      commit();
+    }
+
+    let isRemoving = false;
+    function onFocusOut(e) {
+      setTimeout(() => {
+        if (!container.contains(document.activeElement) && !isRemoving) {
+          isRemoving = true;
+          finish();
+        }
+      }, 50);
+    }
+    
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!isRemoving) {
+          isRemoving = true;
+          finish();
+        }
+      } else if (e.key === "Escape") {
+        container.removeEventListener("focusout", onFocusOut);
+        container.remove();
+      }
+    };
+    taskInput.addEventListener("keydown", handleKeyDown);
+    durInput.addEventListener("keydown", handleKeyDown);
+
+    container.addEventListener("focusout", onFocusOut);
   }
   function editAnnotationInline(a){
     if(a.type === "note"){
@@ -2500,10 +2678,12 @@ html,body{
 
   const fieldEls = {
     label: document.querySelector('[data-field="label"]'),
+    locktime: document.querySelector('[data-field="locktime"]'),
     sublabel: document.querySelector('[data-field="sublabel"]'),
     datetime: document.querySelector('[data-field="datetime"]'),
     fillrow: document.querySelector('[data-field="fillrow"]'),
     duration: document.querySelector('[data-field="duration"]'),
+    lockduration: document.querySelector('[data-field="lockduration"]'),
     task: document.querySelector('[data-field="task"]'),
     connswatches: document.querySelector('[data-field="connswatches"]'),
     connstyle: document.querySelector('[data-field="connstyle"]'),
@@ -2553,6 +2733,7 @@ html,body{
       panelTitle.textContent = "Node — " + n.type;
       $("#labelFieldName").textContent = "Time (Hr)";
       show(fieldEls.label); $("#fLabel").value = n.label || "";
+      show(fieldEls.locktime); $("#fNodeLockTime").checked = !!n.lockTime;
       
       show(fieldEls.sublabel);
       $("#fSublabel").value = n.sublabel || "";
@@ -2567,7 +2748,7 @@ html,body{
       
       if (hasPreds) {
         autoCheckbox.disabled = false;
-        if (n.autoDateTime === undefined) n.autoDateTime = true;
+        n.autoDateTime = true;
       } else {
         autoCheckbox.disabled = true;
         n.autoDateTime = false;
@@ -2589,6 +2770,7 @@ html,body{
       show(fieldEls.duration);
       $("#fDuration").value = c.duration || "";
       $("#fDurationUnit").value = c.durationUnit || "hours";
+      show(fieldEls.lockduration); $("#fConnectorLockDuration").checked = !!c.lockDuration;
       show(fieldEls.connswatches); syncConnSwatches(c.color || "#c0392b");
       show(fieldEls.connstyle); $("#fLineColor").value = c.color || "#c0392b"; $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
     }
@@ -2646,10 +2828,7 @@ html,body{
   bindLive("#fLabel", ()=>{
     const sel = currentSingle();
     if(sel.kind==="node"){
-      findNode(sel.id).label = $("#fLabel").value;
-      state.connectors.forEach(c=>{
-        if(c.fromId === sel.id) propagateFromConnector(c.id);
-      });
+      updateNodeLabelAndAdjust(findNode(sel.id), $("#fLabel").value);
     }
     else if(sel.kind==="annotation"){ findAnnotation(sel.id).text = $("#fLabel").value; }
   });
@@ -2707,6 +2886,22 @@ html,body{
     renderAll();
     commit();
   });
+  $("#fNodeLockTime").addEventListener("change", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "node") return;
+    const n = findNode(sel.id);
+    n.lockTime = $("#fNodeLockTime").checked;
+    renderAll();
+    commit();
+  });
+  $("#fConnectorLockDuration").addEventListener("change", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "connector") return;
+    const c = findConnector(sel.id);
+    c.lockDuration = $("#fConnectorLockDuration").checked;
+    renderAll();
+    commit();
+  });
 
   bindLive("#fFill", ()=>{ findNode(currentSingle().id).fill = $("#fFill").value; });
   bindLive("#fSize", ()=>{ findNode(currentSingle().id).r = parseInt($("#fSize").value,10); });
@@ -2716,6 +2911,237 @@ html,body{
   // set the downstream node's label to (upstream label + duration), and
   // cascade that forward through any further connectors out of that node.
   // ---------------------------------------------------------
+  function formatDurationValue(num, originalStr) {
+    const hasParens = originalStr && String(originalStr).includes("(");
+    const formattedNum = Number.isInteger(num) ? String(num) : String(Math.round(num * 100) / 100);
+    return hasParens ? `(${formattedNum})` : formattedNum;
+  }
+
+  function getMaxAllowedNodeVal(node, visited) {
+    visited = visited || new Set();
+    if (visited.has(node.id)) return Infinity;
+    visited.add(node.id);
+
+    if (node.lockTime) {
+      const val = parseNumericLabel(node.label);
+      if (val !== null) return val;
+    }
+
+    let maxVal = Infinity;
+    state.connectors.forEach(c => {
+      // 1. Through outgoing connectors
+      if (c.fromId === node.id && c.toId) {
+        const target = findNode(c.toId);
+        if (target) {
+          const targetMax = getMaxAllowedNodeVal(target, visited);
+          if (c.lockDuration) {
+            const dur = parseNumericLabel(c.duration) || 0;
+            if (targetMax !== Infinity) {
+              maxVal = Math.min(maxVal, targetMax - dur);
+            }
+          } else {
+            const targetVal = parseNumericLabel(target.label);
+            if (target.lockTime && targetVal !== null) {
+              maxVal = Math.min(maxVal, targetVal);
+            } else if (targetMax !== Infinity) {
+              maxVal = Math.min(maxVal, targetMax);
+            }
+          }
+        }
+      }
+
+      // 2. Through incoming connectors if they are locked (rigid link forward propagation)
+      if (c.toId === node.id && c.lockDuration) {
+        let sourceNode = null;
+        if (c.fromId) {
+          sourceNode = findNode(c.fromId);
+        } else if (c.fromConnectorId) {
+          const parentConn = findConnector(c.fromConnectorId);
+          if (parentConn && parentConn.fromId) {
+            sourceNode = findNode(parentConn.fromId);
+          }
+        }
+        if (sourceNode) {
+          const sourceMax = getMaxAllowedNodeVal(sourceNode, visited);
+          const dur = parseNumericLabel(c.duration) || 0;
+          if (sourceMax !== Infinity) {
+            maxVal = Math.min(maxVal, sourceMax + dur);
+          }
+        }
+      }
+    });
+    return maxVal;
+  }
+
+  function getMinAllowedNodeVal(node, visited) {
+    visited = visited || new Set();
+    if (visited.has(node.id)) return 0;
+    visited.add(node.id);
+
+    if (node.lockTime) {
+      const val = parseNumericLabel(node.label);
+      if (val !== null) return val;
+    }
+
+    let minVal = 0;
+    state.connectors.forEach(c => {
+      // 1. Through incoming connectors
+      if (c.toId === node.id) {
+        let sourceNode = null;
+        if (c.fromId) {
+          sourceNode = findNode(c.fromId);
+        } else if (c.fromConnectorId) {
+          const parentConn = findConnector(c.fromConnectorId);
+          if (parentConn && parentConn.fromId) {
+            sourceNode = findNode(parentConn.fromId);
+          }
+        }
+        if (sourceNode) {
+          const sourceMin = getMinAllowedNodeVal(sourceNode, visited);
+          if (c.lockDuration) {
+            const dur = parseNumericLabel(c.duration) || 0;
+            minVal = Math.max(minVal, sourceMin + dur);
+          } else {
+            const sourceVal = parseNumericLabel(sourceNode.label);
+            if (sourceNode.lockTime && sourceVal !== null) {
+              minVal = Math.max(minVal, sourceVal);
+            } else {
+              minVal = Math.max(minVal, sourceMin);
+            }
+          }
+        }
+      }
+      
+      // 2. Through outgoing connectors if they are locked (rigid link backward propagation)
+      if (c.fromId === node.id && c.toId && c.lockDuration) {
+        const target = findNode(c.toId);
+        if (target) {
+          const targetMin = getMinAllowedNodeVal(target, visited);
+          const dur = parseNumericLabel(c.duration) || 0;
+          minVal = Math.max(minVal, targetMin - dur);
+        }
+      }
+    });
+
+    return minVal;
+  }
+
+  function adjustNodeValueWithConstraints(n, newVal, visited) {
+    visited = visited || new Set();
+    if (visited.has(n.id)) return;
+    visited.add(n.id);
+
+    // If the node itself is locked and we are recursively adjusting it, do not change its value!
+    if (n.lockTime && visited.size > 1) {
+      return;
+    }
+
+    // Cap value by downstream and upstream locked constraints
+    let cappedVal = newVal;
+    const maxVal = getMaxAllowedNodeVal(n);
+    if (maxVal !== Infinity && maxVal < cappedVal) {
+      cappedVal = maxVal;
+    }
+
+    const minVal = getMinAllowedNodeVal(n);
+    if (minVal > cappedVal) {
+      cappedVal = minVal;
+    }
+
+    // Ensure value is not less than 0
+    if (cappedVal < 0) cappedVal = 0;
+
+    n.label = Number.isInteger(cappedVal) ? String(cappedVal) : String(Math.round(cappedVal * 100) / 100);
+
+    // 2. Adjust downstream nodes if outgoing connectors are locked
+    state.connectors.forEach(c => {
+      if (c.fromId === n.id && c.toId) {
+        const targetNode = findNode(c.toId);
+        if (targetNode && c.lockDuration) {
+          const dur = parseNumericLabel(c.duration) || 0;
+          adjustNodeValueWithConstraints(targetNode, cappedVal + dur, visited);
+        }
+      }
+    });
+
+    // 3. Adjust upstream nodes if incoming connectors are locked, or if upstream exceeds cappedVal
+    state.connectors.forEach(c => {
+      if (c.toId === n.id) {
+        let upstreamNode = null;
+        if (c.fromId) {
+          upstreamNode = findNode(c.fromId);
+        } else if (c.fromConnectorId) {
+          const parentConn = findConnector(c.fromConnectorId);
+          if (parentConn && parentConn.fromId) {
+            upstreamNode = findNode(parentConn.fromId);
+          }
+        }
+        if (upstreamNode) {
+          const upVal = parseNumericLabel(upstreamNode.label);
+          if (c.lockDuration) {
+            const dur = parseNumericLabel(c.duration) || 0;
+            adjustNodeValueWithConstraints(upstreamNode, cappedVal - dur, visited);
+          } else if (upVal !== null && upVal > cappedVal) {
+            if (!upstreamNode.lockTime) {
+              adjustNodeValueWithConstraints(upstreamNode, cappedVal, visited);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function adjustConnectorDurationsToMatchNodeLabels() {
+    state.connectors.forEach(c => {
+      if (c.lockDuration) return; // Do not modify locked durations
+
+      let fromVal = null;
+      if (c.fromId) {
+        const fromNode = findNode(c.fromId);
+        if (fromNode) fromVal = parseNumericLabel(fromNode.label);
+      } else if (c.fromConnectorId) {
+        const parentConn = findConnector(c.fromConnectorId);
+        if (parentConn) {
+          let parentStartVal = null;
+          if (parentConn.fromId) {
+            const parentFromNode = findNode(parentConn.fromId);
+            if (parentFromNode) parentStartVal = parseNumericLabel(parentFromNode.label);
+          }
+          if (parentStartVal !== null) {
+            const parentDur = parseNumericLabel(parentConn.duration) || 0;
+            const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
+            fromVal = parentStartVal + parentDur * t;
+          }
+        }
+      }
+
+      let toVal = null;
+      if (c.toId) {
+        const toNode = findNode(c.toId);
+        if (toNode) toVal = parseNumericLabel(toNode.label);
+      }
+
+      if (fromVal !== null && toVal !== null) {
+        const newDur = toVal - fromVal;
+        c.duration = formatDurationValue(newDur, c.duration);
+      }
+    });
+  }
+
+  function updateNodeLabelAndAdjust(n, newValStr) {
+    const newVal = parseNumericLabel(newValStr);
+    if (newVal !== null) {
+      adjustNodeValueWithConstraints(n, newVal);
+      adjustConnectorDurationsToMatchNodeLabels();
+    } else {
+      n.label = newValStr;
+      state.connectors.forEach(c => {
+        if (c.fromId === n.id) propagateFromConnector(c.id);
+      });
+    }
+    recalculateDiagramTimes();
+  }
+
   function parseNumericLabel(text){
     if(text === undefined || text === null) return null;
     const cleaned = String(text).replace(/[(),]/g, "").trim();
@@ -2768,15 +3194,136 @@ html,body{
     if (c.toId) {
       const toNode = findNode(c.toId);
       if(toNode) {
-        const best = recalcNodeFromIncoming(c.toId);
-        if(best !== null) {
-          const newLabel = Number.isInteger(best) ? String(best) : String(Math.round(best*100)/100);
-          if(toNode.label !== newLabel) {
-            toNode.label = newLabel;
-            // cascade: any connector leaving toNode might also need recalculating
-            state.connectors.forEach(next=>{
-              if(next.fromId === toNode.id) propagateFromConnector(next.id, visited);
-            });
+        if (toNode.lockTime) {
+          let fromVal = null;
+          if (c.fromId) {
+            const fromNode = findNode(c.fromId);
+            if (fromNode) fromVal = parseNumericLabel(fromNode.label);
+          } else if (c.fromConnectorId) {
+            const parentConn = findConnector(c.fromConnectorId);
+            if (parentConn) {
+              let parentStartVal = null;
+              if (parentConn.fromId) {
+                const parentFromNode = findNode(parentConn.fromId);
+                if (parentFromNode) parentStartVal = parseNumericLabel(parentFromNode.label);
+              }
+              if (parentStartVal !== null) {
+                const parentDur = parseNumericLabel(parentConn.duration) || 0;
+                const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
+                fromVal = parentStartVal + parentDur * t;
+              }
+            }
+          }
+          const toVal = parseNumericLabel(toNode.label);
+          if (fromVal !== null && toVal !== null) {
+            if (c.lockDuration) {
+              const dur = parseNumericLabel(c.duration) || 0;
+              if (fromVal !== toVal - dur) {
+                const targetFromVal = toVal - dur;
+                if (c.fromId) {
+                  const fromNode = findNode(c.fromId);
+                  if (fromNode) adjustNodeValueWithConstraints(fromNode, targetFromVal);
+                } else if (c.fromConnectorId) {
+                  const parentConn = findConnector(c.fromConnectorId);
+                  if (parentConn && parentConn.fromId) {
+                    const parentFromNode = findNode(parentConn.fromId);
+                    if (parentFromNode) adjustNodeValueWithConstraints(parentFromNode, targetFromVal);
+                  }
+                }
+              }
+            } else {
+              if (fromVal > toVal) {
+                if (c.fromId) {
+                  const fromNode = findNode(c.fromId);
+                  if (fromNode) adjustNodeValueWithConstraints(fromNode, toVal);
+                } else if (c.fromConnectorId) {
+                  const parentConn = findConnector(c.fromConnectorId);
+                  if (parentConn && parentConn.fromId) {
+                    const parentFromNode = findNode(parentConn.fromId);
+                    if (parentFromNode) adjustNodeValueWithConstraints(parentFromNode, toVal);
+                  }
+                }
+                if (c.fromId) {
+                  const fromNode = findNode(c.fromId);
+                  if (fromNode) fromVal = parseNumericLabel(fromNode.label);
+                }
+              }
+              const newDur = toVal - fromVal;
+              c.duration = formatDurationValue(newDur, c.duration);
+            }
+          }
+        } else {
+          let fromVal = null;
+          if (c.fromId) {
+            const fromNode = findNode(c.fromId);
+            if (fromNode) fromVal = parseNumericLabel(fromNode.label);
+          } else if (c.fromConnectorId) {
+            const parentConn = findConnector(c.fromConnectorId);
+            if (parentConn) {
+              let parentStartVal = null;
+              if (parentConn.fromId) {
+                const parentFromNode = findNode(parentConn.fromId);
+                if (parentFromNode) parentStartVal = parseNumericLabel(parentFromNode.label);
+              }
+              if (parentStartVal !== null) {
+                const parentDur = parseNumericLabel(parentConn.duration) || 0;
+                const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
+                fromVal = parentStartVal + parentDur * t;
+              }
+            }
+          }
+          
+          const dur = parseNumericLabel(c.duration) || 0;
+          if (fromVal !== null) {
+            let candidateVal = fromVal + dur;
+            
+            // Check downstream locked constraints to cap candidateVal
+            const checkMaxAllowed = (node, val) => {
+              let capped = val;
+              state.connectors.forEach(conn => {
+                if (conn.fromId === node.id && conn.toId) {
+                  const target = findNode(conn.toId);
+                  if (target) {
+                    if (target.lockTime) {
+                      const targetVal = parseNumericLabel(target.label);
+                      if (targetVal !== null && targetVal < capped) {
+                        capped = targetVal;
+                      }
+                    } else {
+                      const nextCapped = checkMaxAllowed(target, val);
+                      if (nextCapped < capped) capped = nextCapped;
+                    }
+                  }
+                }
+              });
+              return capped;
+            };
+            
+            candidateVal = checkMaxAllowed(toNode, candidateVal);
+            
+            if (c.lockDuration) {
+              if (candidateVal < fromVal + dur) {
+                const targetFromVal = candidateVal - dur;
+                if (c.fromId) {
+                  const fromNode = findNode(c.fromId);
+                  if (fromNode) adjustNodeValueWithConstraints(fromNode, targetFromVal);
+                }
+                fromVal = targetFromVal;
+              }
+            } else {
+              // Cap duration if we capped candidateVal
+              if (candidateVal < fromVal + dur) {
+                c.duration = formatDurationValue(candidateVal - fromVal, c.duration);
+              }
+            }
+            
+            const newLabel = Number.isInteger(candidateVal) ? String(candidateVal) : String(Math.round(candidateVal*100)/100);
+            if(toNode.label !== newLabel) {
+              toNode.label = newLabel;
+              state.connectors.forEach(next=>{
+                if(next.fromId === toNode.id) propagateFromConnector(next.id, visited);
+              });
+            }
           }
         }
       }
@@ -2995,6 +3542,7 @@ html,body{
 
       // strip transient/runtime-only DOM that shouldn't be in a saved snapshot
       docClone.querySelectorAll(".inline-edit").forEach(el=> el.remove());
+      docClone.querySelectorAll(".inline-connector-edit").forEach(el=> el.remove());
       docClone.querySelectorAll(".connect-handle").forEach(el=> el.remove());
       docClone.querySelectorAll(".connect-handle-connector").forEach(el=> el.remove());
       docClone.querySelectorAll(".selected").forEach(el=> el.classList.remove("selected"));
