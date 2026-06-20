@@ -53,12 +53,12 @@ Follow these strict rules to ensure high accuracy:
    - Durations are numbers in parentheses (e.g. '(20)', '(52)', '(4)') written near the connector lines. 
    - **CRITICAL**: Do NOT create a node for a duration value in parentheses. For example, if a line has '(20)' below it, do NOT create a node named '20'.
 
-2. **Grid Placement & Alignment (`row` and `col`)**:
-   - You MUST assign a horizontal `row` (0-based integer) and vertical `col` (0-based integer) to each node to place them on a clean grid.
-   - Identify the horizontal rows (swimlanes/paths) in the diagram. Nodes in the same horizontal path MUST share the exact same `row` value.
-   - Vertically aligned nodes (e.g. all nodes labeled '13' that align vertically, or the '72' hand-over milestones) MUST share the exact same `col` value.
-   - Ensure `col` values increase strictly from left to right (e.g. 0 for the leftmost node, up to 12 for the rightmost).
-   - Every node must have a unique combination of `row` and `col`.
+2. **Grid Placement & Alignment ('row' and 'col')**:
+   - You MUST assign a horizontal 'row' (0-based integer) and vertical 'col' (0-based integer) to each node to place them on a clean grid.
+   - Identify the horizontal rows (swimlanes/paths) in the diagram. Nodes in the same horizontal path MUST share the exact same 'row' value.
+   - Vertically aligned nodes (e.g. all nodes labeled '13' that align vertically, or the '72' hand-over milestones) MUST share the exact same 'col' value.
+   - Ensure 'col' values increase strictly from left to right (e.g. 0 for the leftmost node, up to 12 for the rightmost).
+   - Every node must have a unique combination of 'row' and 'col'.
 
 3. **Color Codes**:
    - Process nodes (circles) are usually white ("#ffffff") or yellow ("#f6d34d" / "#f1c40f").
