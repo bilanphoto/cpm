@@ -4489,13 +4489,13 @@ html,body{
     if (!apiKey) {
       let response;
       try {
-        response = await fetch("/api/import-diagram", {
+        response = await fetch("https://cpm-one-kappa.vercel.app/api/import-diagram", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ imageData })
         });
       } catch (netErr) {
-        throw new Error("Could not connect to Vercel proxy. If you are running this file locally from your computer (file:///), you must provide your Gemini API Key in the input field.");
+        throw new Error("Could not connect to Vercel proxy. If you are running this file locally from your computer (file:///) or on GitHub Pages, make sure your Vercel deployment is active, or provide your Gemini API Key in the input field.");
       }
 
       if (!response.ok) {
@@ -4677,8 +4677,11 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
         y: snap(a.y),
         w: a.w || 150,
         h: a.h || 80,
-        color: a.color || "#ffffff",
-        text: a.text || ""
+        color: a.color || "white",
+        textColor: a.textColor || "black",
+        text: a.text || "",
+        fontSize: a.fontSize || (a.type === "banner" ? 18 : 12.5),
+        bold: a.bold !== undefined ? !!a.bold : (a.type === "banner" ? true : false)
       };
     });
 
