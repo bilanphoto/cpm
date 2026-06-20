@@ -121,7 +121,7 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
                   sublabel: { type: "STRING" },
                   datetime: { type: "STRING" }
                 },
-                required: ["type", "row", "col", "x", "y", "r", "fill"]
+                required: ["type", "row", "col", "x", "y", "r", "fill", "label", "sublabel", "datetime"]
               }
             },
             connectors: {
@@ -137,7 +137,7 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
                   duration: { type: "STRING" },
                   task: { type: "STRING" }
                 },
-                required: ["fromIndex", "toIndex", "kind"]
+                required: ["fromIndex", "toIndex", "kind", "duration", "task"]
               }
             },
             annotations: {
