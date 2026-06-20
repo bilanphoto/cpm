@@ -4475,11 +4475,56 @@ html,body{
 
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
+      // Check if it's an image that can be compressed
+      if (!file.type.startsWith("image/")) {
+        // Non-image files, read directly
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          const base64Str = reader.result.split(",")[1];
+          resolve({ mimeType: file.type, data: base64Str });
+        };
+        reader.onerror = error => reject(error);
+        return;
+      }
+
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64Str = reader.result.split(",")[1];
-        resolve({ mimeType: file.type, data: base64Str });
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 1600;
+          const maxHeight = 1600;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width / height > maxWidth / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Compress to JPEG with 80% quality (great readability, tiny file size)
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          const base64Str = dataUrl.split(",")[1];
+          resolve({ mimeType: "image/jpeg", data: base64Str });
+        };
+        img.onerror = () => {
+          // Fallback if image fails to load
+          const base64Str = event.target.result.split(",")[1];
+          resolve({ mimeType: file.type, data: base64Str });
+        };
       };
       reader.onerror = error => reject(error);
     });
