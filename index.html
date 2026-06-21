@@ -116,20 +116,21 @@ html,body{
   flex: 0 0 auto;
 }
 
-/* Dropdown Content (Hidden by Default) */
+/* Dropdown Content */
 .dropdown-content {
   display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
+  position: fixed;
   background-color: var(--chrome-700);
   min-width: 140px;
   box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.3);
   border: 1px solid var(--chrome-line);
   border-radius: var(--radius-sm);
-  z-index: 1000;
-  margin-top: 4px;
+  z-index: 10000;
   overflow: hidden;
+}
+
+.dropdown-content.show {
+  display: block;
 }
 
 /* Buttons inside the dropdown */
@@ -151,11 +152,6 @@ html,body{
 
 .dropdown-item:hover {
   background-color: var(--chrome-600);
-}
-
-/* Show the dropdown menu on hover */
-.dropdown:hover .dropdown-content {
-  display: block;
 }
 .btn:active{ transform:translateY(1px); }
 .btn.primary{ background:var(--amber); border-color:var(--amber-deep); color:#1a1305; }
@@ -2522,6 +2518,55 @@ html,body{
   $("#btnSelectAll").addEventListener("click", selectAll);
   $("#btnCopyEl").addEventListener("click",  copySelected);
   $("#btnPasteEl").addEventListener("click", pasteClipboard);
+
+  // Edit Dropdown positioning & toggle logic
+  const btnEditDropdown = $("#btnEditDropdown");
+  const dropdownContent = document.querySelector(".dropdown-content");
+
+  if(btnEditDropdown && dropdownContent) {
+    function positionDropdown() {
+      const rect = btnEditDropdown.getBoundingClientRect();
+      dropdownContent.style.top = (rect.bottom + 4) + "px";
+      dropdownContent.style.left = rect.left + "px";
+    }
+
+    function closeEditDropdown() {
+      dropdownContent.classList.remove("show");
+    }
+
+    btnEditDropdown.addEventListener("click", function(e) {
+      e.stopPropagation();
+      const isShown = dropdownContent.classList.contains("show");
+      if (isShown) {
+        closeEditDropdown();
+      } else {
+        dropdownContent.classList.add("show");
+        positionDropdown();
+      }
+    });
+
+    document.addEventListener("click", function(e) {
+      if (!dropdownContent.contains(e.target) && e.target !== btnEditDropdown) {
+        closeEditDropdown();
+      }
+    });
+
+    dropdownContent.addEventListener("click", function() {
+      closeEditDropdown();
+    });
+
+    window.addEventListener("resize", function() {
+      if (dropdownContent.classList.contains("show")) {
+        positionDropdown();
+      }
+    });
+
+    window.addEventListener("scroll", function() {
+      if (dropdownContent.classList.contains("show")) {
+        positionDropdown();
+      }
+    }, true);
+  }
 
   // ---------------------------------------------------------
   // Open a previously-saved CPM .html file
