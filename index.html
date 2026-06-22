@@ -79,6 +79,7 @@ html,body{
 
 .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
 .brand-mark{
+  display: inline-flex; align-items: center; gap: 6px;
   font-family:var(--font-mono); font-weight:700; font-size:13px;
   letter-spacing:0.08em;
   background:var(--amber); color:#1a1305;
@@ -487,6 +488,52 @@ html,body{
   from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; }
 }
 
+/* Custom Rich Tooltips */
+[data-tip] {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 10px;
+  background: linear-gradient(135deg, #1a2530 0%, #263545 100%);
+  color: #f0f4f8;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 0 1px rgba(232,146,60,0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10000;
+}
+[data-tip]:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* Top bar tooltip (show below button) */
+.topbar-actions [data-tip]::after,
+.brand [data-tip]::after {
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%) translateY(4px);
+  margin-left: 0;
+  white-space: normal;
+  max-width: 260px;
+  text-align: center;
+}
+.topbar-actions [data-tip]:hover::after,
+.brand [data-tip]:hover::after {
+  transform: translateX(-50%) translateY(4px);
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
@@ -500,7 +547,7 @@ html,body{
   <!-- ============ TOP BAR ============ -->
   <header id="topbar">
     <div class="brand">
-      <div class="brand-mark">CPM</div>
+      <div class="brand-mark" data-tip="ข้อมูลระบบ GSP CPM"><img src="PTT-Logo.png" alt="PTT Logo" style="height: 16px; width: auto; border: none; display: block; pointer-events: none;" />CPM</div>
       <div class="brand-text">
         <input id="diagramTitle" value="CPM SHUT DOWN TURNAROUND" spellcheck="false">
         <input id="diagramSubtitle" value="20 Apr — 5 May 2025" spellcheck="false">
@@ -508,28 +555,28 @@ html,body{
     </div>
 
     <div class="topbar-actions">
-      <button class="btn" id="btnImportExcel" title="Import a Gantt chart .xlsx and auto-build a CPM diagram">Import Excel</button>
+      <button class="btn" id="btnImportExcel" title="Import a Gantt chart .xlsx and auto-build a CPM diagram" data-tip="นำเข้า Gantt Chart จากไฟล์ Excel (.xlsx)">Import Excel</button>
       <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none">
-      <button class="btn" id="btnNewCpm" title="Start a brand new blank CPM diagram">New CPM</button>
+      <button class="btn" id="btnNewCpm" title="Start a brand new blank CPM diagram" data-tip="สร้าง Diagram ใหม่ (ล้างบอร์ดทั้งหมด)">New CPM</button>
       <div class="sep"></div>
-      <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
-      <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+      <button class="btn ghost" id="btnUndo" title="Undo (Ctrl+Z)" data-tip="ย้อนกลับ (Ctrl+Z)">↶</button>
+      <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)" data-tip="ทำซ้ำ (Ctrl+Y)">↷</button>
       <div class="sep"></div>
-      <button class="btn ghost" id="btnGrid" title="Toggle grid">▦</button>
-      <button class="btn ghost" id="btnTimeScale" title="Toggle Time-Scale Layout (1 Hour = 1 Grid Cell)">⏱ Time Scale</button>
-      <label class="btn ghost bg-color-btn" id="bgColorBtn" title="Canvas background color">
+      <button class="btn ghost" id="btnGrid" title="Toggle grid" data-tip="แสดง/ซ่อนเส้นกริด">▦</button>
+      <button class="btn ghost" id="btnTimeScale" title="Toggle Time-Scale Layout (1 Hour = 1 Grid Cell)" data-tip="เปิด/ปิด Time Scale (1 ชม. = 1 ช่องกริด)">⏱ Time Scale</button>
+      <label class="btn ghost bg-color-btn" id="bgColorBtn" title="Canvas background color" data-tip="เปลี่ยนสีพื้นหลัง Canvas">
         🎨
         <input type="color" id="canvasBgColor" value="#f3f1ea">
       </label>
-      <button class="btn ghost" id="btnClear" title="Clear canvas">🗑</button>
+      <button class="btn ghost" id="btnClear" title="Clear canvas" data-tip="ลบทุกอย่างบน Canvas">🗑</button>
       <div class="sep"></div>
-      <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file">Save</button>
-      <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file">📂 Open</button>
-      <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI">📷 Import Image</button>
+      <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file" data-tip="บันทึก Diagram เป็นไฟล์ .html">Save</button>
+      <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file" data-tip="เปิดไฟล์ Diagram (.html) ที่บันทึกไว้">📂 Open</button>
+      <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI" data-tip="นำเข้า Diagram จากรูปภาพด้วย AI">📷 Import Image</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <div class="sep"></div>
       <div class="dropdown">
-        <button class="btn" id="btnEditDropdown">Edit ▼</button>
+        <button class="btn" id="btnEditDropdown" data-tip="เมนู Edit & ตั้งค่า Canvas">Edit ▼</button>
         <div class="dropdown-content" id="editDropdownContent" style="padding: 6px; min-width: 220px;">
           <button class="dropdown-item" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
           <button class="dropdown-item" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy</button>
@@ -560,8 +607,8 @@ html,body{
           </div>
         </div>
       </div>
-      <button class="btn primary" id="btnExportPng">Export image</button>
-      <button class="btn" id="btnShareCollab" title="Share and collaborate in real-time (Firebase)">🔗 Share</button>
+      <button class="btn primary" id="btnExportPng" data-tip="ส่งออกเป็นรูปภาพ PNG">Export image</button>
+      <button class="btn" id="btnShareCollab" title="Share and collaborate in real-time (Firebase)" data-tip="แชร์และทำงานร่วมกันแบบ Real-time">🔗 Share</button>
     </div>
   </header>
 
@@ -572,11 +619,11 @@ html,body{
 
       <div class="tool-group">
         <div class="tool-group-title">Select</div>
-        <button class="tool" data-tool="select" title="Select / Move (V)">
+        <button class="tool" data-tool="select" title="Select / Move (V)" data-tip="เลือก/ย้าย วัตถุ (กด V)">
           <svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 1.5L11 19z"/></svg>
           <span>Select</span>
         </button>
-        <button class="tool" data-tool="pan" title="Pan (Space)">
+        <button class="tool" data-tool="pan" title="Pan (Space)" data-tip="เลื่อนดู Canvas (กด Space ค้าง)">
           <svg viewBox="0 0 24 24"><path d="M9 11V6a1.5 1.5 0 013 0v5M12 11V4.5a1.5 1.5 0 013 0V11m-9 .5l-1.7-1.6a1.4 1.4 0 00-2 2L8 18.5c1 1.3 2 2 4.5 2h2c3 0 4.5-1.8 4.5-4.5V11a1.5 1.5 0 00-3 0"/></svg>
           <span>Pan</span>
         </button>
@@ -584,15 +631,15 @@ html,body{
 
       <div class="tool-group">
         <div class="tool-group-title">Nodes</div>
-        <button class="tool" data-tool="node-circle" title="Circle node">
+        <button class="tool" data-tool="node-circle" title="Circle node" data-tip="วาง Node วงกลม (จุดเหตุการณ์)">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
           <span>Circle</span>
         </button>
-        <button class="tool" data-tool="node-hex" title="Hexagon (Hand Over)">
+        <button class="tool" data-tool="node-hex" title="Hexagon (Hand Over)" data-tip="วาง Node หกเหลี่ยม (จุดส่งมอบงาน)">
           <svg viewBox="0 0 24 24"><path d="M8 3h8l5 9-5 9H8l-5-9z"/></svg>
           <span>Hexagon</span>
         </button>
-        <button class="tool" data-tool="node-diamond" title="Diamond node">
+        <button class="tool" data-tool="node-diamond" title="Diamond node" data-tip="วาง Node สี่เหลี่ยมข้าวหลามตัด">
           <svg viewBox="0 0 24 24"><path d="M12 2l9 10-9 10-9-10z"/></svg>
           <span>Diamond</span>
         </button>
@@ -600,11 +647,11 @@ html,body{
 
       <div class="tool-group">
         <div class="tool-group-title">Connectors</div>
-        <button class="tool" data-tool="connector" title="Arrow connector">
+        <button class="tool" data-tool="connector" title="Arrow connector" data-tip="ลากเส้นลูกศร เชื่อมระหว่าง Node">
           <svg viewBox="0 0 24 24"><path d="M4 12h14M14 7l5 5-5 5"/></svg>
           <span>Arrow</span>
         </button>
-        <button class="tool" data-tool="connector-line" title="Plain line">
+        <button class="tool" data-tool="connector-line" title="Plain line" data-tip="ลากเส้นตรง (ไม่มีหัวลูกศร)">
           <svg viewBox="0 0 24 24"><path d="M4 18L20 6"/></svg>
           <span>Line</span>
         </button>
@@ -612,19 +659,19 @@ html,body{
 
       <div class="tool-group">
         <div class="tool-group-title">Annotations</div>
-        <button class="tool" data-tool="note" title="Sticky note (orange callout)">
+        <button class="tool" data-tool="note" title="Sticky note (orange callout)" data-tip="เพิ่มกล่องบันทึกย่อ (Note)">
           <svg viewBox="0 0 24 24"><path d="M4 4h16v12H10l-4 4v-4H4z"/></svg>
           <span>Note</span>
         </button>
-        <button class="tool" data-tool="banner" title="Section banner">
+        <button class="tool" data-tool="banner" title="Section banner" data-tip="เพิ่มแถบหัวข้อ (Banner)">
           <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
           <span>Banner</span>
         </button>
-        <button class="tool" data-tool="pin" title="Pin marker (insert blind)">
+        <button class="tool" data-tool="pin" title="Pin marker (insert blind)" data-tip="เพิ่มหมุดปัก (Pin Marker)">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M12 14v7"/></svg>
           <span>Pin</span>
         </button>
-        <button class="tool" data-tool="text" title="Free text label">
+        <button class="tool" data-tool="text" title="Free text label" data-tip="เพิ่มข้อความอิสระ (Free Text)">
           <svg viewBox="0 0 24 24"><path d="M4 5h16M12 5v14"/></svg>
           <span>Text</span>
         </button>
@@ -632,7 +679,7 @@ html,body{
 
       <div class="tool-group">
         <div class="tool-group-title">Delete</div>
-        <button class="tool" data-tool="erase" title="Erase element">
+        <button class="tool" data-tool="erase" title="Erase element" data-tip="ลบวัตถุ (คลิกที่วัตถุเพื่อลบ)">
           <svg viewBox="0 0 24 24"><path d="M3 18l9-13 9 6-7 9z"/><path d="M9 13l5 5"/></svg>
           <span>Erase</span>
         </button>
@@ -932,8 +979,9 @@ html,body{
         <button class="modal-close" id="infoModalClose">&times;</button>
       </div>
       <div class="modal-body" style="text-align: center; padding: 24px 20px;">
+        <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 6px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
-        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.1</div>
+        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.2</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
