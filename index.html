@@ -477,6 +477,56 @@ html,body{
 @keyframes slideUp {
   from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; }
 }
+
+/* Floating Zoom Controls */
+.floating-zoom-controls {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(26, 37, 48, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 999;
+  user-select: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.floating-zoom-controls:hover {
+  background-color: rgba(26, 37, 48, 0.95);
+  border-color: rgba(232, 146, 60, 0.4);
+}
+
+.zoom-btn {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.zoom-btn:hover {
+  background-color: var(--chrome-600);
+  color: var(--chrome-text);
+}
+
+.zoom-btn:active {
+  background-color: var(--chrome-500);
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
@@ -506,6 +556,7 @@ html,body{
       <button class="btn ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
       <div class="sep"></div>
       <button class="btn ghost" id="btnGrid" title="Toggle grid">▦</button>
+      <button class="btn ghost" id="btnTimeScale" title="Toggle Time-Scale Layout (1 Hour = 1 Grid Cell)">⏱ Time Scale</button>
       <label class="btn ghost bg-color-btn" id="bgColorBtn" title="Canvas background color">
         🎨
         <input type="color" id="canvasBgColor" value="#f3f1ea">
@@ -519,10 +570,34 @@ html,body{
       <div class="sep"></div>
       <div class="dropdown">
         <button class="btn" id="btnEditDropdown">Edit ▼</button>
-        <div class="dropdown-content">
+        <div class="dropdown-content" id="editDropdownContent" style="padding: 6px; min-width: 220px;">
           <button class="dropdown-item" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
           <button class="dropdown-item" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy</button>
           <button class="dropdown-item" id="btnPasteEl" title="Paste copied elements (Ctrl+V / ⌘V)">Paste</button>
+          
+          <div class="dropdown-divider" style="margin: 8px 0; border-top: 1px solid var(--chrome-line);"></div>
+          
+          <div style="padding: 6px;">
+            <div class="legend-title" style="margin-bottom: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: var(--chrome-text-dim);">Canvas Settings</div>
+            
+            <div class="field" style="margin-bottom: 10px;">
+              <label style="display: block; font-size: 11px; font-weight: 600; color: var(--chrome-text-dim); margin-bottom: 4px;">Width (ความกว้าง)</label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="number" id="fCanvasWidth" style="width: 80px; flex-grow: 1; min-width: 0;" min="800" step="40">
+                <button class="btn small" id="btnExpandW10" style="padding: 4px 8px;" title="Add 10 grid spaces (400px)">+10</button>
+                <button class="btn small" id="btnShrinkW10" style="padding: 4px 8px;" title="Subtract 10 grid spaces (-400px)">-10</button>
+              </div>
+            </div>
+            
+            <div class="field" style="margin-bottom: 4px;">
+              <label style="display: block; font-size: 11px; font-weight: 600; color: var(--chrome-text-dim); margin-bottom: 4px;">Height (ความสูง)</label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="number" id="fCanvasHeight" style="width: 80px; flex-grow: 1; min-width: 0;" min="600" step="40">
+                <button class="btn small" id="btnExpandH10" style="padding: 4px 8px;" title="Add 10 grid spaces (400px)">+10</button>
+                <button class="btn small" id="btnShrinkH10" style="padding: 4px 8px;" title="Subtract 10 grid spaces (-400px)">-10</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <button class="btn primary" id="btnExportPng">Export image</button>
@@ -618,6 +693,13 @@ html,body{
           <g id="layerOverlay"></g>
         </svg>
       </div>
+      <!-- Floating Zoom Controls -->
+      <div class="floating-zoom-controls">
+        <button class="zoom-btn" id="btnZoomOut" title="Zoom Out (Ctrl+Minus / ⌘Minus)">−</button>
+        <span id="zoomLabel">100%</span>
+        <button class="zoom-btn" id="btnZoomIn" title="Zoom In (Ctrl+Plus / ⌘Plus)">+</button>
+        <button class="zoom-btn" id="btnZoomReset" title="Reset Zoom / Fit Canvas">⤢</button>
+      </div>
     </main>
 
     <!-- ============ RIGHT INSPECTOR ============ -->
@@ -634,6 +716,7 @@ html,body{
           <div class="legend-row"><span class="swatch swatch-green-hex"></span> Hand-over milestone</div>
           <div class="legend-row"><span class="swatch swatch-note"></span> Insert / blind note</div>
         </div>
+        
       </div>
 
       <div class="inspector-panel" id="inspectorPanel" style="display:none">
@@ -904,7 +987,10 @@ html,body{
     nodes: [],        // {id,type:'circle'|'hex'|'diamond', x,y,r,fill,label,sublabel,datetime}
     connectors: [],    // {id, fromId, toId, fromPt?, toPt?, kind:'arrow'|'line', color, dashed, duration, task}
     annotations: [],   // {id, type:'note'|'banner'|'pin'|'text', x,y,w,h,text,color,textColor,fontSize,bold}
-    nextId: 1
+    nextId: 1,
+    timeScaleMode: false,
+    canvasWidth: 3000,
+    canvasHeight: 1800
   };
 
   let history = [];
@@ -991,6 +1077,9 @@ html,body{
   }
   function restoreSnapshot(s){
     state = JSON.parse(s);
+    if (state.timeScaleMode === undefined) state.timeScaleMode = false;
+    if (state.canvasWidth === undefined) state.canvasWidth = 3000;
+    if (state.canvasHeight === undefined) state.canvasHeight = 1800;
     selection = [];
     renderAll();
     updateInspector();
@@ -1269,6 +1358,54 @@ html,body{
         }
       }
     });
+
+    if (state.timeScaleMode) {
+      applyTimeScalePositions();
+    }
+    applyCanvasSize();
+  }
+
+  function applyTimeScalePositions() {
+    if (!state.timeScaleMode) return;
+    const startX = 120;
+    state.nodes.forEach(n => {
+      const val = parseNumericLabel(n.label) || 0;
+      n.x = startX + val * 40;
+    });
+  }
+
+  function updateTimeScaleButtonVisual() {
+    const btn = $("#btnTimeScale");
+    if (btn) {
+      if (state.timeScaleMode) {
+        btn.classList.add("active");
+        btn.style.borderColor = "var(--amber)";
+        btn.style.background = "var(--chrome-600)";
+      } else {
+        btn.classList.remove("active");
+        btn.style.borderColor = "";
+        btn.style.background = "";
+      }
+    }
+  }
+
+  function applyCanvasSize() {
+    const w = state.canvasWidth || 3000;
+    const h = state.canvasHeight || 1800;
+    const canvasInner = $("#canvasInner");
+    if (canvasInner) {
+      canvasInner.style.width = w + "px";
+      canvasInner.style.height = h + "px";
+    }
+    const svgCanvas = $("#svgCanvas");
+    if (svgCanvas) {
+      svgCanvas.setAttribute("width", w);
+      svgCanvas.setAttribute("height", h);
+    }
+    const fWidth = $("#fCanvasWidth");
+    if (fWidth) fWidth.value = w;
+    const fHeight = $("#fCanvasHeight");
+    if (fHeight) fHeight.value = h;
   }
 
 
@@ -1830,6 +1967,8 @@ html,body{
   }
 
   function renderAll(){
+    updateTimeScaleButtonVisual();
+    applyCanvasSize();
     renderConnectors();
     renderNodes();
     renderAnnotations();
@@ -1865,13 +2004,22 @@ html,body{
 
   function placeNode(type, x, y){
     const fillDefaults = { circle:"#ffffff", hex:"#7fb56e", diamond:"#f6d34d" };
+    let initialLabel = String(state.nodes.length);
+    if (state.timeScaleMode) {
+      const startX = 120;
+      const hours = Math.max(0, Math.round((x - startX) / 40));
+      initialLabel = String(hours);
+    }
     const node = {
       id: uid(), type, x, y, r: 32,
       fill: fillDefaults[type] || "#ffffff",
-      label: String(state.nodes.length),
+      label: initialLabel,
       sublabel: "", datetime: ""
     };
     state.nodes.push(node);
+    if (state.timeScaleMode) {
+      recalculateDiagramTimes();
+    }
     renderAll();
     selectElement("node", node.id);
     commit();
@@ -2099,15 +2247,35 @@ html,body{
       a.y = snap(drag.origY + dy);
       renderAll();
     } else if(drag.type === "group"){
+      let hourChangeOccurred = false;
       drag.items.forEach(item=>{
         if(item.kind === "node"){
           const n = findNode(item.id);
-          if(n){ n.x = snap(item.origX + dx); n.y = snap(item.origY + dy); }
+          if(n){
+            if (state.timeScaleMode) {
+              n.y = snap(item.origY + dy);
+              const newX = item.origX + dx;
+              const startX = 120;
+              const hours = Math.max(0, Math.round((newX - startX) / 40));
+              const currentHours = parseNumericLabel(n.label) || 0;
+              if (hours !== currentHours) {
+                adjustNodeValueWithConstraints(n, hours);
+                hourChangeOccurred = true;
+              }
+            } else {
+              n.x = snap(item.origX + dx);
+              n.y = snap(item.origY + dy);
+            }
+          }
         } else if(item.kind === "annotation"){
           const a = findAnnotation(item.id);
           if(a){ a.x = snap(item.origX + dx); a.y = snap(item.origY + dy); }
         }
       });
+      if (state.timeScaleMode && hourChangeOccurred) {
+        adjustConnectorDurationsToMatchNodeLabels();
+        recalculateDiagramTimes();
+      }
       renderAll();
     } else if(drag.type === "pan"){
       canvasWrap.scrollLeft = drag.scrollLeft0 - (e.clientX - drag.clientX0);
@@ -2255,6 +2423,40 @@ html,body{
   function clearConnectorPreview(){ layerOverlay.innerHTML = ""; }
 
   function addConnector(fromId, toId, kind, fromConnectorId = null, toConnectorId = null, fromConnectorT = null, toConnectorT = null){
+    let initialDuration = "";
+    if (state.timeScaleMode) {
+      let fromVal = null;
+      if (fromId) {
+        const fromNode = findNode(fromId);
+        if (fromNode) fromVal = parseNumericLabel(fromNode.label);
+      } else if (fromConnectorId) {
+        const parentConn = findConnector(fromConnectorId);
+        if (parentConn) {
+          let parentStartVal = null;
+          if (parentConn.fromId) {
+            const parentFromNode = findNode(parentConn.fromId);
+            if (parentFromNode) parentStartVal = parseNumericLabel(parentFromNode.label);
+          }
+          if (parentStartVal !== null) {
+            const parentDur = parseNumericLabel(parentConn.duration) || 0;
+            const t = fromConnectorT !== undefined && fromConnectorT !== null ? fromConnectorT : 0.5;
+            fromVal = parentStartVal + parentDur * t;
+          }
+        }
+      }
+
+      let toVal = null;
+      if (toId) {
+        const toNode = findNode(toId);
+        if (toNode) toVal = parseNumericLabel(toNode.label);
+      }
+
+      if (fromVal !== null && toVal !== null) {
+        const newDur = toVal - fromVal;
+        initialDuration = formatDurationValue(newDur, "(");
+      }
+    }
+
     const c = {
       id: uid(),
       fromId: fromId || null,
@@ -2266,7 +2468,7 @@ html,body{
       kind,
       color: "#c0392b",
       dashed:false,
-      duration:"",
+      duration: initialDuration,
       task:""
     };
     state.connectors.push(c);
@@ -2521,49 +2723,55 @@ html,body{
 
   // Edit Dropdown positioning & toggle logic
   const btnEditDropdown = $("#btnEditDropdown");
-  const dropdownContent = document.querySelector(".dropdown-content");
+  const editDropdownContent = $("#editDropdownContent");
 
-  if(btnEditDropdown && dropdownContent) {
-    function positionDropdown() {
+  if(btnEditDropdown && editDropdownContent) {
+    function positionEditDropdown() {
       const rect = btnEditDropdown.getBoundingClientRect();
-      dropdownContent.style.top = (rect.bottom + 4) + "px";
-      dropdownContent.style.left = rect.left + "px";
+      editDropdownContent.style.top = (rect.bottom + 4) + "px";
+      editDropdownContent.style.left = rect.left + "px";
     }
 
     function closeEditDropdown() {
-      dropdownContent.classList.remove("show");
+      editDropdownContent.classList.remove("show");
     }
 
     btnEditDropdown.addEventListener("click", function(e) {
       e.stopPropagation();
-      const isShown = dropdownContent.classList.contains("show");
+      const isShown = editDropdownContent.classList.contains("show");
       if (isShown) {
         closeEditDropdown();
       } else {
-        dropdownContent.classList.add("show");
-        positionDropdown();
+        editDropdownContent.classList.add("show");
+        positionEditDropdown();
       }
     });
 
     document.addEventListener("click", function(e) {
-      if (!dropdownContent.contains(e.target) && e.target !== btnEditDropdown) {
+      if (!editDropdownContent.contains(e.target) && e.target !== btnEditDropdown) {
         closeEditDropdown();
       }
     });
 
-    dropdownContent.addEventListener("click", function() {
-      closeEditDropdown();
+    editDropdownContent.addEventListener("click", function(e) {
+      // Close only if user clicks on one of the action buttons
+      if (e.target.closest(".dropdown-item")) {
+        closeEditDropdown();
+      } else {
+        // Prevent click inside Canvas settings from closing the dropdown
+        e.stopPropagation();
+      }
     });
 
     window.addEventListener("resize", function() {
-      if (dropdownContent.classList.contains("show")) {
-        positionDropdown();
+      if (editDropdownContent.classList.contains("show")) {
+        positionEditDropdown();
       }
     });
 
     window.addEventListener("scroll", function() {
-      if (dropdownContent.classList.contains("show")) {
-        positionDropdown();
+      if (editDropdownContent.classList.contains("show")) {
+        positionEditDropdown();
       }
     }, true);
   }
@@ -3700,6 +3908,19 @@ html,body{
   });
 
   // ---------------------------------------------------------
+  // Time Scale layout toggle
+  // ---------------------------------------------------------
+  $("#btnTimeScale").addEventListener("click", ()=>{
+    state.timeScaleMode = !state.timeScaleMode;
+    if (state.timeScaleMode) {
+      applyTimeScalePositions();
+      recalculateDiagramTimes();
+    }
+    commit();
+    renderAll();
+  });
+
+  // ---------------------------------------------------------
   // Canvas background color
   // ---------------------------------------------------------
   function applyCanvasBg(){
@@ -3714,6 +3935,45 @@ html,body{
   });
   $("#canvasBgColor").addEventListener("change", ()=> commit());
 
+  // Canvas size settings change listeners
+  const fCanvasWidth = $("#fCanvasWidth");
+  const fCanvasHeight = $("#fCanvasHeight");
+  if (fCanvasWidth && fCanvasHeight) {
+    fCanvasWidth.addEventListener("change", () => {
+      const val = parseInt(fCanvasWidth.value) || 3000;
+      state.canvasWidth = Math.max(800, val);
+      applyCanvasSize();
+      commit();
+      renderAll();
+    });
+    fCanvasHeight.addEventListener("change", () => {
+      const val = parseInt(fCanvasHeight.value) || 1800;
+      state.canvasHeight = Math.max(600, val);
+      applyCanvasSize();
+      commit();
+      renderAll();
+    });
+  }
+
+  const addExpandListener = (id, deltaX, deltaY) => {
+    const btn = $(id);
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const nextW = (state.canvasWidth || 3000) + deltaX;
+        const nextH = (state.canvasHeight || 1800) + deltaY;
+        state.canvasWidth = Math.max(800, nextW);
+        state.canvasHeight = Math.max(600, nextH);
+        applyCanvasSize();
+        commit();
+        renderAll();
+      });
+    }
+  };
+  addExpandListener("#btnExpandW10", 400, 0);
+  addExpandListener("#btnShrinkW10", -400, 0);
+  addExpandListener("#btnExpandH10", 0, 400);
+  addExpandListener("#btnShrinkH10", 0, -400);
+
   // ---------------------------------------------------------
   // Undo / redo buttons
   // ---------------------------------------------------------
@@ -3726,7 +3986,7 @@ html,body{
   $("#btnClear").addEventListener("click", ()=>{
     if(!confirm("Clear the entire canvas? This cannot be undone after closing this dialog.")) return;
     const keepBg = state.canvasBg;
-    state = {nodes:[], connectors:[], annotations:[], nextId:1, canvasBg:keepBg};
+    state = {nodes:[], connectors:[], annotations:[], nextId:1, canvasBg:keepBg, timeScaleMode:state.timeScaleMode || false, canvasWidth:state.canvasWidth || 3000, canvasHeight:state.canvasHeight || 1800};
     selection = [];
     renderAll(); updateInspector(); applyCanvasBg(); commit();
     setStatus("Canvas cleared");
@@ -3737,7 +3997,7 @@ html,body{
   // ---------------------------------------------------------
   $("#btnNewCpm").addEventListener("click", ()=>{
     if(!confirm("Start a new CPM diagram? Any unsaved changes to the current canvas will be lost.")) return;
-    state = {nodes:[], connectors:[], annotations:[], nextId:1};
+    state = {nodes:[], connectors:[], annotations:[], nextId:1, timeScaleMode:state.timeScaleMode || false, canvasWidth:state.canvasWidth || 3000, canvasHeight:state.canvasHeight || 1800};
     selection = [];
     $("#diagramTitle").value = "NEW CPM DIAGRAM";
     $("#diagramSubtitle").value = "";
@@ -4418,6 +4678,7 @@ html,body{
       const remoteState = JSON.parse(stateJson);
       if (remoteState && Array.isArray(remoteState.nodes)) {
         state = remoteState;
+        if (state.timeScaleMode === undefined) state.timeScaleMode = false;
         
         // Re-run setup fields if needed
         initNodesDatetimeFields(state.nodes);
