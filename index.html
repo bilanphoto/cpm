@@ -533,7 +533,7 @@ html,body{
 .topbar-actions [data-tip]:hover::after,
 .brand [data-tip]:hover::after {
   transform: translateX(-50%) translateY(4px);
-
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
@@ -700,7 +700,6 @@ html,body{
           <g id="layerOverlay"></g>
         </svg>
       </div>
-
 
     </main>
 
@@ -981,7 +980,7 @@ html,body{
       <div class="modal-body" style="text-align: center; padding: 24px 20px;">
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 6px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
-        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.2</div>
+        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.3</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -2045,6 +2044,83 @@ html,body{
     switchToSelectTool();
   }
 
+  function insertNodeOnConnector(type, x, y, c) {
+    const fromId = c.fromId;
+    const toId = c.toId;
+    if (!fromId || !toId) return;
+
+    const fromNode = findNode(fromId);
+    const toNode = findNode(toId);
+    if (!fromNode || !toNode) return;
+
+    const fillDefaults = { circle: "#ffffff", hex: "#7fb56e", diamond: "#f6d34d" };
+    
+    let initialLabel = String(state.nodes.length);
+    const fromVal = parseNumericLabel(fromNode.label) || 0;
+    const toVal = parseNumericLabel(toNode.label) || 0;
+
+    if (state.timeScaleMode) {
+      const startX = 120;
+      const hours = Math.max(0, Math.round((x - startX) / 40));
+      initialLabel = String(hours);
+    } else {
+      const origDur = parseNumericLabel(c.duration) || 0;
+      initialLabel = String(fromVal + origDur);
+    }
+
+    const newNode = {
+      id: uid(),
+      type,
+      x,
+      y,
+      r: 32,
+      fill: fillDefaults[type] || "#ffffff",
+      label: initialLabel,
+      sublabel: "",
+      datetime: "",
+      autoDateTime: true
+    };
+
+    state.nodes.push(newNode);
+
+    const oldToId = c.toId;
+    c.toId = newNode.id;
+
+    if (state.timeScaleMode) {
+      const newHour = parseInt(initialLabel, 10);
+      c.duration = formatDurationValue(newHour - fromVal, c.duration || "(");
+    }
+
+    const c2 = {
+      id: uid(),
+      fromId: newNode.id,
+      toId: oldToId,
+      kind: c.kind,
+      color: c.color || "#cbd5e0",
+      dashed: c.dashed || false,
+      thick: c.thick || false,
+      duration: "",
+      task: "",
+      lockDuration: false
+    };
+
+    if (state.timeScaleMode) {
+      const newHour = parseInt(initialLabel, 10);
+      c2.duration = formatDurationValue(toVal - newHour, c.duration || "(");
+    } else {
+      c2.duration = formatDurationValue(0, c.duration || "(");
+    }
+
+    state.connectors.push(c2);
+
+    recalculateDiagramTimes();
+    renderAll();
+    selectElement("node", newNode.id);
+    commit();
+    setStatus("Node inserted on connector");
+    switchToSelectTool();
+  }
+
   function placeAnnotation(type, x, y){
     let a;
     if(type === "note"){
@@ -2171,6 +2247,11 @@ html,body{
   function onConnectorMouseDown(e, c){
     e.stopPropagation();
     if(currentTool === "erase"){ deleteConnector(c.id); return; }
+    if(currentTool.startsWith("node-")){
+      const pt = getCanvasPoint(e);
+      insertNodeOnConnector(currentTool.replace("node-",""), snap(pt.x), snap(pt.y), c);
+      return;
+    }
     if(currentTool === "connector" || currentTool === "connector-line"){
       const pt = getCanvasPoint(e);
       const closest = closestPointOnConnector(pt.x, pt.y, c);
