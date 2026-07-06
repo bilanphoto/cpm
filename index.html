@@ -249,6 +249,7 @@ html,body{
 /* node visuals */
 .cpm-node{ cursor:move; }
 .cpm-node-shape{ stroke:var(--node-stroke); stroke-width:2.2; }
+.cpm-node-shape-inner{ stroke:var(--node-stroke); stroke-width:2.2; fill:none; }
 .cpm-node-label{
   font-family:var(--font-display); font-weight:700;
   text-anchor:middle; dominant-baseline:central;
@@ -643,6 +644,13 @@ html,body{
           <svg viewBox="0 0 24 24"><path d="M12 2l9 10-9 10-9-10z"/></svg>
           <span>Diamond</span>
         </button>
+        <button class="tool" data-tool="node-circle-hex" title="Circle-Hex node" data-tip="วาง Node วงกลมซ้อนหกเหลี่ยม">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 6.5l4 2.5v5l-4 2.5-4-2.5v-5z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Circle-Hex</span>
+        </button>
       </div>
 
       <div class="tool-group">
@@ -986,7 +994,7 @@ html,body{
       <div class="modal-body" style="text-align: center; padding: 24px 20px;">
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 6px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
-        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.5</div>
+        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.6</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1471,6 +1479,14 @@ html,body{
       } else if(n.type === "hex"){
         const pts = hexPoints(r);
         shape = svgElCreate("polygon", {points:pts, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
+      } else if(n.type === "circle-hex"){
+        const gShape = svgElCreate("g");
+        const outer = svgElCreate("circle", {cx:0, cy:0, r:r, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
+        const pts = hexPoints(r * 0.82);
+        const inner = svgElCreate("polygon", {points:pts, fill:"none", class:"cpm-node-shape-inner", ...strokeAttrs});
+        gShape.appendChild(outer);
+        gShape.appendChild(inner);
+        shape = gShape;
       } else {
         const pts = `0,${-r} ${r},0 0,${r} ${-r},0`;
         shape = svgElCreate("polygon", {points:pts, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
@@ -2026,7 +2042,7 @@ html,body{
   }
 
   function placeNode(type, x, y){
-    const fillDefaults = { circle:"#ffffff", hex:"#7fb56e", diamond:"#f6d34d" };
+    const fillDefaults = { circle:"#ffffff", hex:"#7fb56e", diamond:"#f6d34d", "circle-hex":"#ffffff" };
     let initialLabel = String(state.nodes.length);
     if (state.timeScaleMode) {
       const startX = 120;
@@ -2059,7 +2075,7 @@ html,body{
     const toNode = findNode(toId);
     if (!fromNode || !toNode) return;
 
-    const fillDefaults = { circle: "#ffffff", hex: "#7fb56e", diamond: "#f6d34d" };
+    const fillDefaults = { circle: "#ffffff", hex: "#7fb56e", diamond: "#f6d34d", "circle-hex": "#ffffff" };
     
     let initialLabel = String(state.nodes.length);
     const fromVal = parseNumericLabel(fromNode.label) || 0;
