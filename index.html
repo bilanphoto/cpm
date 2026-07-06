@@ -727,9 +727,15 @@ html,body{
         </div>
 
         <!-- generic label -->
-        <div class="field" data-field="label">
-          <label id="labelFieldName">Label</label>
-          <input type="text" id="fLabel">
+        <div class="field" data-field="label" id="fieldLabelContainer">
+          <div>
+            <label id="labelFieldName">Label</label>
+            <input type="text" id="fLabel">
+          </div>
+          <div id="labelColorCol" style="display:none;">
+            <label>Label color</label>
+            <input type="color" id="fLabelColor" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
+          </div>
         </div>
         <div class="field" data-field="locktime" style="display:none; margin-top:-8px; margin-bottom:12px;">
           <div style="display:flex; align-items:center; gap:4px;">
@@ -769,7 +775,7 @@ html,body{
         <div class="field two-col" data-field="fillrow">
           <div>
             <label>Fill color</label>
-            <input type="color" id="fFill">
+            <input type="color" id="fFill" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
           </div>
           <div>
             <label>Size</label>
@@ -811,7 +817,7 @@ html,body{
         <div class="field two-col" data-field="connstyle">
           <div>
             <label>Line color</label>
-            <input type="color" id="fLineColor">
+            <input type="color" id="fLineColor" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
           </div>
           <div>
             <label>Style</label>
@@ -876,11 +882,11 @@ html,body{
 
         <div class="field" data-field="multiFill">
           <label>Fill color (nodes)</label>
-          <input type="color" id="fMultiFill">
+          <input type="color" id="fMultiFill" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
         </div>
         <div class="field" data-field="multiLineColor">
           <label>Line color (connectors)</label>
-          <input type="color" id="fMultiLineColor">
+          <input type="color" id="fMultiLineColor" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
         </div>
 
         <div class="panel-section secondary-section">
@@ -980,7 +986,7 @@ html,body{
       <div class="modal-body" style="text-align: center; padding: 24px 20px;">
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 6px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
-        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.3</div>
+        <div style="font-size: 12.5px; color: #4a5568; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.5</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1471,7 +1477,7 @@ html,body{
       }
       g.appendChild(shape);
 
-      const label = svgElCreate("text", {class:"cpm-node-label", style:`font-size:${Math.max(14, r*0.62)}px`, y:0, "text-anchor":"middle", "dominant-baseline":"central"});
+      const label = svgElCreate("text", {class:"cpm-node-label", style:`font-size:${Math.max(14, r*0.62)}px; fill:${n.labelColor || 'var(--node-stroke)'};`, y:0, "text-anchor":"middle", "dominant-baseline":"central"});
       label.textContent = n.label || "";
       g.appendChild(label);
 
@@ -3240,6 +3246,11 @@ html,body{
       return;
     }
 
+    const container = $("#fieldLabelContainer");
+    if (container) container.classList.remove("two-col");
+    const colorCol = $("#labelColorCol");
+    if (colorCol) colorCol.style.display = "none";
+
     inspectorEmpty.style.display = "none";
     inspectorPanel.style.display = "block";
     inspectorMulti.style.display = "none";
@@ -3252,6 +3263,12 @@ html,body{
       panelTitle.textContent = "Node — " + n.type;
       $("#labelFieldName").textContent = "Time (Hr)";
       show(fieldEls.label); $("#fLabel").value = n.label || "";
+      
+      const containerEl = $("#fieldLabelContainer");
+      if (containerEl) containerEl.classList.add("two-col");
+      const colorColEl = $("#labelColorCol");
+      if (colorColEl) colorColEl.style.display = "block";
+      $("#fLabelColor").value = n.labelColor || "#23303c";
       show(fieldEls.locktime); $("#fNodeLockTime").checked = !!n.lockTime;
       
       show(fieldEls.sublabel);
@@ -3280,6 +3297,10 @@ html,body{
       
       dateInput.disabled = n.autoDateTime;
       timeInput.disabled = n.autoDateTime;
+
+      show(fieldEls.fillrow);
+      $("#fFill").value = n.fill || "#ffffff";
+      $("#fSize").value = n.r || 32;
     }
     else if(sel.kind === "connector"){
       const c = findConnector(sel.id);
@@ -3424,6 +3445,7 @@ html,body{
   });
 
   bindLive("#fFill", ()=>{ findNode(currentSingle().id).fill = $("#fFill").value; });
+  bindLive("#fLabelColor", ()=>{ findNode(currentSingle().id).labelColor = $("#fLabelColor").value; });
   bindLive("#fSize", ()=>{ findNode(currentSingle().id).r = parseInt($("#fSize").value,10); });
 
   // ---------------------------------------------------------
