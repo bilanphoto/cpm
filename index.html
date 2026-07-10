@@ -305,7 +305,17 @@ html,body{
 .cpm-pin-dot{ cursor:move; }
 .cpm-freetext{
   font-family:var(--font-body); cursor:move; pointer-events:auto;
-  user-select:none; white-space:pre;
+  user-select:none; white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word;
+}
+.cpm-ann-fo{ overflow:visible; }
+.cpm-ann-fo div{
+  font-family:var(--font-body); cursor:move; pointer-events:auto;
+  white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word;
+  overflow:hidden; box-sizing:border-box;
+}
+.cpm-resize-handle{
+  cursor:se-resize; fill:rgba(255,255,255,0.85); stroke:#94a3b8; stroke-width:1.2;
+  pointer-events:all;
 }
 
 .cpm-note.selected .cpm-note-box, .cpm-banner.selected rect, .cpm-pin.selected circle{
@@ -775,9 +785,22 @@ html,body{
               <label for="fNodeAutoTime" style="font-size: 11px; margin: 0; cursor: pointer; user-select: none;">Auto-calculate</label>
             </div>
           </div>
-          <div>
-            <label>Date/Time color</label>
-            <input type="color" id="fDatetimeColor" value="#1d4ed8" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div>
+              <label>Date/Time color</label>
+              <input type="color" id="fDatetimeColor" value="#1d4ed8" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
+            </div>
+            <div style="display:flex; gap:6px; align-items:flex-end;">
+              <div style="flex:1;">
+                <label>Font size</label>
+                <input type="number" id="fDtFontSize" min="7" max="32" step="1" value="12"
+                  style="width:100%; padding:5px 6px; font-size:12px; border:1px solid var(--chrome-line); border-radius:var(--radius-sm); background:var(--chrome-800); color:var(--chrome-text);">
+              </div>
+              <div style="display:flex; align-items:center; gap:3px; padding-bottom:6px;">
+                <input type="checkbox" id="fDtBold">
+                <label for="fDtBold" style="font-size:11px; margin:0; cursor:pointer; user-select:none; white-space:nowrap;">Bold</label>
+              </div>
+            </div>
           </div>
         </div>
         <div class="field two-col" data-field="fillrow">
@@ -995,7 +1018,7 @@ html,body{
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.6</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.7</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1520,7 +1543,7 @@ html,body{
         const oy = n.datetimeOffsetY || 0;
         const lines = n.datetime.split("\\n");
         lines.forEach((ln,i)=>{
-          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:ox, y:r+22+i*16 + oy, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.datetimeColor || '#1d4ed8'}; cursor:move;`});
+          const dt = svgElCreate("text", {class:"cpm-node-datetime", x:ox, y:r+22+i*16 + oy, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.datetimeColor || '#1d4ed8'}; font-size:${n.datetimeFontSize || 12}px; font-weight:${n.datetimeBold ? 700 : 600}; cursor:move;`});
           dt.textContent = ln;
           dt.addEventListener("mousedown", (e) => {
             e.stopPropagation();
@@ -1881,29 +1904,61 @@ html,body{
     });
   }
 
+  function addResizeHandle(g, a){
+    const sz = 12;
+    const grip = svgElCreate("rect", {
+      x: a.w - sz, y: a.h - sz, width: sz, height: sz,
+      class: "cpm-resize-handle", rx: 2
+    });
+    // Draw grip lines
+    const mk = (x1,y1,x2,y2) => { const l=svgElCreate("line",{x1,y1,x2,y2,stroke:"#64748b","stroke-width":1,"pointer-events":"none"}); return l; };
+    const lines = [
+      mk(a.w-9, a.h-3, a.w-3, a.h-9),
+      mk(a.w-6, a.h-3, a.w-3, a.h-6)
+    ];
+    grip.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      if(currentTool !== "select") return;
+      const start = getCanvasPoint(e);
+      drag = { type:"ann-resize", id:a.id, startX:start.x, startY:start.y, origW:a.w, origH:a.h };
+      window.addEventListener("mousemove", onWindowMouseMove);
+      window.addEventListener("mouseup", onWindowMouseUp);
+    });
+    g.appendChild(grip);
+    lines.forEach(l => g.appendChild(l));
+  }
+
   function renderNoteEl(a){
     const g = svgElCreate("g", {class:"cpm-note", transform:`translate(${a.x},${a.y})`});
     const col = colorToken(a.color);
-    const rect = svgElCreate("rect", {width:a.w, height:a.h, fill:col.fill, stroke:col.border, class:"cpm-note-box", rx:3});
+    const w = Math.max(a.w, 120); const h = Math.max(a.h, 40);
+    const rect = svgElCreate("rect", {width:w, height:h, fill:col.fill, stroke:col.border, class:"cpm-note-box", rx:3});
     g.appendChild(rect);
-    const lines = a.text.split("\n");
-    const fz = a.fontSize || 12.5;
-    lines.forEach((ln,i)=>{
-      const t = svgElCreate("text", {class:"cpm-note-text", x:8, y:16+i*(fz+4), style:`font-size:${fz}px; font-weight:${a.bold?700:400}`});
-      t.textContent = ln;
-      g.appendChild(t);
-    });
+    const fo = svgElCreate("foreignObject", {x:0, y:0, width:w, height:h, class:"cpm-ann-fo"});
+    const div = document.createElement("div");
+    div.style.cssText = `padding:6px 8px; font-size:${a.fontSize||12.5}px; font-weight:${a.bold?700:400}; color:#3a2c10; line-height:1.35; width:${w}px; height:${h}px;`;
+    div.textContent = a.text;
+    fo.appendChild(div);
+    g.appendChild(fo);
+    // Resize handle
+    addResizeHandle(g, {w, h, id: a.id});
     return g;
   }
 
   function renderBannerEl(a){
     const g = svgElCreate("g", {class:"cpm-banner", transform:`translate(${a.x},${a.y})`});
     const col = colorToken(a.color);
-    const rect = svgElCreate("rect", {width:a.w, height:a.h, fill:col.fill, stroke:col.border, rx:4, "stroke-width":1.6});
+    const w = Math.max(a.w, 120); const h = Math.max(a.h, 32);
+    const rect = svgElCreate("rect", {width:w, height:h, fill:col.fill, stroke:col.border, rx:4, "stroke-width":1.6});
     g.appendChild(rect);
-    const t = svgElCreate("text", {class:"cpm-banner-text", x:a.w/2, y:a.h/2, style:`font-size:${a.fontSize||18}px; fill:${textColorToken(a.textColor)}`, "text-anchor":"middle", "dominant-baseline":"central"});
-    t.textContent = a.text;
-    g.appendChild(t);
+    const fo = svgElCreate("foreignObject", {x:0, y:0, width:w, height:h, class:"cpm-ann-fo"});
+    const div = document.createElement("div");
+    const fz = a.fontSize || 18;
+    div.style.cssText = `display:flex; align-items:center; justify-content:center; text-align:center; padding:4px 10px; font-size:${fz}px; font-weight:${a.bold?700:400}; color:${textColorToken(a.textColor)}; line-height:1.3; width:${w}px; height:${h}px; font-family:var(--font-display);`;
+    div.textContent = a.text;
+    fo.appendChild(div);
+    g.appendChild(fo);
+    addResizeHandle(g, {w, h, id: a.id});
     return g;
   }
 
@@ -1993,16 +2048,15 @@ html,body{
 
   function renderTextEl(a){
     const g = svgElCreate("g", {class:"cpm-text-wrap", transform:`translate(${a.x},${a.y})`});
-    const fo = svgElCreate("foreignObject", {x:0, y:0, width:Math.max(a.w,200), height:Math.max(a.h,40)});
+    const w = Math.max(a.w, 80); const h = Math.max(a.h, 24);
+    const fo = svgElCreate("foreignObject", {x:0, y:0, width:w, height:h, class:"cpm-ann-fo"});
     const div = document.createElement("div");
     div.className = "cpm-freetext";
-    div.style.color = textColorToken(a.textColor);
-    div.style.fontSize = (a.fontSize||16)+"px";
-    div.style.fontWeight = a.bold ? "700" : "500";
-    div.style.lineHeight = "1.25";
+    div.style.cssText = `color:${textColorToken(a.textColor)}; font-size:${a.fontSize||16}px; font-weight:${a.bold?700:500}; line-height:1.35; width:${w}px; height:${h}px;`;
     div.textContent = a.text;
     fo.appendChild(div);
     g.appendChild(fo);
+    addResizeHandle(g, {w, h, id: a.id});
     return g;
   }
 
@@ -2413,6 +2467,13 @@ html,body{
         a.textOffsetY = drag.origOffsetY + dy;
         renderAll();
       }
+    } else if(drag.type === "ann-resize"){
+      const a = findAnnotation(drag.id);
+      if(a){
+        a.w = Math.max(60, drag.origW + dx);
+        a.h = Math.max(20, drag.origH + dy);
+        renderAll();
+      }
     } else if(drag.type === "node-text"){
       const n = findNode(drag.id);
       if(n){
@@ -2431,7 +2492,7 @@ html,body{
 
   function onWindowMouseUp(e){
     const wasDragging = drag !== null;
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text")) commit();
+    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "ann-resize")) commit();
     if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
@@ -3000,12 +3061,26 @@ html,body{
     const pos = screenPosFor(canvasX, canvasY);
     ta.style.left = pos.left + "px";
     ta.style.top = pos.top + "px";
-    ta.style.width = (width||160) + "px";
+    ta.style.width = Math.max(width||160, 80) + "px";
+    ta.style.minWidth = "80px";
+    ta.style.maxWidth = "600px";
+    if(opts.height) ta.style.height = Math.max(opts.height, 40) + "px";
     ta.style.fontSize = (opts.fontSize||14) + "px";
     ta.style.fontWeight = opts.bold ? "700" : "400";
+    ta.style.resize = "both";
+    ta.style.whiteSpace = "pre-wrap";
+    ta.style.overflowY = "auto";
     ta.value = initialValue || "";
     document.body.appendChild(ta);
     setTimeout(()=>{ ta.focus(); ta.select(); }, 0);
+
+    // Auto-grow height as user types
+    function autoGrow(){
+      ta.style.height = "auto";
+      ta.style.height = Math.max(ta.scrollHeight, 40) + "px";
+    }
+    ta.addEventListener("input", autoGrow);
+    autoGrow();
 
     function finish(){
       onCommit(ta.value);
@@ -3016,12 +3091,14 @@ html,body{
     }
     ta.addEventListener("blur", finish);
     ta.addEventListener("keydown", (e)=>{
+      if(e.key === "Escape"){
+        ta.removeEventListener("blur", finish);
+        ta.remove();
+      }
+      // Shift+Enter = newline (default), Enter alone commits (only for note type with singleLine kept)
       if(e.key === "Enter" && !e.shiftKey && opts.singleLine){
         e.preventDefault();
         ta.blur();
-      } else if(e.key === "Escape"){
-        ta.removeEventListener("blur", finish);
-        ta.remove();
       }
     });
   }
@@ -3178,9 +3255,9 @@ html,body{
     if(a.type === "note"){
       openInlineEditor(a.x, a.y, a.w, a.text, (val)=>{ a.text = val; });
     } else if(a.type === "banner"){
-      openInlineEditor(a.x+8, a.y+a.h/2-12, a.w-16, a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:18});
+      openInlineEditor(a.x, a.y, Math.max(a.w,120), a.text, (val)=>{ a.text = val; }, {fontSize:a.fontSize||18, bold:a.bold, height:Math.max(a.h,32)});
     } else if(a.type === "text"){
-      openInlineEditor(a.x, a.y, Math.max(a.w,120), a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:a.fontSize||16, bold:a.bold});
+      openInlineEditor(a.x, a.y, Math.max(a.w,80), a.text, (val)=>{ a.text = val; }, {fontSize:a.fontSize||16, bold:a.bold, height:Math.max(a.h,24)});
     } else if(a.type === "pin"){
       const tx = a.textOffsetX !== undefined ? a.textOffsetX : 14;
       const ty = a.textOffsetY !== undefined ? a.textOffsetY : 4;
@@ -3315,6 +3392,9 @@ html,body{
       dateInput.disabled = n.autoDateTime;
       timeInput.disabled = n.autoDateTime;
 
+      $("#fDtFontSize").value = n.datetimeFontSize || 12;
+      $("#fDtBold").checked = !!n.datetimeBold;
+
       show(fieldEls.fillrow);
       $("#fFill").value = n.fill || "#ffffff";
       $("#fSize").value = n.r || 32;
@@ -3401,6 +3481,19 @@ html,body{
       findAnnotation(sel.id).datetimeColor = $("#fDatetimeColor").value;
     }
   });
+  bindLive("#fDtFontSize", ()=>{
+    const sel = currentSingle();
+    if (!sel || sel.kind !== "node") return;
+    const v = parseInt($("#fDtFontSize").value);
+    if (!isNaN(v) && v >= 7) findNode(sel.id).datetimeFontSize = v;
+  });
+  $("#fDtBold").addEventListener("change", ()=>{
+    const sel = currentSingle();
+    if (!sel || sel.kind !== "node") return;
+    findNode(sel.id).datetimeBold = $("#fDtBold").checked;
+    renderAll(); commit();
+  });
+
   bindLive("#fNodeDate", ()=>{
     const sel = currentSingle();
     if (!sel) return;
