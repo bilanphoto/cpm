@@ -1018,7 +1018,7 @@ html,body{
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.7</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.8</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1911,7 +1911,7 @@ html,body{
       class: "cpm-resize-handle", rx: 2
     });
     // Draw grip lines
-    const mk = (x1,y1,x2,y2) => { const l=svgElCreate("line",{x1,y1,x2,y2,stroke:"#64748b","stroke-width":1,"pointer-events":"none"}); return l; };
+    const mk = (x1,y1,x2,y2) => { const l=svgElCreate("line",{x1,y1,x2,y2,stroke:"#64748b","stroke-width":1,"pointer-events":"none",class:"cpm-resize-grip-line"}); return l; };
     const lines = [
       mk(a.w-9, a.h-3, a.w-3, a.h-9),
       mk(a.w-6, a.h-3, a.w-3, a.h-6)
@@ -4565,7 +4565,11 @@ html,body{
     const clone = svg.cloneNode(true);
     const docStyle = document.querySelector("style");
     if(docStyle){
-      const styleClone = docStyle.cloneNode(true);
+      const styleClone = svgElCreate("style");
+      // Strip external @import rules so standalone SVG image rendering cannot be blocked or taint the canvas
+      styleClone.textContent = (docStyle.textContent || "")
+        .replace(/@import\s+url\([^)]*\)\s*;?/gi, "")
+        .replace(/:root\s*\{/, ":root, svg {");
       clone.insertBefore(styleClone, clone.firstChild);
     }
     clone.setAttribute("width", w);
@@ -4590,20 +4594,113 @@ html,body{
 
     clone.querySelectorAll(".connect-handle").forEach(h=>h.remove());
     clone.querySelectorAll(".connect-handle-connector").forEach(h=>h.remove());
+    clone.querySelectorAll(".cpm-resize-handle, .cpm-resize-grip-line").forEach(h=>h.remove());
     clone.querySelectorAll(".selected").forEach(elm=>elm.classList.remove("selected"));
 
-    // foreignObject (used for free-text annotations) taints the canvas when
+    // Helper to wrap text lines to fit within a given pixel width for SVG <text> export
+    const measureCanvas = document.createElement("canvas");
+    const measureCtx = measureCanvas.getContext("2d");
+    function wrapTextForSvgExport(rawText, maxWidth, fontCss){
+      measureCtx.font = fontCss;
+      const paragraphs = String(rawText || "").replace(/\\n/g, "\n").split("\n");
+      const out = [];
+      paragraphs.forEach(para => {
+        if(!para){ out.push(""); return; }
+        if(!maxWidth || maxWidth <= 0 || measureCtx.measureText(para).width <= maxWidth){
+          out.push(para);
+          return;
+        }
+        const tokens = para.split(/(\s+)/);
+        let current = "";
+        tokens.forEach(tok => {
+          const candidate = current + tok;
+          if(measureCtx.measureText(candidate).width <= maxWidth){
+            current = candidate;
+          } else {
+            if(current.trim()) out.push(current.trimEnd());
+            current = tok.trimStart();
+            while(current && measureCtx.measureText(current).width > maxWidth && current.length > 1){
+              let cut = 1;
+              while(cut < current.length && measureCtx.measureText(current.slice(0, cut + 1)).width <= maxWidth){
+                cut++;
+              }
+              out.push(current.slice(0, cut));
+              current = current.slice(cut);
+            }
+          }
+        });
+        if(current) out.push(current);
+      });
+      return out.length ? out : [""];
+    }
+
+    // foreignObject (used for notes, banners, and free-text annotations) taints the canvas when
     // rasterized via drawImage, even with no external resources inside it.
     // Swap each one out for a plain SVG <text> element before export.
+    clone.querySelectorAll(".cpm-note").forEach(noteG=>{
+      const fo = noteG.querySelector("foreignObject");
+      if(!fo) return;
+      const div = fo.querySelector("div");
+      if(!div){ fo.remove(); return; }
+      const boxW = parseFloat(fo.getAttribute("width")) || 120;
+      const fontSize = parseFloat(div.style.fontSize) || 12.5;
+      const fontWeight = div.style.fontWeight || "400";
+      const color = div.style.color || "#3a2c10";
+      const fontFamily = "'Inter','Segoe UI',Helvetica,Arial,sans-serif";
+      const lines = wrapTextForSvgExport(div.textContent || "", boxW - 16, `${fontWeight} ${fontSize}px ${fontFamily}`);
+      const replacement = svgElCreate("text", {
+        x: 8, y: 6 + fontSize,
+        style:`font-family:${fontFamily}; font-weight:${fontWeight}; font-size:${fontSize}px; fill:${color};`
+      });
+      lines.forEach((ln, i)=>{
+        const tspan = svgElCreate("tspan", {x: 8, dy: i === 0 ? 0 : fontSize * 1.35});
+        tspan.textContent = ln;
+        replacement.appendChild(tspan);
+      });
+      noteG.replaceChild(replacement, fo);
+    });
+
+    clone.querySelectorAll(".cpm-banner").forEach(bannerG=>{
+      const fo = bannerG.querySelector("foreignObject");
+      if(!fo) return;
+      const div = fo.querySelector("div");
+      if(!div){ fo.remove(); return; }
+      const boxW = parseFloat(fo.getAttribute("width")) || 120;
+      const boxH = parseFloat(fo.getAttribute("height")) || 32;
+      const fontSize = parseFloat(div.style.fontSize) || 18;
+      const fontWeight = div.style.fontWeight || "700";
+      const color = div.style.color || "#1c2530";
+      const fontFamily = "'Space Grotesk','Segoe UI',Arial,sans-serif";
+      const lines = wrapTextForSvgExport(div.textContent || "", boxW - 20, `${fontWeight} ${fontSize}px ${fontFamily}`);
+      const lineH = fontSize * 1.3;
+      const startY = (boxH / 2) - ((lines.length - 1) * lineH) / 2;
+      const replacement = svgElCreate("text", {
+        x: boxW / 2, y: startY,
+        "text-anchor": "middle",
+        "dominant-baseline": "central",
+        style:`font-family:${fontFamily}; font-weight:${fontWeight}; font-size:${fontSize}px; fill:${color};`
+      });
+      lines.forEach((ln, i)=>{
+        const tspan = svgElCreate("tspan", {x: boxW / 2, dy: i === 0 ? 0 : lineH});
+        tspan.textContent = ln;
+        replacement.appendChild(tspan);
+      });
+      bannerG.replaceChild(replacement, fo);
+    });
+
     clone.querySelectorAll(".cpm-text-wrap").forEach(wrap=>{
       const fo = wrap.querySelector("foreignObject");
       const div = fo ? fo.querySelector(".cpm-freetext") : null;
-      if(!div) return;
-      const lines = (div.textContent || "").split("\n");
+      if(!div){ if(fo) fo.remove(); return; }
+      const boxW = parseFloat(fo.getAttribute("width")) || 80;
       const fontSize = parseFloat(div.style.fontSize) || 16;
+      const fontWeight = div.style.fontWeight || "500";
+      const color = div.style.color || "#1c2530";
+      const fontFamily = "'Inter','Segoe UI',Helvetica,Arial,sans-serif";
+      const lines = wrapTextForSvgExport(div.textContent || "", boxW - 8, `${fontWeight} ${fontSize}px ${fontFamily}`);
       const replacement = svgElCreate("text", {
         x: 4, y: fontSize,
-        style:`font-family:'Inter','Segoe UI',Helvetica,Arial,sans-serif; font-weight:${div.style.fontWeight||500}; font-size:${fontSize}px; fill:${div.style.color||'#1c2530'};`
+        style:`font-family:${fontFamily}; font-weight:${fontWeight}; font-size:${fontSize}px; fill:${color};`
       });
       lines.forEach((ln,i)=>{
         const tspan = svgElCreate("tspan", {x:4, dy: i===0 ? 0 : fontSize*1.25});
@@ -4613,31 +4710,45 @@ html,body{
       wrap.replaceChild(replacement, fo);
     });
 
+    // Final safety guarantee: remove any remaining foreignObject so canvas can never be tainted
+    clone.querySelectorAll("foreignObject").forEach(fo=>fo.remove());
+
     const svgData = new XMLSerializer().serializeToString(clone);
     const svgBlob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
     const url = URL.createObjectURL(svgBlob);
 
     const img = new Image();
     img.onload = ()=>{
-      const scaleFactor = 2;
-      const canvasEl = document.createElement("canvas");
-      canvasEl.width = w*scaleFactor;
-      canvasEl.height = h*scaleFactor;
-      const ctx = canvasEl.getContext("2d");
-      ctx.fillStyle = state.canvasBg || "#f3f1ea";
-      ctx.fillRect(0,0,canvasEl.width, canvasEl.height);
-      ctx.scale(scaleFactor, scaleFactor);
-      ctx.drawImage(img, 0, 0, w, h);
-      canvasEl.toBlob((blob)=>{
-        const finish = handle ? writeBlobToHandle(handle, blob) : Promise.resolve(downloadBlobFallback(blob, filename));
-        finish.then(()=>{
-          URL.revokeObjectURL(url);
-          setStatus("Exported " + filename);
-        }).catch(()=>{
-          URL.revokeObjectURL(url);
-          setStatus("Export failed — try again");
-        });
-      }, "image/png");
+      try {
+        const scaleFactor = 2;
+        const canvasEl = document.createElement("canvas");
+        canvasEl.width = w*scaleFactor;
+        canvasEl.height = h*scaleFactor;
+        const ctx = canvasEl.getContext("2d");
+        ctx.fillStyle = state.canvasBg || "#f3f1ea";
+        ctx.fillRect(0,0,canvasEl.width, canvasEl.height);
+        ctx.scale(scaleFactor, scaleFactor);
+        ctx.drawImage(img, 0, 0, w, h);
+        canvasEl.toBlob((blob)=>{
+          if(!blob){
+            URL.revokeObjectURL(url);
+            setStatus("Export failed — try again");
+            return;
+          }
+          const finish = handle ? writeBlobToHandle(handle, blob) : Promise.resolve(downloadBlobFallback(blob, filename));
+          finish.then(()=>{
+            URL.revokeObjectURL(url);
+            setStatus("Exported " + filename);
+          }).catch(()=>{
+            URL.revokeObjectURL(url);
+            setStatus("Export failed — try again");
+          });
+        }, "image/png");
+      } catch(err) {
+        console.error("Export PNG failed:", err);
+        URL.revokeObjectURL(url);
+        setStatus("Export failed — try again");
+      }
     };
     img.onerror = ()=>{
       setStatus("Export failed — try again");
