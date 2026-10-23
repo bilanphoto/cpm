@@ -581,7 +581,8 @@ html,body{
       </label>
       <button class="btn ghost" id="btnClear" title="Clear canvas" data-tip="ลบทุกอย่างบน Canvas">🗑</button>
       <div class="sep"></div>
-      <button class="btn" id="btnSaveCanvasHtml" title="Save the whole canvas as a self-contained, editable .html file" data-tip="บันทึก Diagram เป็นไฟล์ .html">Save</button>
+      <button class="btn" id="btnSaveCanvasHtml" title="Save changes directly to file (Ctrl+S / ⌘S)" data-tip="บันทึกทับลงในไฟล์เดิม (Save)">💾 Save</button>
+      <button class="btn" id="btnSaveAsCanvasHtml" title="Save as a new .html file" data-tip="บันทึกเป็นไฟล์ใหม่ (Save As)">Save As</button>
       <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file" data-tip="เปิดไฟล์ Diagram (.html) ที่บันทึกไว้">📂 Open</button>
       <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI" data-tip="นำเข้า Diagram จากรูปภาพด้วย AI">📷 Import Image</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
@@ -696,6 +697,31 @@ html,body{
         <button class="tool" data-tool="text" title="Free text label" data-tip="เพิ่มข้อความอิสระ (Free Text)">
           <svg viewBox="0 0 24 24"><path d="M4 5h16M12 5v14"/></svg>
           <span>Text</span>
+        </button>
+      </div>
+
+      <div class="tool-group">
+        <div class="tool-group-title">Tracking Lines</div>
+        <button class="tool" data-tool="timeline-actual" title="Time Actual (เส้นประเขียว Tracking Time)" data-tip="วางเส้น Time Actual (เส้นประสีเขียว Tracking เวลาจริง)">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="2" x2="12" y2="22" stroke="#16a34a" stroke-width="2.5" stroke-dasharray="4 3"/>
+            <rect x="5" y="4" width="14" height="6" rx="2" fill="#16a34a"/>
+          </svg>
+          <span>Actual</span>
+        </button>
+        <button class="tool" data-tool="timeline-plan" title="Plan (เส้นประน้ำเงิน)" data-tip="วางเส้น Plan (เส้นประสีน้ำเงิน แผนงาน)">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="2" x2="12" y2="22" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="4 3"/>
+            <rect x="5" y="4" width="14" height="6" rx="2" fill="#2563eb"/>
+          </svg>
+          <span>Plan</span>
+        </button>
+        <button class="tool" data-tool="timeline-delay" title="Delay (เส้นประสีส้ม)" data-tip="วางเส้น Delay (เส้นประสีส้ม ความล่าช้า)">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="2" x2="12" y2="22" stroke="#ea580c" stroke-width="2.5" stroke-dasharray="4 3"/>
+            <rect x="5" y="4" width="14" height="6" rx="2" fill="#ea580c"/>
+          </svg>
+          <span>Delay</span>
         </button>
       </div>
 
@@ -877,6 +903,34 @@ html,body{
             <option value="line">Plain line (----)</option>
           </select>
         </div>
+        <div class="field" data-field="conntracking">
+          <label>Tracking Preset (ประเภทเส้น Tracking)</label>
+          <select id="fConnTracking">
+            <option value="none">Standard / None (ปกติ)</option>
+            <option value="actual">Time Actual (เส้นประเขียว #16a34a)</option>
+            <option value="plan">Plan (เส้นประน้ำเงิน #2563eb)</option>
+            <option value="delay">Delay (เส้นประสีส้ม #ea580c)</option>
+          </select>
+        </div>
+
+        <!-- timeline tracking line specific -->
+        <div class="field" data-field="timelinetype">
+          <label>Tracking Type (ประเภทเส้น)</label>
+          <select id="fTimelineType">
+            <option value="actual">Time Actual (เส้นประเขียว)</option>
+            <option value="plan">Plan (เส้นประน้ำเงิน)</option>
+            <option value="delay">Delay (เส้นประสีส้ม)</option>
+            <option value="custom">Custom (กำหนดเอง)</option>
+          </select>
+        </div>
+        <div class="field" data-field="timelinedatetime">
+          <label>Date & Time / Info (ข้อความวันที่หรือเวลา)</label>
+          <input type="text" id="fTimelineDatetime" placeholder="e.g. 16/06/68 08:00น. (Hr 8)">
+        </div>
+        <div class="field" data-field="timelinecolor">
+          <label>Line & Badge Color (สีเส้นและป้าย)</label>
+          <input type="color" id="fTimelineColor" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
+        </div>
 
         <!-- note / banner / text specific -->
         <div class="field" data-field="notebody">
@@ -1030,7 +1084,7 @@ html,body{
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.10</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.11</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1166,6 +1220,13 @@ html,body{
   function commit(){
     pushHistory();
     refreshCount();
+    try {
+      localStorage.setItem("cpm_current_canvas", JSON.stringify({
+        title: $("#diagramTitle").value,
+        subtitle: $("#diagramSubtitle").value,
+        state
+      }));
+    } catch(e){}
     if (isCollabActive) {
       pushLocalStateUpdate();
     }
@@ -1182,6 +1243,22 @@ html,body{
   // person's click; the actual file content can be written later once it's
   // ready. Falls back to a normal anchor download otherwise.
   // ---------------------------------------------------------
+  let currentFileHandle = null;
+  let currentFileName = null;
+
+  async function verifyPermission(fileHandle, readWrite) {
+    if (!fileHandle || !fileHandle.queryPermission) return false;
+    const options = {};
+    if (readWrite) options.mode = 'readwrite';
+    try {
+      if ((await fileHandle.queryPermission(options)) === 'granted') return true;
+      if ((await fileHandle.requestPermission(options)) === 'granted') return true;
+    } catch(e) {
+      console.warn("verifyPermission error", e);
+    }
+    return false;
+  }
+
   function pickSaveHandle(suggestedName, extension, description, mimeType){
     if(!window.showSaveFilePicker) return Promise.resolve(null);
     return window.showSaveFilePicker({
@@ -1318,25 +1395,37 @@ html,body{
   }
 
   function recalculateDiagramTimes() {
-    state.nodes.forEach(n => {
-      if (state.connectors.some(c => c.toId === n.id)) {
-        n.autoDateTime = true;
-      }
-    });
-
     const nodeTimes = {};
     const connTimes = {}; // { id: { start, end } }
 
-    // Start with manual node times
+    // Start with explicitly set node times
+    let anchorFound = false;
     state.nodes.forEach(n => {
-      const isAuto = n.autoDateTime !== false;
-      const hasPrev = state.connectors.some(c => c.toId === n.id);
-      if (!hasPrev || !isAuto) {
-        nodeTimes[n.id] = getNodeDateTime(n) || new Date();
+      if (n.datetimeDate && n.datetimeTime) {
+        const dt = getNodeDateTime(n);
+        if (dt) {
+          nodeTimes[n.id] = dt;
+          anchorFound = true;
+        }
       }
     });
 
-    // Iterative relaxation
+    // If no node has explicit datetime, initialize with earliest node or node 0 or first node
+    if (!anchorFound && state.nodes.length > 0) {
+      let minNode = state.nodes[0];
+      let minVal = parseNumericLabel(minNode.label);
+      state.nodes.forEach(n => {
+        const v = parseNumericLabel(n.label);
+        if (v !== null && (minVal === null || v < minVal)) {
+          minVal = v;
+          minNode = n;
+        }
+      });
+      const baseDate = getNodeDateTime(minNode) || new Date();
+      nodeTimes[minNode.id] = baseDate;
+    }
+
+    // Iterative relaxation (bidirectional: forward and backward)
     let changed = true;
     let iter = 0;
     const maxIter = (state.nodes.length + state.connectors.length) * 5 + 50;
@@ -1345,14 +1434,14 @@ html,body{
       changed = false;
       iter++;
 
-      // Update connectors
+      // Update connectors forward
       state.connectors.forEach(c => {
-        let startTime = null;
+        const duration = parseNumericLabel(c.duration) || 0;
+        const unit = c.durationUnit || "hours";
 
-        if (c.fromId) {
-          if (nodeTimes[c.fromId]) {
-            startTime = nodeTimes[c.fromId];
-          }
+        let startTime = null;
+        if (c.fromId && nodeTimes[c.fromId]) {
+          startTime = nodeTimes[c.fromId];
         } else if (c.fromConnectorId) {
           const parent = connTimes[c.fromConnectorId];
           if (parent && parent.start) {
@@ -1360,7 +1449,6 @@ html,body{
             if (parentConn) {
               const parentDur = parseNumericLabel(parentConn.duration) || 0;
               const parentUnit = parentConn.durationUnit || "hours";
-              
               const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
               startTime = addDuration(parent.start, parentDur * t, parentUnit);
             }
@@ -1368,10 +1456,7 @@ html,body{
         }
 
         if (startTime) {
-          const duration = parseNumericLabel(c.duration) || 0;
-          const unit = c.durationUnit || "hours";
           const endTime = addDuration(startTime, duration, unit);
-
           const existing = connTimes[c.id];
           if (!existing || existing.start.getTime() !== startTime.getTime() || existing.end.getTime() !== endTime.getTime()) {
             connTimes[c.id] = { start: startTime, end: endTime };
@@ -1380,22 +1465,17 @@ html,body{
         }
       });
 
-      // Update auto nodes
+      // Update nodes forward (toId receives end of connector)
       state.nodes.forEach(n => {
-        const isAuto = n.autoDateTime !== false;
-        if (!isAuto) return;
-
-        // Find incoming connectors
+        if (n.lockTime) return; // locked nodes preserve their time
         const incoming = state.connectors.filter(c => c.toId === n.id);
-        if (incoming.length === 0) return; // start node
+        if (incoming.length === 0) return;
 
         let maxTime = null;
         incoming.forEach(c => {
           const ct = connTimes[c.id];
           if (ct && ct.end) {
-            if (!maxTime || ct.end > maxTime) {
-              maxTime = ct.end;
-            }
+            if (!maxTime || ct.end > maxTime) maxTime = ct.end;
           }
         });
 
@@ -1407,13 +1487,27 @@ html,body{
           }
         }
       });
+
+      // Update backward: if toNode has a time, calculate fromNode backward (startTime = endTime - duration)
+      state.connectors.forEach(c => {
+        if (!c.fromId || !c.toId) return;
+        const sourceNode = findNode(c.fromId);
+        if (sourceNode && sourceNode.lockTime) return;
+
+        const targetTime = nodeTimes[c.toId];
+        if (targetTime && !nodeTimes[c.fromId]) {
+          const duration = parseNumericLabel(c.duration) || 0;
+          const unit = c.durationUnit || "hours";
+          const calculatedStart = addDuration(targetTime, -duration, unit);
+          nodeTimes[c.fromId] = calculatedStart;
+          changed = true;
+        }
+      });
     }
 
-    // Write back
+    // Write back to all nodes
     state.nodes.forEach(n => {
-      const isAuto = n.autoDateTime !== false;
-      const hasPrev = state.connectors.some(c => c.toId === n.id);
-      if (hasPrev && isAuto && nodeTimes[n.id]) {
+      if (nodeTimes[n.id]) {
         const calcDate = nodeTimes[n.id];
         n.datetimeDate = formatDateISO(calcDate);
         n.datetimeTime = formatTimeISO(calcDate);
@@ -1439,7 +1533,7 @@ html,body{
       const val = parseNumericLabel(n.label);
       if (val !== null && val < minVal) minVal = val;
     });
-    const startX = 120;
+    const startX = 160;
     const offset = minVal < 0 ? startX - minVal * 40 : startX;
     state.nodes.forEach(n => {
       const val = parseNumericLabel(n.label);
@@ -1943,6 +2037,7 @@ html,body{
       else if(a.type === "banner") g = renderBannerEl(a);
       else if(a.type === "pin") g = renderPinEl(a);
       else if(a.type === "text") g = renderTextEl(a);
+      else if(a.type === "timeline") g = renderTimelineEl(a);
       if(g){
         g.setAttribute("data-id", a.id);
         if(isSelected("annotation", a.id)) g.classList.add("selected");
@@ -2108,6 +2203,66 @@ html,body{
     return g;
   }
 
+  function renderTimelineEl(a){
+    const g = svgElCreate("g", {class:"cpm-timeline-wrap"});
+    const h = state.canvasHeight || 1800;
+    const color = a.color || (a.timelineKind === "actual" ? "#16a34a" : (a.timelineKind === "plan" ? "#2563eb" : "#ea580c"));
+
+    // Invisible wide hit line for easy dragging anywhere along the vertical line
+    const hit = svgElCreate("line", {
+      x1: a.x, y1: 0, x2: a.x, y2: h,
+      stroke: "transparent", "stroke-width": 16,
+      style: "cursor: ew-resize;"
+    });
+    g.appendChild(hit);
+
+    // Visible vertical dashed line
+    const dashArr = a.dashed !== false ? "8 5" : "none";
+    const line = svgElCreate("line", {
+      x1: a.x, y1: 0, x2: a.x, y2: h,
+      stroke: color, "stroke-width": 2.5,
+      "stroke-dasharray": dashArr
+    });
+    g.appendChild(line);
+
+    // Draggable badge/pill at (a.x, a.y)
+    const badgeY = a.y !== undefined ? a.y : 36;
+    const badgeG = svgElCreate("g", {
+      transform: `translate(${a.x}, ${badgeY})`,
+      style: "cursor: move;"
+    });
+
+    const label = a.label || (a.timelineKind === "actual" ? "Time Actual" : (a.timelineKind === "plan" ? "Plan" : "Delay"));
+    const sub = a.sublabel ? ` ${a.sublabel}` : "";
+    const fullText = label + sub;
+    const padW = Math.max(90, fullText.length * 8 + 24);
+    const badgeH = 26;
+
+    const bgRect = svgElCreate("rect", {
+      x: -padW / 2, y: -badgeH / 2,
+      width: padW, height: badgeH,
+      rx: 4, ry: 4,
+      fill: color,
+      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))"
+    });
+    badgeG.appendChild(bgRect);
+
+    const txt = svgElCreate("text", {
+      x: 0, y: 1,
+      fill: "#ffffff",
+      "font-size": "11.5px",
+      "font-weight": "600",
+      "font-family": "var(--font-display, sans-serif)",
+      "text-anchor": "middle",
+      "dominant-baseline": "central"
+    });
+    txt.textContent = fullText;
+    badgeG.appendChild(txt);
+
+    g.appendChild(badgeG);
+    return g;
+  }
+
   function renderAll(){
     updateTimeScaleButtonVisual();
     applyCanvasSize();
@@ -2134,7 +2289,7 @@ html,body{
       placeNode(currentTool.replace("node-",""), snap(pt.x), snap(pt.y));
       return;
     }
-    if(currentTool === "note" || currentTool === "banner" || currentTool === "pin" || currentTool === "text"){
+    if(currentTool === "note" || currentTool === "banner" || currentTool === "pin" || currentTool === "text" || currentTool.startsWith("timeline-")){
       const pt = getCanvasPoint(e);
       placeAnnotation(currentTool, snap(pt.x), snap(pt.y));
       return;
@@ -2153,7 +2308,7 @@ html,body{
         const val = parseNumericLabel(n.label);
         if (val !== null && val < minVal) minVal = val;
       });
-      const startX = 120;
+      const startX = 160;
       const offset = minVal < 0 ? startX - minVal * 40 : startX;
       const hours = Math.round((x - offset) / 40);
       initialLabel = String(hours);
@@ -2196,7 +2351,7 @@ html,body{
         const val = parseNumericLabel(n.label);
         if (val !== null && val < minVal) minVal = val;
       });
-      const startX = 120;
+      const startX = 160;
       const offset = minVal < 0 ? startX - minVal * 40 : startX;
       const hours = Math.round((x - offset) / 40);
       initialLabel = String(hours);
@@ -2268,6 +2423,23 @@ html,body{
       a = {id:uid(), type, x, y, w:10, h:34, text:"", color:"pink", textColor:"black", fontSize:12, bold:false};
     } else if(type === "text"){
       a = {id:uid(), type, x, y, w:160, h:28, text:"Label text", color:"none", textColor:"red", fontSize:16, bold:true};
+    } else if(type.startsWith("timeline-")){
+      const kind = type.replace("timeline-", "");
+      const isActual = kind === "actual";
+      const isPlan = kind === "plan";
+      const title = isActual ? "Time Actual" : (isPlan ? "Plan" : "Delay");
+      const color = isActual ? "#16a34a" : (isPlan ? "#2563eb" : "#ea580c");
+      a = {
+        id: uid(),
+        type: "timeline",
+        timelineKind: kind,
+        x,
+        y: Math.max(30, y),
+        label: title,
+        sublabel: "",
+        color,
+        dashed: true
+      };
     }
     state.annotations.push(a);
     renderAll();
@@ -2491,8 +2663,14 @@ html,body{
             if (state.timeScaleMode) {
               n.y = snap(item.origY + dy);
               const newX = item.origX + dx;
-              const startX = 120;
-              const hours = Math.max(0, Math.round((newX - startX) / 40));
+              let minVal = 0;
+              state.nodes.forEach(nd => {
+                const v = parseNumericLabel(nd.label);
+                if (v !== null && v < minVal) minVal = v;
+              });
+              const startX = 160;
+              const offset = minVal < 0 ? startX - minVal * 40 : startX;
+              const hours = Math.round((newX - offset) / 40);
               const currentHours = parseNumericLabel(n.label) || 0;
               if (hours !== currentHours) {
                 adjustNodeValueWithConstraints(n, hours);
@@ -3130,10 +3308,35 @@ html,body{
     reader.readAsText(file, "utf-8");
   }
 
-  $("#btnOpenHtml").addEventListener("click", () => $("#htmlFileInput").click());
+  async function triggerOpenHtml(){
+    if(window.showOpenFilePicker){
+      try{
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: "CPM diagram (HTML)", accept: { "text/html": [".html", ".htm"] } }],
+          multiple: false
+        });
+        if(handle){
+          currentFileHandle = handle;
+          currentFileName = handle.name;
+          const file = await handle.getFile();
+          openHtmlFile(file);
+          return;
+        }
+      } catch(err){
+        if(err && err.name === "AbortError") return;
+      }
+    }
+    $("#htmlFileInput").click();
+  }
+
+  $("#btnOpenHtml").addEventListener("click", triggerOpenHtml);
   $("#htmlFileInput").addEventListener("change", (e) => {
     const file = e.target.files[0];
-    if(file) openHtmlFile(file);
+    if(file){
+      currentFileHandle = null;
+      currentFileName = file.name;
+      openHtmlFile(file);
+    }
     e.target.value = "";
   });
 
@@ -3401,6 +3604,8 @@ html,body{
       const tx = a.textOffsetX !== undefined ? a.textOffsetX : 14;
       const ty = a.textOffsetY !== undefined ? a.textOffsetY : 4;
       openInlineEditor(a.x + tx, a.y + ty - 12, 160, a.text, (val)=>{ a.text = val; }, {singleLine:true, fontSize:12});
+    } else if(a.type === "timeline"){
+      openInlineEditor(a.x - 60, (a.y || 36) - 13, 120, a.label, (val)=>{ a.label = val; }, {singleLine:true, fontSize:12});
     }
   }
 
@@ -3444,8 +3649,12 @@ html,body{
     task: document.querySelector('[data-field="task"]'),
     connswatches: document.querySelector('[data-field="connswatches"]'),
     connarrow: document.querySelector('[data-field="connarrow"]'),
+    conntracking: document.querySelector('[data-field="conntracking"]'),
     connstyle: document.querySelector('[data-field="connstyle"]'),
     connthickness: document.querySelector('[data-field="connthickness"]'),
+    timelinetype: document.querySelector('[data-field="timelinetype"]'),
+    timelinedatetime: document.querySelector('[data-field="timelinedatetime"]'),
+    timelinecolor: document.querySelector('[data-field="timelinecolor"]'),
     notebody: document.querySelector('[data-field="notebody"]'),
     notecolor: document.querySelector('[data-field="notecolor"]'),
     textcolor: document.querySelector('[data-field="textcolor"]'),
@@ -3552,12 +3761,24 @@ html,body{
       show(fieldEls.connswatches); syncConnSwatches(c.color || "#c0392b");
       show(fieldEls.connstyle); $("#fLineColor").value = c.color || "#c0392b"; $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
       show(fieldEls.connthickness); $("#fLineThickness").value = c.thick ? "thick" : "normal";
+      show(fieldEls.conntracking);
+      const isAct = (c.color === "#16a34a" || c.color === "#22c55e") && c.dashed;
+      const isPln = (c.color === "#2563eb" || c.color === "#1d4ed8") && c.dashed;
+      const isDly = (c.color === "#ea580c" || c.color === "#f97316") && c.dashed;
+      $("#fConnTracking").value = isAct ? "actual" : (isPln ? "plan" : (isDly ? "delay" : "none"));
     }
     else if(sel.kind === "annotation"){
       const a = findAnnotation(sel.id);
       if(!a) return;
       panelTitle.textContent = "Annotation — " + a.type;
-      if(a.type === "note"){
+      if(a.type === "timeline"){
+        panelTitle.textContent = "Tracking Line — " + (a.label || "Timeline");
+        $("#labelFieldName").textContent = "Label";
+        show(fieldEls.label); $("#fLabel").value = a.label || "";
+        show(fieldEls.timelinetype); $("#fTimelineType").value = a.timelineKind || "actual";
+        show(fieldEls.timelinedatetime); $("#fTimelineDatetime").value = a.sublabel || "";
+        show(fieldEls.timelinecolor); $("#fTimelineColor").value = a.color || "#16a34a";
+      } else if(a.type === "note"){
         show(fieldEls.notebody); $("#fNoteBody").value = a.text;
         show(fieldEls.notecolor); $("#fNoteColor").value = a.color;
         show(fieldEls.fontsize); $("#fFontSize").value = a.fontSize;
@@ -3609,7 +3830,11 @@ html,body{
     if(sel.kind==="node"){
       updateNodeLabelAndAdjust(findNode(sel.id), $("#fLabel").value);
     }
-    else if(sel.kind==="annotation"){ findAnnotation(sel.id).text = $("#fLabel").value; }
+    else if(sel.kind==="annotation"){
+      const a = findAnnotation(sel.id);
+      if(a && a.type === "timeline") a.label = $("#fLabel").value;
+      else if(a) a.text = $("#fLabel").value;
+    }
   });
   bindLive("#fSublabel", ()=>{ findNode(currentSingle().id).sublabel = $("#fSublabel").value; });
   bindLive("#fSublabelColor", ()=>{ findNode(currentSingle().id).sublabelColor = $("#fSublabelColor").value; });
@@ -3847,18 +4072,27 @@ html,body{
 
     n.label = Number.isInteger(cappedVal) ? String(cappedVal) : String(Math.round(cappedVal * 100) / 100);
 
-    // 2. Adjust downstream nodes if outgoing connectors are locked
+    // 2. Adjust downstream nodes
     state.connectors.forEach(c => {
       if (c.fromId === n.id && c.toId) {
         const targetNode = findNode(c.toId);
-        if (targetNode && c.lockDuration) {
-          const dur = parseNumericLabel(c.duration) || 0;
-          adjustNodeValueWithConstraints(targetNode, cappedVal + dur, visited);
+        if (targetNode) {
+          const dur = parseNumericLabel(c.duration);
+          if (dur !== null) {
+            if (!targetNode.lockTime) {
+              adjustNodeValueWithConstraints(targetNode, cappedVal + dur, visited);
+            } else {
+              const targetVal = parseNumericLabel(targetNode.label);
+              if (targetVal !== null) {
+                c.duration = formatDurationValue(targetVal - cappedVal, c.duration);
+              }
+            }
+          }
         }
       }
     });
 
-    // 3. Adjust upstream nodes if incoming connectors are locked, or if upstream exceeds cappedVal
+    // 3. Adjust upstream nodes
     state.connectors.forEach(c => {
       if (c.toId === n.id) {
         let upstreamNode = null;
@@ -3871,13 +4105,15 @@ html,body{
           }
         }
         if (upstreamNode) {
-          const upVal = parseNumericLabel(upstreamNode.label);
-          if (c.lockDuration) {
-            const dur = parseNumericLabel(c.duration) || 0;
-            adjustNodeValueWithConstraints(upstreamNode, cappedVal - dur, visited);
-          } else if (upVal !== null && upVal > cappedVal) {
+          const dur = parseNumericLabel(c.duration);
+          if (dur !== null) {
             if (!upstreamNode.lockTime) {
-              adjustNodeValueWithConstraints(upstreamNode, cappedVal, visited);
+              adjustNodeValueWithConstraints(upstreamNode, cappedVal - dur, visited);
+            } else {
+              const upVal = parseNumericLabel(upstreamNode.label);
+              if (upVal !== null) {
+                c.duration = formatDurationValue(cappedVal - upVal, c.duration);
+              }
             }
           }
         }
@@ -4159,6 +4395,64 @@ html,body{
     }
   });
 
+  bindLive("#fConnTracking", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "connector") return;
+    const c = findConnector(sel.id);
+    if(!c) return;
+    const val = $("#fConnTracking").value;
+    if(val === "actual"){
+      c.color = "#16a34a"; c.dashed = true;
+    } else if(val === "plan"){
+      c.color = "#2563eb"; c.dashed = true;
+    } else if(val === "delay"){
+      c.color = "#ea580c"; c.dashed = true;
+    } else if(val === "none"){
+      c.color = "#c0392b"; c.dashed = false;
+    }
+    $("#fLineColor").value = c.color;
+    $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
+    syncConnSwatches(c.color);
+  });
+
+  bindLive("#fTimelineType", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "annotation") return;
+    const a = findAnnotation(sel.id);
+    if(!a || a.type !== "timeline") return;
+    a.timelineKind = $("#fTimelineType").value;
+    if(a.timelineKind === "actual"){
+      a.color = "#16a34a";
+      if(!a.label || a.label === "Plan" || a.label === "Delay") a.label = "Time Actual";
+    } else if(a.timelineKind === "plan"){
+      a.color = "#2563eb";
+      if(!a.label || a.label === "Time Actual" || a.label === "Delay") a.label = "Plan";
+    } else if(a.timelineKind === "delay"){
+      a.color = "#ea580c";
+      if(!a.label || a.label === "Time Actual" || a.label === "Plan") a.label = "Delay";
+    }
+    $("#fTimelineColor").value = a.color;
+    $("#fLabel").value = a.label;
+  });
+
+  bindLive("#fTimelineDatetime", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "annotation") return;
+    const a = findAnnotation(sel.id);
+    if(a && a.type === "timeline") a.sublabel = $("#fTimelineDatetime").value;
+  });
+
+  bindLive("#fTimelineColor", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "annotation") return;
+    const a = findAnnotation(sel.id);
+    if(a && a.type === "timeline"){
+      a.color = $("#fTimelineColor").value;
+      a.timelineKind = "custom";
+      $("#fTimelineType").value = "custom";
+    }
+  });
+
   function syncConnSwatches(color){
     const norm = (color||"").toLowerCase();
     [$("#connSwatchRed"), $("#connSwatchGreen")].forEach(btn=>{
@@ -4248,6 +4542,9 @@ html,body{
     }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="v" && !isTyping(e.target)){
       e.preventDefault(); pasteClipboard();
+    }
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s"){
+      e.preventDefault(); saveCanvasDirect();
     }
   });
   window.addEventListener("keyup", (e)=>{
@@ -4391,38 +4688,76 @@ html,body{
   // ---------------------------------------------------------
   // Save Canvas as a self-contained, directly-editable .html file
   // ---------------------------------------------------------
-  function saveCanvasAsHtml(){
+  function buildCanvasHtmlBlob(){
     const payload = { title: $("#diagramTitle").value, subtitle: $("#diagramSubtitle").value, state };
-    const filename = (payload.title || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".html";
+    try {
+      localStorage.setItem("cpm_current_canvas", JSON.stringify(payload));
+    } catch(e) {}
 
-    pickSaveHandle(filename, "html", "CPM diagram (HTML)", "text/html").then(handle=>{
-      setStatus("Building editable HTML file…");
-      const docClone = document.documentElement.cloneNode(true);
+    const docClone = document.documentElement.cloneNode(true);
 
-      // strip transient/runtime-only DOM that shouldn't be in a saved snapshot
-      docClone.querySelectorAll(".inline-edit").forEach(el=> el.remove());
-      docClone.querySelectorAll(".inline-connector-edit").forEach(el=> el.remove());
-      docClone.querySelectorAll(".connect-handle").forEach(el=> el.remove());
-      docClone.querySelectorAll(".connect-handle-connector").forEach(el=> el.remove());
-      docClone.querySelectorAll(".selected").forEach(el=> el.classList.remove("selected"));
+    // strip transient/runtime-only DOM that shouldn't be in a saved snapshot
+    docClone.querySelectorAll(".inline-edit").forEach(el=> el.remove());
+    docClone.querySelectorAll(".inline-connector-edit").forEach(el=> el.remove());
+    docClone.querySelectorAll(".connect-handle").forEach(el=> el.remove());
+    docClone.querySelectorAll(".connect-handle-connector").forEach(el=> el.remove());
+    docClone.querySelectorAll(".selected").forEach(el=> el.classList.remove("selected"));
 
-      const stateScript = docClone.querySelector("#embeddedState");
-      if(stateScript){
-        stateScript.textContent = JSON.stringify(payload);
+    const stateScript = docClone.querySelector("#embeddedState");
+    if(stateScript){
+      stateScript.textContent = JSON.stringify(payload);
+    }
+
+    const html = "<!DOCTYPE html>\n" + docClone.outerHTML;
+    return { blob: new Blob([html], {type:"text/html"}), payload };
+  }
+
+  async function saveCanvasDirect(){
+    const { blob, payload } = buildCanvasHtmlBlob();
+    const defaultName = (payload.title || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".html";
+    const filename = currentFileName || defaultName;
+
+    if(currentFileHandle){
+      try {
+        setStatus("Saving changes to " + filename + "…");
+        const ok = await verifyPermission(currentFileHandle, true);
+        if(ok){
+          await writeBlobToHandle(currentFileHandle, blob);
+          setStatus("Saved: " + filename);
+          return;
+        }
+      } catch(err){
+        console.warn("Direct write to handle failed, falling back to Save As:", err);
       }
+    }
+    await saveCanvasAsHtml();
+  }
 
-      const html = "<!DOCTYPE html>\n" + docClone.outerHTML;
-      const blob = new Blob([html], {type:"text/html"});
+  async function saveCanvasAsHtml(){
+    const { blob, payload } = buildCanvasHtmlBlob();
+    const defaultName = (payload.title || "cpm-diagram").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_") + ".html";
+    const filename = currentFileName || defaultName;
 
-      const finish = handle ? writeBlobToHandle(handle, blob) : Promise.resolve(downloadBlobFallback(blob, filename));
-      finish.then(()=> setStatus("Saved " + filename))
-            .catch(()=> setStatus("Save failed — try again"));
-    }).catch(err=>{
+    try {
+      const handle = await pickSaveHandle(filename, "html", "CPM diagram (HTML)", "text/html");
+      if(handle){
+        currentFileHandle = handle;
+        currentFileName = handle.name;
+        await writeBlobToHandle(handle, blob);
+        setStatus("Saved: " + handle.name);
+      } else {
+        downloadBlobFallback(blob, filename);
+        setStatus("Saved " + filename);
+      }
+    } catch(err){
       if(err && err.name === "AbortError"){ setStatus("Save cancelled"); return; }
       setStatus("Save failed — try again");
-    });
+    }
   }
-  $("#btnSaveCanvasHtml").addEventListener("click", saveCanvasAsHtml);
+
+  $("#btnSaveCanvasHtml").addEventListener("click", saveCanvasDirect);
+  const btnSaveAs = $("#btnSaveAsCanvasHtml");
+  if(btnSaveAs) btnSaveAs.addEventListener("click", saveCanvasAsHtml);
 
   // ---------------------------------------------------------
   // Import Excel Gantt chart -> auto-build CPM diagram
@@ -5681,6 +6016,25 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
         console.error("Could not parse embedded canvas state, falling back to example.", err);
       }
     }
+    try{
+      const localSaved = localStorage.getItem("cpm_current_canvas");
+      if(localSaved){
+        const payload = JSON.parse(localSaved);
+        if(payload && payload.state && (payload.state.nodes?.length || payload.state.connectors?.length)){
+          if(payload.title !== undefined) $("#diagramTitle").value = payload.title;
+          if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
+          state = payload.state;
+          initNodesDatetimeFields(state.nodes);
+          recalculateDiagramTimes();
+          selection = [];
+          renderAll(); updateInspector(); applyCanvasBg();
+          history = []; historyIndex = -1;
+          pushHistory();
+          setStatus("Restored canvas from internal storage");
+          return;
+        }
+      }
+    } catch(e){}
     seedExample();
     applyCanvasBg();
     updateInspector();
