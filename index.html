@@ -65,6 +65,9 @@ html,body{
   display:flex; flex-direction:column;
   height:100vh; width:100vw;
   color:var(--chrome-text);
+  overflow:hidden;
+  position:fixed;
+  top:0; left:0; right:0; bottom:0;
 }
 
 /* ============== TOP BAR ============== */
@@ -75,6 +78,9 @@ html,body{
   display:flex; align-items:center; justify-content:space-between;
   padding:0 16px;
   gap:16px;
+  flex-shrink:0;
+  position:relative;
+  z-index:100;
 }
 
 .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
@@ -106,7 +112,7 @@ html,body{
 #diagramSubtitle{ font-size:11px; color:var(--chrome-text-dim); font-family:var(--font-mono); width:210px;}
 .brand-text input:hover, .brand-text input:focus{ background:var(--chrome-700); }
 
-.topbar-actions{ display:flex; align-items:center; gap:6px; flex:1 1 auto; overflow-x:auto; scrollbar-width:thin; min-width:0; }
+.topbar-actions{ display:flex; align-items:center; gap:6px; flex:0 0 auto; overflow:visible; min-width:0; }
 .sep{ width:1px; height:26px; background:var(--chrome-line); margin:0 6px; flex:0 0 auto; }
 
 .btn{
@@ -616,18 +622,6 @@ input:checked + .slider:before {
   </div>
 </div>
 
-<!-- LOCAL FILE BANNER -->
-<div id="localFileBanner" style="display:none; background:#eff6ff; border-bottom:1px solid #bfdbfe; padding:8px 18px; font-size:12.5px; color:#1e40af; align-items:center; justify-content:space-between; z-index:9999; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-  <div style="display:flex; align-items:center; gap:8px;">
-    <span style="font-size:16px;">🚀</span>
-    <span><b>คุณกำลังเปิดไฟล์ออฟไลน์ในเครื่อง:</b> ต้องการเปิดด้วยเวอร์ชันล่าสุดบนเว็บเพื่อใช้งานเครื่องมือใหม่ทั้งหมดหรือไม่?</span>
-  </div>
-  <div style="display:flex; gap:8px; align-items:center;">
-    <button id="btnBannerOpenWeb" style="background:#2563eb; color:#fff; border:none; border-radius:4px; padding:5px 14px; font-size:12px; font-weight:700; cursor:pointer;">เปิดบน GitHub Pages ทันที</button>
-    <button onclick="document.getElementById('localFileBanner').style.display='none'" style="background:none; border:none; color:#6b7280; font-size:18px; cursor:pointer; padding:0 4px; line-height:1;">&times;</button>
-  </div>
-</div>
-
 <div id="app">
 
   <!-- ============ TOP BAR ============ -->
@@ -656,24 +650,24 @@ input:checked + .slider:before {
       </label>
       <button class="btn ghost" id="btnClear" title="Clear canvas" data-tip="ลบทุกอย่างบน Canvas">🗑</button>
       <div class="sep"></div>
-      <button class="btn" id="btnSaveCanvasHtml" title="Save changes directly to file (Ctrl+S / ⌘S)" data-tip="บันทึกทับลงในไฟล์เดิม (Save)">💾 Save</button>
-      <button class="btn" id="btnSaveAsCanvasHtml" title="Save as a new .html file" data-tip="บันทึกเป็นไฟล์ใหม่ (Save As)">Save As</button>
       <span id="autoSaveIndicator" style="font-size:11.5px; color:#16a34a; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; background:rgba(22,163,74,0.08);" title="ระบบบันทึกข้อมูลอัตโนมัติลงในเบราว์เซอร์">☁️ Auto-saved</span>
       <button class="btn" id="btnOpenHtml" title="Open a previously-saved CPM .html file" data-tip="เปิดไฟล์ Diagram (.html) ที่บันทึกไว้">📂 Open</button>
-      <button class="btn" id="btnOpenInGitHub" title="เปิดแผนภาพนี้บน GitHub Pages เวอร์ชันล่าสุด" data-tip="เปิดบนเว็บเวอร์ชันล่าสุด" style="display:none; color:#2563eb; border-color:#93c5fd; background:rgba(37,99,235,0.06); font-weight:600;">🌐 เปิดบนเว็บ (GitHub)</button>
       <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI" data-tip="นำเข้า Diagram จากรูปภาพด้วย AI">📷 Import Image</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <div class="sep"></div>
-      <button class="btn" id="btnTopCopy" title="Copy selected elements (Ctrl+C / ⌘C)" data-tip="คัดลอก Node ที่เลือก">📋 Copy</button>
-      <button class="btn" id="btnTopPaste" title="Paste copied elements (Ctrl+V / ⌘V)" data-tip="วาง Node ที่คัดลอกไว้">📋 Paste</button>
       <div class="dropdown">
         <button class="btn" id="btnEditDropdown" data-tip="เมนู Edit & ตั้งค่า Canvas">Edit ▼</button>
-        <div class="dropdown-content" id="editDropdownContent" style="padding: 6px; min-width: 220px;">
-          <button class="dropdown-item" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All</button>
-          <button class="dropdown-item" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy</button>
-          <button class="dropdown-item" id="btnPasteEl" title="Paste copied elements (Ctrl+V / ⌘V)">Paste</button>
+        <div class="dropdown-content" id="editDropdownContent" style="padding: 6px; min-width: 230px;">
+          <button class="dropdown-item" id="btnSaveCanvasHtml" title="Save changes directly to file (Ctrl+S / ⌘S)">💾 Save <span style="float:right; color:var(--chrome-text-dim); font-size:11px; margin-left:16px;">Ctrl+S</span></button>
+          <button class="dropdown-item" id="btnSaveAsCanvasHtml" title="Save as a new .html file">Save As...</button>
           
-          <div class="dropdown-divider" style="margin: 8px 0; border-top: 1px solid var(--chrome-line);"></div>
+          <div class="dropdown-divider" style="margin: 6px 0; border-top: 1px solid var(--chrome-line);"></div>
+          
+          <button class="dropdown-item" id="btnSelectAll" title="Select all elements (Ctrl+A / ⌘A)">Select All <span style="float:right; color:var(--chrome-text-dim); font-size:11px; margin-left:16px;">Ctrl+A</span></button>
+          <button class="dropdown-item" id="btnCopyEl" title="Copy selected elements (Ctrl+C / ⌘C)">Copy <span style="float:right; color:var(--chrome-text-dim); font-size:11px; margin-left:16px;">Ctrl+C</span></button>
+          <button class="dropdown-item" id="btnPasteEl" title="Paste copied elements (Ctrl+V / ⌘V)">Paste <span style="float:right; color:var(--chrome-text-dim); font-size:11px; margin-left:16px;">Ctrl+V</span></button>
+          
+          <div class="dropdown-divider" style="margin: 6px 0; border-top: 1px solid var(--chrome-line);"></div>
           
           <div style="padding: 6px;">
             <div class="legend-title" style="margin-bottom: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: var(--chrome-text-dim);">Canvas Settings</div>
@@ -1207,7 +1201,7 @@ input:checked + .slider:before {
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.16</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.17</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -2809,6 +2803,7 @@ input:checked + .slider:before {
     updateInspector();
   }
   function deselectAll(){
+    consecutivePasteCount = 1;
     selection = [];
     renderAll();
     updateInspector();
@@ -3304,6 +3299,8 @@ input:checked + .slider:before {
   const PASTE_OFFSET = 24;
   const CLIPBOARD_STORAGE_KEY = "cpm_clipboard";
   let clipboardTimestamp = 0;
+  let consecutivePasteCount = 1;
+  let lastCopiedSignature = "";
   window._cpmJustPasted = false;
 
   function fallbackCopyText(str){
@@ -3368,6 +3365,8 @@ input:checked + .slider:before {
 
     clipboard = items;
     clipboardTimestamp = payload.timestamp;
+    consecutivePasteCount = 1;
+    lastCopiedSignature = items.map(it => it.id || (it.data && it.data.id)).join(",");
 
     // 1. LocalStorage (shares between tabs of same origin)
     try {
@@ -3449,6 +3448,8 @@ input:checked + .slider:before {
 
     clipboard = items;
     clipboardTimestamp = payload.timestamp;
+    consecutivePasteCount = 1;
+    lastCopiedSignature = items.map(it => it.id || (it.data && it.data.id)).join(",");
     try {
       localStorage.setItem(CLIPBOARD_STORAGE_KEY, jsonStr);
     } catch(err){}
@@ -3523,6 +3524,22 @@ input:checked + .slider:before {
     if(!items || !items.length) return;
     window._cpmJustPasted = true;
 
+    // Check if this paste is of the same copied items to cascade consecutively
+    const currentSignature = items.map(it => it.id || (it.data && it.data.id)).join(",");
+    if (currentSignature !== lastCopiedSignature) {
+      consecutivePasteCount = 1;
+      lastCopiedSignature = currentSignature;
+    }
+
+    const isTimeScale = !!state.timeScaleMode;
+    const count = consecutivePasteCount;
+    // In Time Scale mode, cascade vertically down (+24px each) so node hours stay identical (see Image 3)
+    // In free mode, cascade diagonally down-right (+24px each)
+    const offsetX = isTimeScale ? 0 : PASTE_OFFSET * count;
+    const offsetY = PASTE_OFFSET * count;
+
+    consecutivePasteCount++;
+
     const nodeIdMap = {};
     const connectorIdMap = {};
 
@@ -3571,8 +3588,8 @@ input:checked + .slider:before {
       const newId = uid();
       nodeIdMap[n.id] = newId;
       n.id = newId;
-      n.x = (n.x || 0) + PASTE_OFFSET;
-      n.y = (n.y || 0) + PASTE_OFFSET;
+      n.x = (n.x || 0) + offsetX;
+      n.y = (n.y || 0) + offsetY;
       state.nodes.push(n);
       pastedNodes.push(n);
     });
@@ -3580,8 +3597,8 @@ input:checked + .slider:before {
     const pastedAnnotations = [];
     annotationsToPaste.forEach(a => {
       a.id = uid();
-      a.x = (a.x || 0) + PASTE_OFFSET;
-      a.y = (a.y || 0) + PASTE_OFFSET;
+      a.x = (a.x || 0) + offsetX;
+      a.y = (a.y || 0) + offsetY;
       state.annotations.push(a);
       pastedAnnotations.push(a);
     });
@@ -3593,10 +3610,10 @@ input:checked + .slider:before {
       c.id = newId;
 
       if (c.fromPt) {
-        c.fromPt = { x: c.fromPt.x + PASTE_OFFSET, y: c.fromPt.y + PASTE_OFFSET };
+        c.fromPt = { x: c.fromPt.x + offsetX, y: c.fromPt.y + offsetY };
       }
       if (c.toPt) {
-        c.toPt = { x: c.toPt.x + PASTE_OFFSET, y: c.toPt.y + PASTE_OFFSET };
+        c.toPt = { x: c.toPt.x + offsetX, y: c.toPt.y + offsetY };
       }
 
       pastedConnectors.push(c);
@@ -3666,10 +3683,10 @@ input:checked + .slider:before {
 
   function updateCopyPasteBtns(){
     const hasSelection = selection && selection.length > 0;
-    const copyBtns = [$("#btnCopyEl"), $("#btnTopCopy"), $("#btnCopySingle"), $("#btnCopyMulti")];
+    const copyBtns = [$("#btnCopyEl"), $("#btnCopySingle"), $("#btnCopyMulti")];
     copyBtns.forEach(btn => { if(btn) btn.disabled = !hasSelection; });
 
-    const pasteBtns = [$("#btnPasteEl"), $("#btnTopPaste"), $("#btnPasteEmpty")];
+    const pasteBtns = [$("#btnPasteEl"), $("#btnPasteEmpty")];
     pasteBtns.forEach(btn => { if(btn) btn.disabled = false; });
   }
 
@@ -3693,8 +3710,6 @@ input:checked + .slider:before {
   $("#btnSelectAll").addEventListener("click", selectAll);
   $("#btnCopyEl").addEventListener("click", copySelected);
   $("#btnPasteEl").addEventListener("click", pasteClipboard);
-  if ($("#btnTopCopy")) $("#btnTopCopy").addEventListener("click", copySelected);
-  if ($("#btnTopPaste")) $("#btnTopPaste").addEventListener("click", pasteClipboard);
   if ($("#btnCopySingle")) $("#btnCopySingle").addEventListener("click", copySelected);
   if ($("#btnCopyMulti")) $("#btnCopyMulti").addEventListener("click", copySelected);
   if ($("#btnPasteEmpty")) $("#btnPasteEmpty").addEventListener("click", pasteClipboard);
@@ -6879,16 +6894,6 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
       }
     }
 
-    // 2. Setup GitHub open buttons if running on local file: protocol
-    if (window.location.protocol === "file:") {
-      const banner = document.getElementById("localFileBanner");
-      if (banner) banner.style.display = "flex";
-      const btnGit = document.getElementById("btnOpenInGitHub");
-      if (btnGit) btnGit.style.display = "inline-flex";
-      const btnBanner = document.getElementById("btnBannerOpenWeb");
-      if (btnBanner) btnBanner.addEventListener("click", openOnLatestGitHubVersion);
-      if (btnGit) btnGit.addEventListener("click", openOnLatestGitHubVersion);
-    }
 
     const embedded = document.getElementById("embeddedState");
     const raw = embedded ? embedded.textContent.trim() : "";
