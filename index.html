@@ -446,6 +446,55 @@ html,body{
   border-color: var(--amber);
 }
 
+/* Toggle Switch Styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 20px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input:checked + .slider {
+  background-color: #16a34a;
+}
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
+/* Delayed Node Halo Animation */
+@keyframes pulseDelayHalo {
+  0% { stroke-opacity: 0.55; stroke-width: 2.2; }
+  50% { stroke-opacity: 1; stroke-width: 3.2; }
+  100% { stroke-opacity: 0.55; stroke-width: 2.2; }
+}
+.cpm-node-delayed-ring {
+  animation: pulseDelayHalo 2s infinite ease-in-out;
+}
+
 /* Collaboration modal styles */
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -864,6 +913,14 @@ html,body{
             <input type="range" id="fSize" min="20" max="80" step="2">
           </div>
         </div>
+        <!-- node status & completion confirmation -->
+        <div class="field" data-field="nodecompletion" style="margin-top: 6px; padding: 10px; background: rgba(30,41,59,0.04); border: 1px solid var(--chrome-line); border-radius: var(--radius-sm);">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12.5px; font-weight:700; color:#16a34a; user-select:none; margin:0;">
+            <input type="checkbox" id="fNodeCompleted" style="width:16px; height:16px; cursor:pointer;">
+            <span>✅ ยืนยันงานเสร็จแล้ว (Completed)</span>
+          </label>
+          <div id="nodeStatusIndicator" style="margin-top:6px; font-size:11.5px; font-weight:600; display:none;"></div>
+        </div>
 
         <!-- connector specific -->
         <div class="field two-col" data-field="duration">
@@ -944,9 +1001,34 @@ html,body{
             <option value="custom">Custom (กำหนดเอง)</option>
           </select>
         </div>
+        <div class="field" data-field="timelineliveswitch" style="padding:10px; background:rgba(22,163,74,0.08); border:1px solid rgba(22,163,74,0.3); border-radius:6px; margin: 6px 0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <div>
+              <div style="font-weight:700; font-size:12px; color:#16a34a; display:flex; align-items:center; gap:5px;">
+                <span>🕒</span>
+                <span>นับเวลาจริงอัตโนมัติ (Live Clock)</span>
+              </div>
+              <div style="font-size:11px; color:#64748b; margin-top:2px;">นับวันเวลาปัจจุบันบนป้ายกำกับเส้นประต่อเนื่อง</div>
+            </div>
+            <label class="switch" style="position:relative; display:inline-block; width:38px; height:20px; flex-shrink:0;">
+              <input type="checkbox" id="fTimelineLiveClock">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="field two-col" data-field="timelinedatetimepicker" id="timelinedatetimepicker">
+          <div>
+            <label>Date (วันที่)</label>
+            <input type="date" id="fTimelineDate" style="width:100%; font-size:12px; padding:6px 4px; background:var(--chrome-800); border:1px solid var(--chrome-line); color:var(--chrome-text); border-radius:var(--radius-sm);">
+          </div>
+          <div>
+            <label>Time (เวลา)</label>
+            <input type="time" id="fTimelineTime" style="width:100%; font-size:12px; padding:6px 4px; background:var(--chrome-800); border:1px solid var(--chrome-line); color:var(--chrome-text); border-radius:var(--radius-sm);">
+          </div>
+        </div>
         <div class="field" data-field="timelinedatetime">
           <label>Date & Time / Info (ข้อความวันที่หรือเวลา)</label>
-          <input type="text" id="fTimelineDatetime" placeholder="e.g. 16/06/68 08:00น. (Hr 8)">
+          <input type="text" id="fTimelineDatetime" placeholder="e.g. 23/10/26 20:38">
         </div>
         <div class="field" data-field="timelinecolor">
           <label>Line & Badge Color (สีเส้นและป้าย)</label>
@@ -1106,7 +1188,7 @@ html,body{
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.13</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.14</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1657,6 +1739,47 @@ html,body{
   updateHint();
 
   // ---------------------------------------------------------
+  // Time Actual Tracking & Node Delay Evaluation
+  // ---------------------------------------------------------
+  function findActiveTimeActualLine(){
+    return state.annotations.find(a => a.type === "timeline" && (
+      a.timelineKind === "actual" ||
+      (a.label && a.label.toLowerCase().includes("actual")) ||
+      (a.color && (a.color.toLowerCase() === "#16a34a" || a.color.toLowerCase() === "#22c55e"))
+    ));
+  }
+
+  function isNodeDelayed(n, actualLine){
+    if(!n) return false;
+    if(n.completed || n.status === "completed") return false;
+    if(n.status === "delayed") return true;
+    if(!actualLine) return false;
+
+    // 1. Position-based comparison on canvas:
+    // If the Actual line has crossed past the node center + slight buffer
+    if(actualLine.x > (n.x + (n.r || 24) * 0.25)){
+      return true;
+    }
+
+    // 2. Date-based comparison (if both have dates)
+    if(n.datetimeDate && n.datetimeTime){
+      const nodeDt = new Date(`${n.datetimeDate}T${n.datetimeTime}`);
+      if(!isNaN(nodeDt.getTime())){
+        let actDt = null;
+        if(actualLine.liveClock){
+          actDt = new Date();
+        } else if(actualLine.date && actualLine.time){
+          actDt = new Date(`${actualLine.date}T${actualLine.time}`);
+        }
+        if(actDt && !isNaN(actDt.getTime())){
+          return actDt.getTime() > nodeDt.getTime();
+        }
+      }
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------
   // Rendering: NODES
   // ---------------------------------------------------------
   function renderNodes(){
@@ -1686,6 +1809,41 @@ html,body{
         shape = svgElCreate("polygon", {points:pts, fill:n.fill, class:"cpm-node-shape", ...strokeAttrs});
       }
       g.appendChild(shape);
+
+      // Check status & delays against active Time Actual line
+      const actualLine = findActiveTimeActualLine();
+      const isCompleted = !!n.completed;
+      const isDelayed = isNodeDelayed(n, actualLine);
+
+      if (isCompleted) {
+        // Green completed badge at top-right: (r * 0.72, -r * 0.72)
+        const badgeG = svgElCreate("g", { class: "cpm-node-status-badge", transform: `translate(${r * 0.72}, ${-r * 0.72})` });
+        const bCircle = svgElCreate("circle", { cx: 0, cy: 0, r: 8.5, fill: "#16a34a", stroke: "#ffffff", "stroke-width": 1.5 });
+        const bText = svgElCreate("text", { x: 0, y: 1, fill: "#ffffff", "font-size": "10.5px", "font-weight": "bold", "text-anchor": "middle", "dominant-baseline": "central" });
+        bText.textContent = "✓";
+        badgeG.appendChild(bCircle);
+        badgeG.appendChild(bText);
+        g.appendChild(badgeG);
+      } else if (isDelayed) {
+        // Delayed: Pulsing orange-red halo ring + Warning '!' badge
+        const halo = svgElCreate("circle", {
+          cx: 0, cy: 0, r: r + 5,
+          fill: "none",
+          stroke: "#ea580c",
+          "stroke-width": 2.5,
+          "stroke-dasharray": "5 3",
+          class: "cpm-node-delayed-ring"
+        });
+        g.appendChild(halo);
+
+        const badgeG = svgElCreate("g", { class: "cpm-node-delayed-badge", transform: `translate(${r * 0.72}, ${-r * 0.72})` });
+        const bCircle = svgElCreate("circle", { cx: 0, cy: 0, r: 8.5, fill: "#ea580c", stroke: "#ffffff", "stroke-width": 1.5 });
+        const bText = svgElCreate("text", { x: 0, y: 0.5, fill: "#ffffff", "font-size": "11px", "font-weight": "900", "font-family": "monospace", "text-anchor": "middle", "dominant-baseline": "central" });
+        bText.textContent = "!";
+        badgeG.appendChild(bCircle);
+        badgeG.appendChild(bText);
+        g.appendChild(badgeG);
+      }
 
       const labelStr = String(n.label || "");
       let lblFontSize = Math.max(14, r * 0.62);
@@ -3669,7 +3827,7 @@ html,body{
   function editNodeLabelInline(n){
     const container = document.createElement("div");
     container.className = "inline-node-edit";
-    const pos = screenPosFor(n.x - 80, n.y - n.r - 70);
+    const pos = screenPosFor(n.x - 80, n.y - n.r - 88);
     container.style.left = pos.left + "px";
     container.style.top = pos.top + "px";
 
@@ -3691,8 +3849,58 @@ html,body{
     timeDiv.appendChild(timeLabel);
     timeDiv.appendChild(timeInput);
 
+    // Completion status checkbox & indicator
+    const statusDiv = document.createElement("div");
+    statusDiv.style.marginTop = "4px";
+    statusDiv.style.paddingTop = "6px";
+    statusDiv.style.borderTop = "1px solid #e2e8f0";
+    statusDiv.style.display = "flex";
+    statusDiv.style.flexDirection = "column";
+    statusDiv.style.gap = "4px";
+
+    const statusLabel = document.createElement("label");
+    statusLabel.style.display = "flex";
+    statusLabel.style.alignItems = "center";
+    statusLabel.style.gap = "6px";
+    statusLabel.style.cursor = "pointer";
+    statusLabel.style.fontSize = "11px";
+    statusLabel.style.fontWeight = "700";
+    statusLabel.style.color = "#16a34a";
+    statusLabel.style.userSelect = "none";
+    statusLabel.style.margin = "0";
+
+    const completedCheckbox = document.createElement("input");
+    completedCheckbox.type = "checkbox";
+    completedCheckbox.checked = !!n.completed;
+    completedCheckbox.style.width = "14px";
+    completedCheckbox.style.height = "14px";
+    completedCheckbox.style.cursor = "pointer";
+
+    const completedText = document.createElement("span");
+    completedText.textContent = "✅ เสร็จแล้ว (Completed)";
+
+    statusLabel.appendChild(completedCheckbox);
+    statusLabel.appendChild(completedText);
+    statusDiv.appendChild(statusLabel);
+
+    // Delay warning notice if overdue
+    const actualLine = findActiveTimeActualLine();
+    const delayed = isNodeDelayed(n, actualLine);
+    if (!n.completed && delayed) {
+      const delayWarn = document.createElement("div");
+      delayWarn.style.fontSize = "10.5px";
+      delayWarn.style.color = "#ea580c";
+      delayWarn.style.fontWeight = "700";
+      delayWarn.style.display = "flex";
+      delayWarn.style.alignItems = "center";
+      delayWarn.style.gap = "3px";
+      delayWarn.textContent = "⚠️ เลยกำหนด Actual (Delayed)";
+      statusDiv.appendChild(delayWarn);
+    }
+
     container.appendChild(captionDiv);
     container.appendChild(timeDiv);
+    container.appendChild(statusDiv);
     document.body.appendChild(container);
 
     setTimeout(() => { timeInput.focus(); timeInput.select(); }, 0);
@@ -3702,6 +3910,7 @@ html,body{
       const timeVal = timeInput.value;
       
       n.sublabel = captionVal;
+      n.completed = completedCheckbox.checked;
       updateNodeLabelAndAdjust(n, timeVal);
       
       container.removeEventListener("focusout", onFocusOut);
@@ -3865,6 +4074,7 @@ html,body{
     sublabel: document.querySelector('[data-field="sublabel"]'),
     datetime: document.querySelector('[data-field="datetime"]'),
     fillrow: document.querySelector('[data-field="fillrow"]'),
+    nodecompletion: document.querySelector('[data-field="nodecompletion"]'),
     duration: document.querySelector('[data-field="duration"]'),
     lockduration: document.querySelector('[data-field="lockduration"]'),
     task: document.querySelector('[data-field="task"]'),
@@ -3874,6 +4084,8 @@ html,body{
     connstyle: document.querySelector('[data-field="connstyle"]'),
     connthickness: document.querySelector('[data-field="connthickness"]'),
     timelinetype: document.querySelector('[data-field="timelinetype"]'),
+    timelineliveswitch: document.querySelector('[data-field="timelineliveswitch"]'),
+    timelinedatetimepicker: document.querySelector('[data-field="timelinedatetimepicker"]'),
     timelinedatetime: document.querySelector('[data-field="timelinedatetime"]'),
     timelinecolor: document.querySelector('[data-field="timelinecolor"]'),
     notebody: document.querySelector('[data-field="notebody"]'),
@@ -3968,6 +4180,24 @@ html,body{
       show(fieldEls.fillrow);
       $("#fFill").value = n.fill || "#ffffff";
       $("#fSize").value = n.r || 32;
+
+      show(fieldEls.nodecompletion);
+      const isCompleted = !!n.completed;
+      $("#fNodeCompleted").checked = isCompleted;
+
+      const actualLine = findActiveTimeActualLine();
+      const isDelayed = isNodeDelayed(n, actualLine);
+      const ind = $("#nodeStatusIndicator");
+      if(ind){
+        ind.style.display = "block";
+        if(isCompleted){
+          ind.innerHTML = `<span style="color:#16a34a; display:inline-flex; align-items:center; gap:4px;">✓ สถานะ: เสร็จสิ้นเรียบร้อย (Completed)</span>`;
+        } else if(isDelayed){
+          ind.innerHTML = `<span style="color:#ea580c; display:inline-flex; align-items:center; gap:4px;">⚠️ สถานะ: ล่าช้ากว่ากำหนด (Overdue / Past Actual)</span>`;
+        } else {
+          ind.innerHTML = `<span style="color:#64748b; display:inline-flex; align-items:center; gap:4px;">⏱️ สถานะ: ตามแผนงาน (On Track / Pending)</span>`;
+        }
+      }
     }
     else if(sel.kind === "connector"){
       const c = findConnector(sel.id);
@@ -3997,6 +4227,25 @@ html,body{
         $("#labelFieldName").textContent = "Label";
         show(fieldEls.label); $("#fLabel").value = a.label || "";
         show(fieldEls.timelinetype); $("#fTimelineType").value = a.timelineKind || "actual";
+        
+        show(fieldEls.timelineliveswitch);
+        $("#fTimelineLiveClock").checked = !!a.liveClock;
+
+        show(fieldEls.timelinedatetimepicker);
+        if(a.date){
+          $("#fTimelineDate").value = a.date;
+        } else {
+          syncTimelineDateInputsFromSublabel(a);
+        }
+        if(a.time){
+          $("#fTimelineTime").value = a.time;
+        }
+
+        const isLive = !!a.liveClock;
+        $("#fTimelineDate").disabled = isLive;
+        $("#fTimelineTime").disabled = isLive;
+        $("#fTimelineDatetime").disabled = isLive;
+
         show(fieldEls.timelinedatetime); $("#fTimelineDatetime").value = a.sublabel || "";
         show(fieldEls.timelinecolor); $("#fTimelineColor").value = a.color || "#16a34a";
       } else if(a.type === "note"){
@@ -4718,6 +4967,147 @@ html,body{
     $("#fTimelineColor").value = a.color;
     $("#fLabel").value = a.label;
   });
+
+  // Node completion toggle in inspector
+  $("#fNodeCompleted").addEventListener("change", () => {
+    const sel = currentSingle();
+    if (!sel || sel.kind !== "node") return;
+    const n = findNode(sel.id);
+    if (!n) return;
+    n.completed = $("#fNodeCompleted").checked;
+    renderAll();
+    updateInspector();
+    commit();
+  });
+
+  // Timeline Live Clock & Date/Time pickers
+  function formatLiveTimestamp(d = new Date()) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const mon = String(d.getMonth() + 1).padStart(2, '0');
+    const yr = String(d.getFullYear()).slice(-2);
+    const hrs = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const sec = String(d.getSeconds()).padStart(2, '0');
+    return `${day}/${mon}/${yr} ${hrs}:${min}:${sec}`;
+  }
+
+  function syncTimelineDateInputsFromSublabel(a) {
+    if (!a.sublabel) return;
+    const m = a.sublabel.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}:\d{2}))?/);
+    if (m) {
+      const dd = m[1].padStart(2, '0');
+      const mm = m[2].padStart(2, '0');
+      let yy = m[3];
+      let yyyy = yy.length === 2 ? (parseInt(yy, 10) > 50 ? "19" + yy : "20" + yy) : yy;
+      if (parseInt(yy, 10) >= 60 && parseInt(yy, 10) <= 90) {
+        yyyy = String(2500 + parseInt(yy, 10) - 543);
+      }
+      $("#fTimelineDate").value = `${yyyy}-${mm}-${dd}`;
+      if (m[4]) {
+        $("#fTimelineTime").value = m[4];
+      }
+    }
+  }
+
+  function updateTimelineSublabelFromPicker(a) {
+    const dVal = $("#fTimelineDate").value;
+    const tVal = $("#fTimelineTime").value;
+    a.date = dVal;
+    a.time = tVal;
+    if (dVal) {
+      const [yyyy, mm, dd] = dVal.split("-");
+      const yy = yyyy.slice(-2);
+      a.sublabel = `${dd}/${mm}/${yy}${tVal ? ' ' + tVal : ''}`;
+    } else if (tVal) {
+      a.sublabel = tVal;
+    }
+    $("#fTimelineDatetime").value = a.sublabel || "";
+    renderAll();
+    commit();
+  }
+
+  $("#fTimelineLiveClock").addEventListener("change", () => {
+    const sel = currentSingle();
+    if (!sel || sel.kind !== "annotation") return;
+    const a = findAnnotation(sel.id);
+    if (!a || a.type !== "timeline") return;
+
+    a.liveClock = $("#fTimelineLiveClock").checked;
+    if (a.liveClock) {
+      a.sublabel = formatLiveTimestamp(new Date());
+      $("#fTimelineDatetime").value = a.sublabel;
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const minStr = String(now.getMinutes()).padStart(2, '0');
+      $("#fTimelineDate").value = `${yyyy}-${mm}-${dd}`;
+      $("#fTimelineTime").value = `${hh}:${minStr}`;
+      a.date = $("#fTimelineDate").value;
+      a.time = $("#fTimelineTime").value;
+      showSaveNotification("เปิดโหมด Live Clock", "เส้นประกำลังนับวันและเวลาจริงบนป้ายกำกับต่อเนื่อง");
+    }
+    $("#fTimelineDate").disabled = a.liveClock;
+    $("#fTimelineTime").disabled = a.liveClock;
+    $("#fTimelineDatetime").disabled = a.liveClock;
+
+    renderAll();
+    commit();
+  });
+
+  $("#fTimelineDate").addEventListener("change", () => {
+    const sel = currentSingle();
+    if (!sel || sel.kind !== "annotation") return;
+    const a = findAnnotation(sel.id);
+    if (a && a.type === "timeline") updateTimelineSublabelFromPicker(a);
+  });
+
+  $("#fTimelineTime").addEventListener("change", () => {
+    const sel = currentSingle();
+    if (!sel || sel.kind !== "annotation") return;
+    const a = findAnnotation(sel.id);
+    if (a && a.type === "timeline") updateTimelineSublabelFromPicker(a);
+  });
+
+  let liveClockInterval = null;
+  function startLiveTrackingTicker() {
+    if (liveClockInterval) clearInterval(liveClockInterval);
+    liveClockInterval = setInterval(() => {
+      const liveTimelines = state.annotations.filter(a => a.type === "timeline" && a.liveClock);
+      if (liveTimelines.length === 0) return;
+
+      const now = new Date();
+      const formatted = formatLiveTimestamp(now);
+
+      let needsRender = false;
+      liveTimelines.forEach(a => {
+        if (a.sublabel !== formatted) {
+          a.sublabel = formatted;
+          needsRender = true;
+        }
+      });
+
+      if (needsRender) {
+        renderAnnotations();
+        renderNodes();
+        const sel = currentSingle();
+        if (sel && sel.kind === "annotation") {
+          const selA = findAnnotation(sel.id);
+          if (selA && selA.type === "timeline" && selA.liveClock) {
+            if ($("#fTimelineDatetime")) $("#fTimelineDatetime").value = formatted;
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const minStr = String(now.getMinutes()).padStart(2, '0');
+            if ($("#fTimelineDate")) $("#fTimelineDate").value = `${yyyy}-${mm}-${dd}`;
+            if ($("#fTimelineTime")) $("#fTimelineTime").value = `${hh}:${minStr}`;
+          }
+        }
+      }
+    }, 1000);
+  }
 
   bindLive("#fTimelineDatetime", ()=>{
     const sel = currentSingle();
@@ -6336,6 +6726,7 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
           pushHistory();
           setStatus("Restored canvas from internal storage");
           showSaveNotification("กู้คืนข้อมูลสำเร็จ (Auto-restored)", "โหลดข้อมูลแผนภาพล่าสุดจากเบราว์เซอร์เรียบร้อยแล้ว");
+          startLiveTrackingTicker();
           return;
         }
       }
@@ -6343,6 +6734,7 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
     seedExample();
     applyCanvasBg();
     updateInspector();
+    startLiveTrackingTicker();
   })();
 
 })();
