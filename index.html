@@ -1015,6 +1015,12 @@ input:checked + .slider:before {
               <span class="slider"></span>
             </label>
           </div>
+          <div style="margin-top:8px; padding-top:6px; border-top:1px dashed rgba(22,163,74,0.25);">
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#16a34a; cursor:pointer; user-select:none; margin:0;">
+              <input type="checkbox" id="fTimelineAutoMove" checked style="width:14px; height:14px; cursor:pointer;">
+              <span>ขยับตำแหน่งเส้นตามเวลาจริง (อิง Milestone 0)</span>
+            </label>
+          </div>
         </div>
         <div class="field two-col" data-field="timelinedatetimepicker" id="timelinedatetimepicker">
           <div>
@@ -1188,7 +1194,7 @@ input:checked + .slider:before {
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.14</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.15</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1749,34 +1755,102 @@ input:checked + .slider:before {
     ));
   }
 
+  function calculateTimeActualX(actualLine, now = new Date()){
+    if(!actualLine) return undefined;
+
+    // Find Milestone 0
+    let node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
+    if (!node0 && state.nodes.length > 0) {
+      let minVal = null;
+      state.nodes.forEach(n => {
+        const v = parseNumericLabel(n.label);
+        if (v !== null && (minVal === null || v < minVal)) {
+          minVal = v;
+          node0 = n;
+        }
+      });
+      if (!node0) node0 = state.nodes[0];
+    }
+
+    if (node0) {
+      const anchorDt = getNodeDateTime(node0);
+      if (anchorDt && !isNaN(anchorDt.getTime())) {
+        const diffMs = now.getTime() - anchorDt.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+        // In CPM TimeScale: 1 hour = 40px
+        const targetX = Math.round(node0.x + diffHours * 40);
+        return Math.max(40, Math.min((state.canvasWidth || 3000) - 40, targetX));
+      }
+    }
+    return actualLine.x;
+  }
+
   function isNodeDelayed(n, actualLine){
     if(!n) return false;
     if(n.completed || n.status === "completed") return false;
     if(n.status === "delayed") return true;
     if(!actualLine) return false;
 
-    // 1. Position-based comparison on canvas:
-    // If the Actual line has crossed past the node center + slight buffer
-    if(actualLine.x > (n.x + (n.r || 24) * 0.25)){
-      return true;
+    // Time Actual is the center reference point for present time (Now)
+    // Any node strictly to the right of Time Actual is in the FUTURE -> NEVER delayed!
+    const nodeCenterX = n.x || 0;
+    const actualX = actualLine.x || 0;
+
+    if (nodeCenterX > actualX) {
+      return false; // Time Actual has NOT reached this node yet!
     }
 
-    // 2. Date-based comparison (if both have dates)
-    if(n.datetimeDate && n.datetimeTime){
-      const nodeDt = new Date(`${n.datetimeDate}T${n.datetimeTime}`);
-      if(!isNaN(nodeDt.getTime())){
-        let actDt = null;
-        if(actualLine.liveClock){
-          actDt = new Date();
-        } else if(actualLine.date && actualLine.time){
-          actDt = new Date(`${actualLine.date}T${actualLine.time}`);
-        }
-        if(actDt && !isNaN(actDt.getTime())){
-          return actDt.getTime() > nodeDt.getTime();
-        }
-      }
-    }
-    return false;
+    // Node is to the left of Time Actual (past due) and not completed -> DELAYED!
+    return true;
+  }
+
+  function renderAutoDelayLine(n, idx){
+    const g = svgElCreate("g", {class:"cpm-timeline-wrap cpm-auto-delay-wrap", "data-node-id": n.id});
+    const h = state.canvasHeight || 1800;
+    const color = "#ea580c";
+
+    // Vertical dashed orange line
+    const line = svgElCreate("line", {
+      x1: n.x, y1: 0, x2: n.x, y2: h,
+      stroke: color, "stroke-width": 2.2,
+      "stroke-dasharray": "8 5",
+      opacity: 0.92
+    });
+    g.appendChild(line);
+
+    // Staggered Delay badge at top: y = 36 + (idx % 4) * 26
+    const badgeY = 36 + (idx % 4) * 26;
+    const badgeG = svgElCreate("g", {
+      transform: `translate(${n.x}, ${badgeY})`
+    });
+
+    const fullText = `Delay (Hr ${n.label || '!'})`;
+    const padW = Math.max(88, fullText.length * 7.5 + 20);
+    const badgeH = 24;
+
+    const bgRect = svgElCreate("rect", {
+      x: -padW / 2, y: -badgeH / 2,
+      width: padW, height: badgeH,
+      rx: 4, ry: 4,
+      fill: color,
+      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))"
+    });
+    badgeG.appendChild(bgRect);
+
+    const txt = svgElCreate("text", {
+      x: 0, y: 1,
+      fill: "#ffffff",
+      "font-size": "11px",
+      "font-weight": "700",
+      "font-family": "var(--font-display, sans-serif)",
+      "text-anchor": "middle",
+      "dominant-baseline": "central"
+    });
+    txt.textContent = fullText;
+    badgeG.appendChild(txt);
+
+    g.appendChild(badgeG);
+    return g;
   }
 
   // ---------------------------------------------------------
@@ -2260,6 +2334,18 @@ input:checked + .slider:before {
         layerAnnotations.appendChild(g);
       }
     });
+
+    // Render dynamic Delay dashed lines for delayed nodes
+    const actualLine = findActiveTimeActualLine();
+    if(actualLine){
+      const delayedNodes = state.nodes.filter(n => isNodeDelayed(n, actualLine));
+      delayedNodes.forEach((n, idx) => {
+        const hasManualLine = state.annotations.some(a => a.type === "timeline" && a.timelineKind === "delay" && Math.abs((a.x || 0) - (n.x || 0)) < 8);
+        if(hasManualLine) return;
+        const delayEl = renderAutoDelayLine(n, idx);
+        layerAnnotations.appendChild(delayEl);
+      });
+    }
   }
 
   function addResizeHandle(g, a){
@@ -3886,8 +3972,9 @@ input:checked + .slider:before {
     // Delay warning notice if overdue
     const actualLine = findActiveTimeActualLine();
     const delayed = isNodeDelayed(n, actualLine);
+    let delayWarn = null;
     if (!n.completed && delayed) {
-      const delayWarn = document.createElement("div");
+      delayWarn = document.createElement("div");
       delayWarn.style.fontSize = "10.5px";
       delayWarn.style.color = "#ea580c";
       delayWarn.style.fontWeight = "700";
@@ -3897,6 +3984,15 @@ input:checked + .slider:before {
       delayWarn.textContent = "⚠️ เลยกำหนด Actual (Delayed)";
       statusDiv.appendChild(delayWarn);
     }
+
+    completedCheckbox.addEventListener("change", () => {
+      n.completed = completedCheckbox.checked;
+      renderAll();
+      const isDel = isNodeDelayed(n, findActiveTimeActualLine());
+      if (delayWarn) {
+        delayWarn.style.display = (!n.completed && isDel) ? "flex" : "none";
+      }
+    });
 
     container.appendChild(captionDiv);
     container.appendChild(timeDiv);
@@ -4230,6 +4326,10 @@ input:checked + .slider:before {
         
         show(fieldEls.timelineliveswitch);
         $("#fTimelineLiveClock").checked = !!a.liveClock;
+        if ($("#fTimelineAutoMove")) {
+          $("#fTimelineAutoMove").checked = a.autoMove !== false;
+          $("#fTimelineAutoMove").disabled = !a.liveClock;
+        }
 
         show(fieldEls.timelinedatetimepicker);
         if(a.date){
@@ -5034,9 +5134,14 @@ input:checked + .slider:before {
 
     a.liveClock = $("#fTimelineLiveClock").checked;
     if (a.liveClock) {
-      a.sublabel = formatLiveTimestamp(new Date());
-      $("#fTimelineDatetime").value = a.sublabel;
+      if (a.autoMove === undefined) a.autoMove = true;
       const now = new Date();
+      a.sublabel = formatLiveTimestamp(now);
+      if (a.autoMove !== false) {
+        const newX = calculateTimeActualX(a, now);
+        if (newX !== undefined) a.x = newX;
+      }
+      $("#fTimelineDatetime").value = a.sublabel;
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const dd = String(now.getDate()).padStart(2, '0');
@@ -5046,7 +5151,11 @@ input:checked + .slider:before {
       $("#fTimelineTime").value = `${hh}:${minStr}`;
       a.date = $("#fTimelineDate").value;
       a.time = $("#fTimelineTime").value;
-      showSaveNotification("เปิดโหมด Live Clock", "เส้นประกำลังนับวันและเวลาจริงบนป้ายกำกับต่อเนื่อง");
+      showSaveNotification("เปิดโหมด Live Clock", "เส้นประกำลังนับเวลาจริงและขยับตำแหน่งอิง Milestone 0");
+    }
+    if ($("#fTimelineAutoMove")) {
+      $("#fTimelineAutoMove").disabled = !a.liveClock;
+      $("#fTimelineAutoMove").checked = a.autoMove !== false;
     }
     $("#fTimelineDate").disabled = a.liveClock;
     $("#fTimelineTime").disabled = a.liveClock;
@@ -5055,6 +5164,22 @@ input:checked + .slider:before {
     renderAll();
     commit();
   });
+
+  if ($("#fTimelineAutoMove")) {
+    $("#fTimelineAutoMove").addEventListener("change", () => {
+      const sel = currentSingle();
+      if (!sel || sel.kind !== "annotation") return;
+      const a = findAnnotation(sel.id);
+      if (!a || a.type !== "timeline") return;
+      a.autoMove = $("#fTimelineAutoMove").checked;
+      if (a.autoMove && a.liveClock) {
+        const newX = calculateTimeActualX(a, new Date());
+        if (newX !== undefined) a.x = newX;
+        renderAll();
+        commit();
+      }
+    });
+  }
 
   $("#fTimelineDate").addEventListener("change", () => {
     const sel = currentSingle();
@@ -5085,6 +5210,15 @@ input:checked + .slider:before {
         if (a.sublabel !== formatted) {
           a.sublabel = formatted;
           needsRender = true;
+        }
+
+        // Auto-move line along timeline based on Milestone 0
+        if (a.autoMove !== false) {
+          const newX = calculateTimeActualX(a, now);
+          if (newX !== undefined && Math.abs(newX - a.x) >= 1) {
+            a.x = newX;
+            needsRender = true;
+          }
         }
       });
 
