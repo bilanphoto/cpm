@@ -602,6 +602,8 @@ html,body{
       <button class="btn" id="btnImportImage" title="Import CPM diagram from a JPG/PNG image using Gemini AI" data-tip="นำเข้า Diagram จากรูปภาพด้วย AI">📷 Import Image</button>
       <input type="file" id="htmlFileInput" accept=".html" style="display:none">
       <div class="sep"></div>
+      <button class="btn" id="btnTopCopy" title="Copy selected elements (Ctrl+C / ⌘C)" data-tip="คัดลอก Node ที่เลือก">📋 Copy</button>
+      <button class="btn" id="btnTopPaste" title="Paste copied elements (Ctrl+V / ⌘V)" data-tip="วาง Node ที่คัดลอกไว้">📋 Paste</button>
       <div class="dropdown">
         <button class="btn" id="btnEditDropdown" data-tip="เมนู Edit & ตั้งค่า Canvas">Edit ▼</button>
         <div class="dropdown-content" id="editDropdownContent" style="padding: 6px; min-width: 220px;">
@@ -772,6 +774,9 @@ html,body{
       <div class="inspector-empty" id="inspectorEmpty">
         <div class="inspector-empty-icon">◇</div>
         <p>Select an element on the canvas to edit its properties, or pick a tool on the left to start drawing.</p>
+        <div style="margin: 12px 0 16px 0;">
+          <button class="btn small" id="btnPasteEmpty" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; font-weight: 600;" title="วาง Node หรือ Connector ที่คัดลอกไว้ (Ctrl+V / ⌘V)">📋 Paste (วางข้อมูลที่คัดลอกไว้)</button>
+        </div>
         <div class="legend">
           <div class="legend-title">Legend reference</div>
           <div class="legend-row"><span class="swatch swatch-white"></span> Process node</div>
@@ -784,8 +789,9 @@ html,body{
       </div>
 
       <div class="inspector-panel" id="inspectorPanel" style="display:none">
-        <div class="panel-section">
-          <div class="panel-title" id="panelTitle">Node</div>
+        <div class="panel-section" style="gap:6px; flex-wrap:wrap;">
+          <div class="panel-title" id="panelTitle" style="flex:1;">Node</div>
+          <button class="btn small" id="btnCopySingle" title="Copy this element (Ctrl+C / ⌘C)">📋 Copy</button>
           <button class="btn danger small" id="btnDeleteSelected">Delete</button>
         </div>
 
@@ -986,8 +992,9 @@ html,body{
       </div>
 
       <div class="inspector-panel" id="inspectorMulti" style="display:none">
-        <div class="panel-section">
-          <div class="panel-title" id="multiTitle">3 selected</div>
+        <div class="panel-section" style="gap:6px; flex-wrap:wrap;">
+          <div class="panel-title" id="multiTitle" style="flex:1;">3 selected</div>
+          <button class="btn small" id="btnCopyMulti" title="Copy selected elements (Ctrl+C / ⌘C)">📋 Copy</button>
           <button class="btn danger small" id="btnDeleteMulti">Delete all</button>
         </div>
         <p class="multi-hint">Editing a property here applies it to every selected element it's relevant to.</p>
@@ -1099,7 +1106,7 @@ html,body{
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.12</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.13</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -3035,13 +3042,31 @@ html,body{
   $("#btnDeleteMulti").addEventListener("click", deleteSelected);
 
   // ---------------------------------------------------------
-  // Copy / Paste
+  // Copy / Paste (Cross-origin, Cross-window & System Clipboard)
   // ---------------------------------------------------------
   const PASTE_OFFSET = 24;
   const CLIPBOARD_STORAGE_KEY = "cpm_clipboard";
+  let clipboardTimestamp = 0;
+  window._cpmJustPasted = false;
 
-  function copySelected(){
-    if(!selection.length) return;
+  function fallbackCopyText(str){
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = str;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "-9999px";
+      ta.setAttribute("readonly", "");
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, 999999);
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch(e){}
+  }
+
+  function extractSelectionData(){
+    if(!selection || !selection.length) return [];
     const items = [];
     selection.forEach(sel => {
       let data = null;
@@ -3069,55 +3094,177 @@ html,body{
         items.push(item);
       }
     });
+    return items;
+  }
 
+  function copySelected(){
+    const items = extractSelectionData();
     if (items.length === 0) return;
     
+    const payload = {
+      type: "cpm_clipboard",
+      version: 1,
+      timestamp: Date.now(),
+      items: items
+    };
+    const jsonStr = JSON.stringify(payload);
+
     clipboard = items;
-    // Save to localStorage so elements can be pasted across different files / tabs
+    clipboardTimestamp = payload.timestamp;
+
+    // 1. LocalStorage (shares between tabs of same origin)
     try {
-      localStorage.setItem(CLIPBOARD_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(CLIPBOARD_STORAGE_KEY, jsonStr);
     } catch(e){}
 
-    // Also write to system clipboard for cross-window / cross-browser compatibility
+    // 2. Modern Clipboard API
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(JSON.stringify({ type: "cpm_clipboard", items })).catch(()=>{});
+      navigator.clipboard.writeText(jsonStr).catch(() => {});
     }
 
+    // 3. Fallback execCommand('copy') - ensures OS system clipboard is written even on file://
+    fallbackCopyText(jsonStr);
+
     setStatus("Copied " + items.length + " elements (ready to paste in this or another file)");
+    showSaveNotification("คัดลอกสำเร็จ (Copied)", "คัดลอก " + items.length + " รายการลง Clipboard เรียบร้อยแล้ว (พร้อมวางข้ามไฟล์หรือระหว่างหน้าเว็บ)");
     updateCopyPasteBtns();
   }
 
-  async function getClipboardItemsToPaste(){
-    // 1. In-memory clipboard
-    if (clipboard && clipboard.length) return clipboard;
-    // 2. localStorage (cross-tab / cross-file in same browser)
+  function parseCpmClipboardText(text){
+    if (!text || typeof text !== "string") return null;
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && parsed.type === "cpm_clipboard" && Array.isArray(parsed.items) && parsed.items.length) {
+        return { items: parsed.items, timestamp: parsed.timestamp || 0 };
+      }
+      if (Array.isArray(parsed) && parsed.length) {
+        if (parsed[0] && (parsed[0].kind || parsed[0].data)) {
+          const items = parsed.map(item => (item.data && item.kind) ? item : { kind: item.kind || "node", id: item.id || uid(), data: item });
+          return { items, timestamp: 0 };
+        }
+      }
+    } catch(e){}
+    return null;
+  }
+
+  function getLocalClipboardData(){
+    // 1. Check localStorage
     try {
       const ls = localStorage.getItem(CLIPBOARD_STORAGE_KEY);
       if (ls) {
-        const parsed = JSON.parse(ls);
-        if (Array.isArray(parsed) && parsed.length) return parsed;
+        const parsed = parseCpmClipboardText(ls);
+        if (parsed && parsed.items && parsed.items.length) {
+          return parsed;
+        }
       }
     } catch(e){}
-    // 3. System clipboard
-    if (navigator.clipboard && navigator.clipboard.readText) {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text && text.trim()) {
-          const parsed = JSON.parse(text);
-          if (parsed && parsed.type === "cpm_clipboard" && Array.isArray(parsed.items) && parsed.items.length) {
-            return parsed.items;
-          } else if (Array.isArray(parsed) && parsed.length && parsed[0].kind && parsed[0].data) {
-            return parsed;
-          }
-        }
-      } catch(e){}
+
+    // 2. Check in-memory clipboard
+    if (clipboard && clipboard.length) {
+      return { items: clipboard, timestamp: clipboardTimestamp };
     }
     return null;
   }
 
+  // Native copy event listener: captures Cmd+C / Ctrl+C and puts all formats onto clipboardData
+  window.addEventListener("copy", (e) => {
+    if (isTyping(e.target)) return;
+    if (!selection || !selection.length) return;
+    const items = extractSelectionData();
+    if (!items || !items.length) return;
+
+    const payload = {
+      type: "cpm_clipboard",
+      version: 1,
+      timestamp: Date.now(),
+      items: items
+    };
+    const jsonStr = JSON.stringify(payload);
+
+    if (e.clipboardData) {
+      e.clipboardData.setData("application/x-cpm-data", jsonStr);
+      e.clipboardData.setData("application/json", jsonStr);
+      e.clipboardData.setData("text/plain", jsonStr);
+      e.preventDefault();
+    }
+
+    clipboard = items;
+    clipboardTimestamp = payload.timestamp;
+    try {
+      localStorage.setItem(CLIPBOARD_STORAGE_KEY, jsonStr);
+    } catch(err){}
+
+    setStatus("Copied " + items.length + " elements (ready to paste in this or another file)");
+    showSaveNotification("คัดลอกสำเร็จ (Copied)", "คัดลอก " + items.length + " รายการลง Clipboard เรียบร้อยแล้ว");
+    updateCopyPasteBtns();
+  });
+
+  // Native paste event listener: reads e.clipboardData synchronously with 100% browser permission
+  window.addEventListener("paste", async (e) => {
+    if (isTyping(e.target)) return;
+    let text = "";
+    if (e.clipboardData) {
+      text = e.clipboardData.getData("application/x-cpm-data") ||
+             e.clipboardData.getData("application/json") ||
+             e.clipboardData.getData("text/plain");
+    }
+    const sysData = parseCpmClipboardText(text);
+    if (sysData && sysData.items && sysData.items.length) {
+      e.preventDefault();
+      executePaste(sysData.items, "System Clipboard");
+      return;
+    }
+    // If system clipboard didn't have CPM data, try local storage / in-memory fallback
+    const localData = getLocalClipboardData();
+    if (localData && localData.items && localData.items.length) {
+      e.preventDefault();
+      executePaste(localData.items, "Local Storage");
+    }
+  });
+
   async function pasteClipboard(){
-    const items = await getClipboardItemsToPaste();
+    let candidate = null;
+    let source = "System Clipboard";
+
+    // 1. Try reading system clipboard
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      try {
+        const text = await navigator.clipboard.readText();
+        const sysData = parseCpmClipboardText(text);
+        if (sysData && sysData.items && sysData.items.length) {
+          candidate = sysData;
+        }
+      } catch(e) {
+        // Permissions not granted or file:// protocol
+      }
+    }
+
+    // 2. If system clipboard didn't provide valid CPM data, check localStorage / in-memory
+    const localData = getLocalClipboardData();
+    if (!candidate || !candidate.items || !candidate.items.length) {
+      if (localData && localData.items && localData.items.length) {
+        candidate = localData;
+        source = "Local Storage";
+      }
+    } else if (localData && localData.timestamp && candidate.timestamp && localData.timestamp > candidate.timestamp) {
+      candidate = localData;
+      source = "Local Storage";
+    }
+
+    if (!candidate || !candidate.items || !candidate.items.length) {
+      showSaveNotification("ไม่พบข้อมูลสำหรับวาง", "ยังไม่มีข้อมูล Diagram ใน Clipboard กรุณากด Copy ก่อน");
+      setStatus("Clipboard is empty or contains no CPM elements");
+      return;
+    }
+
+    executePaste(candidate.items, source);
+  }
+
+  function executePaste(items, sourceLabel = "Clipboard"){
     if(!items || !items.length) return;
+    window._cpmJustPasted = true;
 
     const nodeIdMap = {};
     const connectorIdMap = {};
@@ -3127,6 +3274,7 @@ html,body{
     const connectorsToPaste = [];
 
     items.forEach(item => {
+      if (!item || !item.data) return;
       const copy = JSON.parse(JSON.stringify(item.data));
       if (item.kind === "node") {
         nodesToPaste.push(copy);
@@ -3227,6 +3375,7 @@ html,body{
     pastedAnnotations.forEach(a => selection.push({ kind: "annotation", id: a.id }));
     pastedConnectors.forEach(c => selection.push({ kind: "connector", id: c.id }));
 
+    // Prepare updated clipboard for consecutive pastes
     const newClipboard = [];
     pastedNodes.forEach(n => {
       newClipboard.push({ kind: "node", id: n.id, data: JSON.parse(JSON.stringify(n)) });
@@ -3238,34 +3387,33 @@ html,body{
       newClipboard.push({ kind: "connector", id: c.id, data: JSON.parse(JSON.stringify(c)) });
     });
     clipboard = newClipboard;
+    clipboardTimestamp = Date.now();
     try {
-      localStorage.setItem(CLIPBOARD_STORAGE_KEY, JSON.stringify(newClipboard));
+      const payload = { type: "cpm_clipboard", version: 1, timestamp: clipboardTimestamp, items: newClipboard };
+      localStorage.setItem(CLIPBOARD_STORAGE_KEY, JSON.stringify(payload));
     } catch(e){}
 
     recalculateDiagramTimes();
     renderAll();
     updateInspector();
     commit();
-    setStatus("Pasted " + (pastedNodes.length + pastedAnnotations.length + pastedConnectors.length) + " elements");
+
+    const totalCount = pastedNodes.length + pastedAnnotations.length + pastedConnectors.length;
+    setStatus("Pasted " + totalCount + " elements");
+    showSaveNotification("วางข้อมูลสำเร็จ (Pasted)", "วาง " + totalCount + " รายการเรียบร้อยแล้ว (" + sourceLabel + ")");
   }
 
   function hasClipboardData(){
-    if(clipboard && clipboard.length > 0) return true;
-    try {
-      const ls = localStorage.getItem(CLIPBOARD_STORAGE_KEY);
-      if(ls) {
-        const parsed = JSON.parse(ls);
-        if(Array.isArray(parsed) && parsed.length > 0) return true;
-      }
-    } catch(e){}
-    return false;
+    return true; // Always allow user to trigger paste from system clipboard
   }
 
   function updateCopyPasteBtns(){
-    const copyBtn  = $("#btnCopyEl");
-    const pasteBtn = $("#btnPasteEl");
-    if(copyBtn)  copyBtn.disabled  = selection.length === 0;
-    if(pasteBtn) pasteBtn.disabled = !hasClipboardData();
+    const hasSelection = selection && selection.length > 0;
+    const copyBtns = [$("#btnCopyEl"), $("#btnTopCopy"), $("#btnCopySingle"), $("#btnCopyMulti")];
+    copyBtns.forEach(btn => { if(btn) btn.disabled = !hasSelection; });
+
+    const pasteBtns = [$("#btnPasteEl"), $("#btnTopPaste"), $("#btnPasteEmpty")];
+    pasteBtns.forEach(btn => { if(btn) btn.disabled = false; });
   }
 
   window.addEventListener("storage", (e)=>{
@@ -3275,7 +3423,6 @@ html,body{
   });
   window.addEventListener("focus", updateCopyPasteBtns);
   updateCopyPasteBtns();
-
 
   function selectAll(){
     selection = [];
@@ -3287,8 +3434,13 @@ html,body{
   }
 
   $("#btnSelectAll").addEventListener("click", selectAll);
-  $("#btnCopyEl").addEventListener("click",  copySelected);
+  $("#btnCopyEl").addEventListener("click", copySelected);
   $("#btnPasteEl").addEventListener("click", pasteClipboard);
+  if ($("#btnTopCopy")) $("#btnTopCopy").addEventListener("click", copySelected);
+  if ($("#btnTopPaste")) $("#btnTopPaste").addEventListener("click", pasteClipboard);
+  if ($("#btnCopySingle")) $("#btnCopySingle").addEventListener("click", copySelected);
+  if ($("#btnCopyMulti")) $("#btnCopyMulti").addEventListener("click", copySelected);
+  if ($("#btnPasteEmpty")) $("#btnPasteEmpty").addEventListener("click", pasteClipboard);
 
   // Edit Dropdown positioning & toggle logic
   const btnEditDropdown = $("#btnEditDropdown");
@@ -4670,10 +4822,18 @@ html,body{
       e.preventDefault(); selectAll();
     }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="c" && !isTyping(e.target)){
-      e.preventDefault(); copySelected();
+      copySelected();
     }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="v" && !isTyping(e.target)){
-      e.preventDefault(); pasteClipboard();
+      // Do not preventDefault here so the browser dispatches the native 'paste' event
+      // with synchronous e.clipboardData access. Fallback to pasteClipboard() if not triggered.
+      window._cpmJustPasted = false;
+      setTimeout(() => {
+        if (!window._cpmJustPasted) {
+          pasteClipboard();
+        }
+        window._cpmJustPasted = false;
+      }, 60);
     }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s"){
       e.preventDefault(); saveCanvasDirect();
