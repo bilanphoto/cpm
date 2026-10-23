@@ -1018,7 +1018,7 @@ html,body{
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.8</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.9</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1422,10 +1422,17 @@ html,body{
 
   function applyTimeScalePositions() {
     if (!state.timeScaleMode) return;
-    const startX = 120;
+    let minVal = 0;
     state.nodes.forEach(n => {
-      const val = parseNumericLabel(n.label) || 0;
-      n.x = startX + val * 40;
+      const val = parseNumericLabel(n.label);
+      if (val !== null && val < minVal) minVal = val;
+    });
+    const startX = 120;
+    const offset = minVal < 0 ? startX - minVal * 40 : startX;
+    state.nodes.forEach(n => {
+      const val = parseNumericLabel(n.label);
+      const num = val !== null ? val : 0;
+      n.x = offset + num * 40;
     });
   }
 
@@ -1517,8 +1524,15 @@ html,body{
       }
       g.appendChild(shape);
 
-      const label = svgElCreate("text", {class:"cpm-node-label", style:`font-size:${Math.max(14, r*0.62)}px; fill:${n.labelColor || 'var(--node-stroke)'};`, y:0, "text-anchor":"middle", "dominant-baseline":"central"});
-      label.textContent = n.label || "";
+      const labelStr = String(n.label || "");
+      let lblFontSize = Math.max(14, r * 0.62);
+      if (labelStr.length >= 4) {
+        lblFontSize = Math.max(11, r * 0.44);
+      } else if (labelStr.length === 3) {
+        lblFontSize = Math.max(12, r * 0.52);
+      }
+      const label = svgElCreate("text", {class:"cpm-node-label", style:`font-size:${lblFontSize}px; fill:${n.labelColor || 'var(--node-stroke)'};`, y:0, "text-anchor":"middle", "dominant-baseline":"central"});
+      label.textContent = labelStr;
       g.appendChild(label);
 
       if(n.sublabel){
@@ -2100,8 +2114,14 @@ html,body{
     const fillDefaults = { circle:"#ffffff", hex:"#7fb56e", diamond:"#f6d34d", "circle-hex":"#ffffff" };
     let initialLabel = String(state.nodes.length);
     if (state.timeScaleMode) {
+      let minVal = 0;
+      state.nodes.forEach(n => {
+        const val = parseNumericLabel(n.label);
+        if (val !== null && val < minVal) minVal = val;
+      });
       const startX = 120;
-      const hours = Math.max(0, Math.round((x - startX) / 40));
+      const offset = minVal < 0 ? startX - minVal * 40 : startX;
+      const hours = Math.round((x - offset) / 40);
       initialLabel = String(hours);
     }
     const node = {
@@ -2137,8 +2157,14 @@ html,body{
     const toVal = parseNumericLabel(toNode.label) || 0;
 
     if (state.timeScaleMode) {
+      let minVal = 0;
+      state.nodes.forEach(n => {
+        const val = parseNumericLabel(n.label);
+        if (val !== null && val < minVal) minVal = val;
+      });
       const startX = 120;
-      const hours = Math.max(0, Math.round((x - startX) / 40));
+      const offset = minVal < 0 ? startX - minVal * 40 : startX;
+      const hours = Math.round((x - offset) / 40);
       initialLabel = String(hours);
     } else {
       const origDur = parseNumericLabel(c.duration) || 0;
@@ -2730,6 +2756,7 @@ html,body{
   // Copy / Paste
   // ---------------------------------------------------------
   const PASTE_OFFSET = 24;
+  const CLIPBOARD_STORAGE_KEY = "cpm_clipboard";
 
   function copySelected(){
     if(!selection.length) return;
@@ -2741,23 +2768,74 @@ html,body{
       else if (sel.kind === "annotation") data = findAnnotation(sel.id);
       
       if (data) {
-        items.push({
+        const item = {
           kind: sel.kind,
           id: sel.id,
           data: JSON.parse(JSON.stringify(data))
-        });
+        };
+        // If it's a connector, bundle connected nodes so copying to another file preserves endpoints
+        if (sel.kind === "connector") {
+          if (data.fromId) {
+            const fn = findNode(data.fromId);
+            if (fn) item._fromNode = JSON.parse(JSON.stringify(fn));
+          }
+          if (data.toId) {
+            const tn = findNode(data.toId);
+            if (tn) item._toNode = JSON.parse(JSON.stringify(tn));
+          }
+        }
+        items.push(item);
       }
     });
 
     if (items.length === 0) return;
     
     clipboard = items;
-    setStatus("Copied " + items.length + " elements");
+    // Save to localStorage so elements can be pasted across different files / tabs
+    try {
+      localStorage.setItem(CLIPBOARD_STORAGE_KEY, JSON.stringify(items));
+    } catch(e){}
+
+    // Also write to system clipboard for cross-window / cross-browser compatibility
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(JSON.stringify({ type: "cpm_clipboard", items })).catch(()=>{});
+    }
+
+    setStatus("Copied " + items.length + " elements (ready to paste in this or another file)");
     updateCopyPasteBtns();
   }
 
-  function pasteClipboard(){
-    if(!clipboard || !clipboard.length) return;
+  async function getClipboardItemsToPaste(){
+    // 1. In-memory clipboard
+    if (clipboard && clipboard.length) return clipboard;
+    // 2. localStorage (cross-tab / cross-file in same browser)
+    try {
+      const ls = localStorage.getItem(CLIPBOARD_STORAGE_KEY);
+      if (ls) {
+        const parsed = JSON.parse(ls);
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch(e){}
+    // 3. System clipboard
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          const parsed = JSON.parse(text);
+          if (parsed && parsed.type === "cpm_clipboard" && Array.isArray(parsed.items) && parsed.items.length) {
+            return parsed.items;
+          } else if (Array.isArray(parsed) && parsed.length && parsed[0].kind && parsed[0].data) {
+            return parsed;
+          }
+        }
+      } catch(e){}
+    }
+    return null;
+  }
+
+  async function pasteClipboard(){
+    const items = await getClipboardItemsToPaste();
+    if(!items || !items.length) return;
 
     const nodeIdMap = {};
     const connectorIdMap = {};
@@ -2766,13 +2844,15 @@ html,body{
     const annotationsToPaste = [];
     const connectorsToPaste = [];
 
-    clipboard.forEach(item => {
+    items.forEach(item => {
       const copy = JSON.parse(JSON.stringify(item.data));
       if (item.kind === "node") {
         nodesToPaste.push(copy);
       } else if (item.kind === "annotation") {
         annotationsToPaste.push(copy);
       } else if (item.kind === "connector") {
+        if (item._fromNode) copy._fromNode = item._fromNode;
+        if (item._toNode) copy._toNode = item._toNode;
         connectorsToPaste.push(copy);
       }
     });
@@ -2782,13 +2862,13 @@ html,body{
 
     connectorsToPaste.forEach(c => {
       if (c.fromId && !copiedNodeIds.has(c.fromId) && !extraNodesMap[c.fromId]) {
-        const originalNode = findNode(c.fromId);
+        const originalNode = findNode(c.fromId) || c._fromNode;
         if (originalNode) {
           extraNodesMap[c.fromId] = JSON.parse(JSON.stringify(originalNode));
         }
       }
       if (c.toId && !copiedNodeIds.has(c.toId) && !extraNodesMap[c.toId]) {
-        const originalNode = findNode(c.toId);
+        const originalNode = findNode(c.toId) || c._toNode;
         if (originalNode) {
           extraNodesMap[c.toId] = JSON.parse(JSON.stringify(originalNode));
         }
@@ -2876,19 +2956,43 @@ html,body{
       newClipboard.push({ kind: "connector", id: c.id, data: JSON.parse(JSON.stringify(c)) });
     });
     clipboard = newClipboard;
+    try {
+      localStorage.setItem(CLIPBOARD_STORAGE_KEY, JSON.stringify(newClipboard));
+    } catch(e){}
 
+    recalculateDiagramTimes();
     renderAll();
     updateInspector();
     commit();
     setStatus("Pasted " + (pastedNodes.length + pastedAnnotations.length + pastedConnectors.length) + " elements");
   }
 
+  function hasClipboardData(){
+    if(clipboard && clipboard.length > 0) return true;
+    try {
+      const ls = localStorage.getItem(CLIPBOARD_STORAGE_KEY);
+      if(ls) {
+        const parsed = JSON.parse(ls);
+        if(Array.isArray(parsed) && parsed.length > 0) return true;
+      }
+    } catch(e){}
+    return false;
+  }
+
   function updateCopyPasteBtns(){
     const copyBtn  = $("#btnCopyEl");
     const pasteBtn = $("#btnPasteEl");
     if(copyBtn)  copyBtn.disabled  = selection.length === 0;
-    if(pasteBtn) pasteBtn.disabled = !clipboard || clipboard.length === 0;
+    if(pasteBtn) pasteBtn.disabled = !hasClipboardData();
   }
+
+  window.addEventListener("storage", (e)=>{
+    if(e.key === CLIPBOARD_STORAGE_KEY){
+      updateCopyPasteBtns();
+    }
+  });
+  window.addEventListener("focus", updateCopyPasteBtns);
+  updateCopyPasteBtns();
 
 
   function selectAll(){
@@ -3627,7 +3731,7 @@ html,body{
 
   function getMinAllowedNodeVal(node, visited) {
     visited = visited || new Set();
-    if (visited.has(node.id)) return 0;
+    if (visited.has(node.id)) return -Infinity;
     visited.add(node.id);
 
     if (node.lockTime) {
@@ -3635,7 +3739,7 @@ html,body{
       if (val !== null) return val;
     }
 
-    let minVal = 0;
+    let minVal = -Infinity;
     state.connectors.forEach(c => {
       // 1. Through incoming connectors
       if (c.toId === node.id) {
@@ -3652,12 +3756,14 @@ html,body{
           const sourceMin = getMinAllowedNodeVal(sourceNode, visited);
           if (c.lockDuration) {
             const dur = parseNumericLabel(c.duration) || 0;
-            minVal = Math.max(minVal, sourceMin + dur);
+            if (sourceMin !== -Infinity) {
+              minVal = Math.max(minVal, sourceMin + dur);
+            }
           } else {
             const sourceVal = parseNumericLabel(sourceNode.label);
             if (sourceNode.lockTime && sourceVal !== null) {
               minVal = Math.max(minVal, sourceVal);
-            } else {
+            } else if (sourceMin !== -Infinity) {
               minVal = Math.max(minVal, sourceMin);
             }
           }
@@ -3670,7 +3776,9 @@ html,body{
         if (target) {
           const targetMin = getMinAllowedNodeVal(target, visited);
           const dur = parseNumericLabel(c.duration) || 0;
-          minVal = Math.max(minVal, targetMin - dur);
+          if (targetMin !== -Infinity) {
+            minVal = Math.max(minVal, targetMin - dur);
+          }
         }
       }
     });
@@ -3696,12 +3804,9 @@ html,body{
     }
 
     const minVal = getMinAllowedNodeVal(n);
-    if (minVal > cappedVal) {
+    if (minVal !== -Infinity && minVal > cappedVal) {
       cappedVal = minVal;
     }
-
-    // Ensure value is not less than 0
-    if (cappedVal < 0) cappedVal = 0;
 
     n.label = Number.isInteger(cappedVal) ? String(cappedVal) : String(Math.round(cappedVal * 100) / 100);
 
