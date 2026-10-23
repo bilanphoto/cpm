@@ -1201,7 +1201,7 @@ input:checked + .slider:before {
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.17</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.18</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1811,7 +1811,7 @@ input:checked + .slider:before {
     return true;
   }
 
-  function renderAutoDelayLine(n, idx){
+  function renderAutoDelayLine(n, idx, totalDelayed = 1){
     const g = svgElCreate("g", {class:"cpm-timeline-wrap cpm-auto-delay-wrap", "data-node-id": n.id});
     const h = state.canvasHeight || 1800;
     const color = "#ea580c";
@@ -1825,14 +1825,15 @@ input:checked + .slider:before {
     });
     g.appendChild(line);
 
-    // Staggered Delay badge at top: y = 36 + (idx % 4) * 26
-    const badgeY = 36 + (idx % 4) * 26;
+    // Clean Delay badge at top: aligned at y = 36 (same baseline as Time Actual and Plan)
+    const badgeY = 36;
     const badgeG = svgElCreate("g", {
       transform: `translate(${n.x}, ${badgeY})`
     });
 
-    const fullText = `Delay (Hr ${n.label || '!'})`;
-    const padW = Math.max(88, fullText.length * 7.5 + 20);
+    const labelText = n.label || '!';
+    const fullText = totalDelayed > 1 ? `Delay (Hr ${labelText}) • ${totalDelayed} nodes` : `Delay (Hr ${labelText})`;
+    const padW = Math.max(90, fullText.length * 7.5 + 24);
     const badgeH = 24;
 
     const bgRect = svgElCreate("rect", {
@@ -2342,16 +2343,22 @@ input:checked + .slider:before {
       }
     });
 
-    // Render dynamic Delay dashed lines for delayed nodes
+    // Render single primary Delay line for the most critical/worst delayed node (avoids multi-line clutter)
     const actualLine = findActiveTimeActualLine();
     if(actualLine){
       const delayedNodes = state.nodes.filter(n => isNodeDelayed(n, actualLine));
-      delayedNodes.forEach((n, idx) => {
-        const hasManualLine = state.annotations.some(a => a.type === "timeline" && a.timelineKind === "delay" && Math.abs((a.x || 0) - (n.x || 0)) < 8);
-        if(hasManualLine) return;
-        const delayEl = renderAutoDelayLine(n, idx);
-        layerAnnotations.appendChild(delayEl);
-      });
+      if(delayedNodes.length > 0){
+        // If user is currently inspecting a specific delayed node, show line on that node;
+        // Otherwise, show on the furthest/worst delayed node (smallest x, earliest scheduled time)
+        const selectedDelayedNode = delayedNodes.find(n => isSelected("node", n.id));
+        const targetNode = selectedDelayedNode || delayedNodes.reduce((worst, curr) => ((curr.x || 0) < (worst.x || 0) ? curr : worst), delayedNodes[0]);
+
+        const hasManualLine = state.annotations.some(a => a.type === "timeline" && a.timelineKind === "delay" && Math.abs((a.x || 0) - (targetNode.x || 0)) < 8);
+        if(!hasManualLine){
+          const delayEl = renderAutoDelayLine(targetNode, 0, delayedNodes.length);
+          layerAnnotations.appendChild(delayEl);
+        }
+      }
     }
   }
 
