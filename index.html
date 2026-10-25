@@ -600,6 +600,17 @@ input:checked + .slider:before {
 .brand [data-tip]:hover::after {
   transform: translateX(-50%) translateY(4px);
 }
+.cpm-auto-delay-badge {
+  cursor: grab;
+  user-select: none;
+  transition: filter 0.12s ease;
+}
+.cpm-auto-delay-badge:hover {
+  filter: brightness(1.1);
+}
+.cpm-auto-delay-badge:active {
+  cursor: grabbing;
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
@@ -1201,7 +1212,7 @@ input:checked + .slider:before {
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.18</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.19</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -1825,10 +1836,16 @@ input:checked + .slider:before {
     });
     g.appendChild(line);
 
-    // Clean Delay badge at top: aligned at y = 36 (same baseline as Time Actual and Plan)
-    const badgeY = 36;
+    // Movable Delay badge: default y = 140 (safe distance below header title) or user-customized state.autoDelayBadgeY
+    const badgeY = (state.autoDelayBadgeY !== undefined) ? state.autoDelayBadgeY : 140;
+    const badgeXOff = (state.autoDelayBadgeXOffset !== undefined) ? state.autoDelayBadgeXOffset : 0;
+    const badgeX = n.x + badgeXOff;
+
     const badgeG = svgElCreate("g", {
-      transform: `translate(${n.x}, ${badgeY})`
+      transform: `translate(${badgeX}, ${badgeY})`,
+      class: "cpm-auto-delay-badge",
+      style: "cursor: grab;",
+      "data-tip": "คลิกแล้วลากเพื่อปรับตำแหน่งป้าย Delay (ดับเบิลคลิกเพื่อรีเซ็ต)"
     });
 
     const labelText = n.label || '!';
@@ -1841,7 +1858,9 @@ input:checked + .slider:before {
       width: padW, height: badgeH,
       rx: 4, ry: 4,
       fill: color,
-      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))"
+      stroke: "#ffffff",
+      "stroke-width": 1.2,
+      filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.25))"
     });
     badgeG.appendChild(bgRect);
 
@@ -1856,6 +1875,33 @@ input:checked + .slider:before {
     });
     txt.textContent = fullText;
     badgeG.appendChild(txt);
+
+    // Drag interaction for repositioning the Delay badge
+    badgeG.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      if(currentTool !== "select") return;
+      const pt = getCanvasPoint(e);
+      drag = {
+        type: "delay-badge",
+        startX: pt.x,
+        startY: pt.y,
+        origY: (state.autoDelayBadgeY !== undefined) ? state.autoDelayBadgeY : 140,
+        origXOff: (state.autoDelayBadgeXOffset !== undefined) ? state.autoDelayBadgeXOffset : 0
+      };
+      badgeG.style.cursor = "grabbing";
+      window.addEventListener("mousemove", onWindowMouseMove);
+      window.addEventListener("mouseup", onWindowMouseUp);
+    });
+
+    // Double-click to reset badge position to default
+    badgeG.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      delete state.autoDelayBadgeY;
+      delete state.autoDelayBadgeXOffset;
+      renderAll();
+      commit();
+      setStatus("Reset Delay badge position to default");
+    });
 
     g.appendChild(badgeG);
     return g;
@@ -3059,13 +3105,24 @@ input:checked + .slider:before {
         }
         renderAll();
       }
+    } else if(drag.type === "delay-badge"){
+      const dy = pt.y - drag.startY;
+      const dx = pt.x - drag.startX;
+      state.autoDelayBadgeY = Math.max(10, Math.min(state.canvasHeight - 30, snap(drag.origY + dy)));
+      state.autoDelayBadgeXOffset = snap(drag.origXOff + dx);
+      renderAll();
     }
 
   }
 
   function onWindowMouseUp(e){
     const wasDragging = drag !== null;
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "ann-resize")) commit();
+    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
+      commit();
+      if(drag.type === "delay-badge"){
+        setStatus("Delay badge position updated");
+      }
+    }
     if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
@@ -5900,6 +5957,10 @@ input:checked + .slider:before {
         minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
       });
     });
+    if(state.autoDelayBadgeY !== undefined){
+      minY = Math.min(minY, state.autoDelayBadgeY - 20);
+      maxY = Math.max(maxY, state.autoDelayBadgeY + 20);
+    }
     if(!isFinite(minX)){ minX=0; minY=0; maxX=1200; maxY=800; }
     return {minX, minY, maxX, maxY};
   }
