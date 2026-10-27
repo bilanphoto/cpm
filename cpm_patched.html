@@ -893,14 +893,23 @@ input:checked + .slider:before {
         </div>
         <div class="field two-col" data-field="datetime">
           <div>
-            <label>Date / time (below node)</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label style="margin: 0;">Date / time (below node)</label>
+              <button type="button" id="btnNodeClearDateTime" style="background: none; border: none; color: #ef4444; font-size: 11px; cursor: pointer; padding: 0 2px; text-decoration: underline;" title="ลบ/ซ่อนข้อความวันเวลาของโหนดนี้">ลบวันเวลา</button>
+            </div>
             <div style="display: flex; gap: 4px; margin-bottom: 4px;">
               <input type="date" id="fNodeDate" style="flex: 1; font-size: 12px; padding: 6px 4px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: var(--radius-sm);">
               <input type="time" id="fNodeTime" style="flex: 1; font-size: 12px; padding: 6px 4px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: var(--radius-sm);">
             </div>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="fNodeAutoTime">
-              <label for="fNodeAutoTime" style="font-size: 11px; margin: 0; cursor: pointer; user-select: none;">Auto-calculate</label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <input type="checkbox" id="fNodeShowDateTime" checked>
+                <label for="fNodeShowDateTime" style="font-size: 11px; margin: 0; cursor: pointer; user-select: none;">แสดงวันเวลา</label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <input type="checkbox" id="fNodeAutoTime">
+                <label for="fNodeAutoTime" style="font-size: 11px; margin: 0; cursor: pointer; user-select: none;">Auto-calc</label>
+              </div>
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px;">
@@ -1114,6 +1123,14 @@ input:checked + .slider:before {
           <input type="color" id="fMultiLineColor" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
         </div>
 
+        <div class="field" data-field="multiDateTime" style="margin-top: 10px;">
+          <label>Date/Time on selected nodes</label>
+          <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <button class="btn small" id="btnMultiShowDateTime" style="flex: 1; padding: 6px 8px;" title="แสดงข้อความวันเวลาของโหนดที่เลือกทั้งหมด">👁 แสดงวันเวลา</button>
+            <button class="btn small" id="btnMultiHideDateTime" style="flex: 1; padding: 6px 8px;" title="ซ่อน/ลบข้อความวันเวลาของโหนดที่เลือกทั้งหมด">🚫 ซ่อน/ลบวันเวลา</button>
+          </div>
+        </div>
+
         <div class="panel-section secondary-section">
           <button class="btn ghost small" id="btnBringFrontMulti">Bring to front</button>
           <button class="btn ghost small" id="btnSendBackMulti">Send to back</button>
@@ -1212,7 +1229,7 @@ input:checked + .slider:before {
         <img src="PTT-Logo.png" alt="PTT Logo" style="height: 38px; width: auto; margin: 0 auto 16px auto; display: block;" />
         <div style="font-size: 18px; font-weight: 700; color: #d97706; margin-bottom: 2px; font-family: var(--font-display); letter-spacing: 0.5px;">GSP CPM DIAGRAM</div>
         <div style="font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px; font-family: var(--font-body);">CPM : Critical Path Method</div>
-        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.19</div>
+        <div style="font-size: 12.5px; color: #718096; margin-bottom: 20px; font-family: var(--font-mono);">Version 1.0 build 1.0.20</div>
         <div style="border-top: 1px solid #edf2f7; padding-top: 16px; font-size: 14px; font-weight: 600; color: #2d3748;">by Phalat 490047</div>
       </div>
     </div>
@@ -2001,7 +2018,7 @@ input:checked + .slider:before {
         });
         g.appendChild(sub);
       }
-      if(n.datetime){
+      if(n.datetime && !n.hideDateTime){
         const ox = n.datetimeOffsetX || 0;
         const oy = n.datetimeOffsetY || 0;
         const lines = n.datetime.split("\\n");
@@ -2637,14 +2654,14 @@ input:checked + .slider:before {
   // Placement (click-to-add)
   // ---------------------------------------------------------
   canvasInner.addEventListener("mousedown", (e)=>{
-    if(e.target === canvasInner || e.target === svg || e.target.id === "grid"){
+    if(e.target === canvasInner || e.target === svg || e.target.id === "grid" || e.target.tagName === "svg" || e.target.id === "svgCanvas" || e.target === layerConnectors || e.target === layerNodes || e.target === layerAnnotations || e.target === layerOverlay){
       handleEmptyMouseDown(e);
     }
   });
 
   function handleEmptyMouseDown(e){
     if(currentTool === "pan"){ startPan(e); return; }
-    if(currentTool === "select"){ deselectAll(); return; }
+    if(currentTool === "select"){ startMarqueeSelect(e); return; }
     if(currentTool.startsWith("node-")){
       const pt = getCanvasPoint(e);
       placeNode(currentTool.replace("node-",""), snap(pt.x), snap(pt.y));
@@ -2658,6 +2675,50 @@ input:checked + .slider:before {
     if(currentTool === "connector" || currentTool === "connector-left" || currentTool === "connector-line"){
       cancelPendingConnector();
     }
+  }
+
+  // ---------------------------------------------------------
+  // Marquee (Box / Area) Selection
+  // ---------------------------------------------------------
+  function startMarqueeSelect(e){
+    const pt = getCanvasPoint(e);
+    const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+    const initialSelection = isModifier ? [...selection] : [];
+
+    let marquee = $("#marqueeSelectRect");
+    if (!marquee) {
+      marquee = svgElCreate("rect", {
+        id: "marqueeSelectRect",
+        x: pt.x,
+        y: pt.y,
+        width: 0,
+        height: 0,
+        fill: "rgba(37, 99, 235, 0.12)",
+        stroke: "#2563eb",
+        "stroke-width": 1.5,
+        "stroke-dasharray": "4 2",
+        "pointer-events": "none"
+      });
+      layerOverlay.appendChild(marquee);
+    } else {
+      marquee.setAttribute("x", pt.x);
+      marquee.setAttribute("y", pt.y);
+      marquee.setAttribute("width", 0);
+      marquee.setAttribute("height", 0);
+      marquee.style.display = "block";
+    }
+
+    drag = {
+      type: "marquee",
+      startX: pt.x,
+      startY: pt.y,
+      isModifier,
+      initialSelection,
+      moved: false
+    };
+
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
   }
 
   function placeNode(type, x, y){
@@ -3111,12 +3172,98 @@ input:checked + .slider:before {
       state.autoDelayBadgeY = Math.max(10, Math.min(state.canvasHeight - 30, snap(drag.origY + dy)));
       state.autoDelayBadgeXOffset = snap(drag.origXOff + dx);
       renderAll();
+    } else if(drag.type === "marquee"){
+      const pt = getCanvasPoint(e);
+      const x = Math.min(drag.startX, pt.x);
+      const y = Math.min(drag.startY, pt.y);
+      const w = Math.abs(pt.x - drag.startX);
+      const h = Math.abs(pt.y - drag.startY);
+
+      if (w > 3 || h > 3) {
+        drag.moved = true;
+      }
+
+      const marquee = $("#marqueeSelectRect");
+      if(marquee){
+        marquee.setAttribute("x", x);
+        marquee.setAttribute("y", y);
+        marquee.setAttribute("width", w);
+        marquee.setAttribute("height", h);
+      }
+
+      if(!drag.moved) return;
+
+      const newSel = drag.isModifier ? [...drag.initialSelection] : [];
+      const isAlreadyIn = (kind, id) => newSel.some(s => s.kind === kind && s.id === id);
+
+      // 1. Nodes intersecting marquee
+      state.nodes.forEach(n => {
+        const nr = n.r || 32;
+        if (n.x + nr >= x && n.x - nr <= x + w && n.y + nr >= y && n.y - nr <= y + h) {
+          if (!isAlreadyIn("node", n.id)) {
+            newSel.push({ kind: "node", id: n.id });
+          }
+        }
+      });
+
+      // 2. Annotations intersecting marquee
+      state.annotations.forEach(a => {
+        const aw = a.w || 40;
+        const ah = a.h || 30;
+        if (a.x + aw >= x && a.x <= x + w && a.y + ah >= y && a.y <= y + h) {
+          if (!isAlreadyIn("annotation", a.id)) {
+            newSel.push({ kind: "annotation", id: a.id });
+          }
+        }
+      });
+
+      // 3. Connectors whose endpoints are in newSel
+      state.connectors.forEach(c => {
+        const fromIn = newSel.some(s => s.kind === "node" && s.id === c.fromId);
+        const toIn = newSel.some(s => s.kind === "node" && s.id === c.toId);
+        if (fromIn && toIn) {
+          if (!isAlreadyIn("connector", c.id)) {
+            newSel.push({ kind: "connector", id: c.id });
+          }
+        }
+      });
+
+      selection = newSel;
+
+      // Real-time visual highlight feedback
+      document.querySelectorAll(".cpm-node").forEach(el => {
+        el.classList.toggle("selected", isSelected("node", el.dataset.id));
+      });
+      document.querySelectorAll(".cpm-connector").forEach(el => {
+        el.classList.toggle("selected", isSelected("connector", el.dataset.id));
+      });
+      document.querySelectorAll("#layerAnnotations > g").forEach(el => {
+        el.classList.toggle("selected", isSelected("annotation", el.dataset.id));
+      });
     }
 
   }
 
   function onWindowMouseUp(e){
     const wasDragging = drag !== null;
+    if(drag && drag.type === "marquee"){
+      const marquee = $("#marqueeSelectRect");
+      if(marquee) marquee.style.display = "none";
+      const moved = drag.moved;
+      drag = null;
+      window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup", onWindowMouseUp);
+
+      if(!moved){
+        deselectAll();
+      } else {
+        renderAll();
+        updateInspector();
+        updateCopyPasteBtns();
+        setStatus(selection.length > 0 ? (selection.length + " elements selected") : "Ready");
+      }
+      return;
+    }
     if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
       commit();
       if(drag.type === "delay-badge"){
@@ -4320,6 +4467,8 @@ input:checked + .slider:before {
       const hasConnectors = selection.some(s=> s.kind === "connector");
       document.querySelector('[data-field="multiFill"]').style.display = hasNodes ? "block" : "none";
       document.querySelector('[data-field="multiLineColor"]').style.display = hasConnectors ? "block" : "none";
+      const multiDt = document.querySelector('[data-field="multiDateTime"]');
+      if (multiDt) multiDt.style.display = hasNodes ? "block" : "none";
       return;
     }
 
@@ -4374,6 +4523,9 @@ input:checked + .slider:before {
       
       dateInput.disabled = n.autoDateTime;
       timeInput.disabled = n.autoDateTime;
+      if ($("#fNodeShowDateTime")) {
+        $("#fNodeShowDateTime").checked = !n.hideDateTime;
+      }
 
       $("#fDtFontSize").value = n.datetimeFontSize || 12;
       $("#fDtBold").checked = !!n.datetimeBold;
@@ -4585,6 +4737,63 @@ input:checked + .slider:before {
     renderAll();
     commit();
   });
+
+  if ($("#fNodeShowDateTime")) {
+    $("#fNodeShowDateTime").addEventListener("change", () => {
+      const sel = currentSingle();
+      if (!sel || sel.kind !== "node") return;
+      const n = findNode(sel.id);
+      if (!n) return;
+      n.hideDateTime = !$("#fNodeShowDateTime").checked;
+      renderAll();
+      commit();
+      setStatus(n.hideDateTime ? "ซ่อนวันเวลาของโหนดแล้ว" : "แสดงวันเวลาของโหนดแล้ว");
+    });
+  }
+
+  if ($("#btnNodeClearDateTime")) {
+    $("#btnNodeClearDateTime").addEventListener("click", () => {
+      const sel = currentSingle();
+      if (!sel || sel.kind !== "node") return;
+      const n = findNode(sel.id);
+      if (!n) return;
+      n.hideDateTime = true;
+      if ($("#fNodeShowDateTime")) $("#fNodeShowDateTime").checked = false;
+      renderAll();
+      commit();
+      setStatus("ลบ/ซ่อนวันเวลาของโหนดเรียบร้อยแล้ว");
+    });
+  }
+
+  if ($("#btnMultiShowDateTime")) {
+    $("#btnMultiShowDateTime").addEventListener("click", () => {
+      let count = 0;
+      selection.forEach(s => {
+        if (s.kind === "node") {
+          const n = findNode(s.id);
+          if (n) { n.hideDateTime = false; count++; }
+        }
+      });
+      renderAll();
+      commit();
+      setStatus("แสดงวันเวลาบน " + count + " โหนดที่เลือก");
+    });
+  }
+
+  if ($("#btnMultiHideDateTime")) {
+    $("#btnMultiHideDateTime").addEventListener("click", () => {
+      let count = 0;
+      selection.forEach(s => {
+        if (s.kind === "node") {
+          const n = findNode(s.id);
+          if (n) { n.hideDateTime = true; count++; }
+        }
+      });
+      renderAll();
+      commit();
+      setStatus("ซ่อน/ลบวันเวลาบน " + count + " โหนดที่เลือก");
+    });
+  }
   $("#fNodeLockTime").addEventListener("change", ()=>{
     const sel = currentSingle();
     if(!sel || sel.kind !== "node") return;
