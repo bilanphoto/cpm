@@ -1256,10 +1256,29 @@ input:checked + .slider:before {
       <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1; background: #ffffff;">
         <!-- Top Settings Panel -->
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+          <!-- Saved Task Preset Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
+              <label style="font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; margin: 0; display: flex; align-items: center; gap: 4px;">
+                <span>📁 Task ที่บันทึกไว้:</span>
+              </label>
+              <select id="tgSavedTasksSelect" style="flex: 1; max-width: 320px; padding: 6px 10px; font-size: 12.5px; border: 1px solid #94a3b8; border-radius: 5px; background: white; color: #1e293b; font-weight: 600; cursor: pointer;">
+                <option value="">-- เลือก Task / Template --</option>
+              </select>
+              <button type="button" class="btn" id="tgBtnSaveTask" style="background: #0284c7; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="บันทึก Task และรายการโหนดปัจจุบันเก็บไว้ใช้งานซ้ำ">
+                <span>💾 บันทึก Task</span>
+              </button>
+              <button type="button" class="btn ghost" id="tgBtnDeleteTask" style="border: 1px solid #fecaca; color: #dc2626; padding: 6px 10px; font-size: 12px; border-radius: 5px; cursor: pointer; background: #fff5f5;" title="ลบ Task ที่เลือกออกจากรายการบันทึก">
+                <span>🗑 ลบ</span>
+              </button>
+            </div>
+            <div id="tgPresetNotice" style="font-size: 11.5px; color: #16a34a; font-weight: 600;"></div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1.4fr 1.2fr 1fr; gap: 14px; align-items: flex-end;">
             <div>
               <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: block;">ชื่อกลุ่มงาน / Task Group</label>
-              <input type="text" id="tgGroupName" placeholder="เช่น Warm up & Depressurize Unit 3" style="width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; box-sizing: border-box;">
+              <input type="text" id="tgGroupName" placeholder="เช่น salegas, Refrig, WHB" style="width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; box-sizing: border-box;">
             </div>
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -6615,9 +6634,118 @@ input:checked + .slider:before {
   const tgCreateBanner = document.getElementById("tgCreateBanner");
   const tgUseTimeScale = document.getElementById("tgUseTimeScale");
   const tgStatusMsg = document.getElementById("tgStatusMsg");
+  const tgSavedTasksSelect = document.getElementById("tgSavedTasksSelect");
+  const tgBtnSaveTask = document.getElementById("tgBtnSaveTask");
+  const tgBtnDeleteTask = document.getElementById("tgBtnDeleteTask");
+  const tgPresetNotice = document.getElementById("tgPresetNotice");
 
   let tgRows = [];
   const tgFillDefaults = { circle: "#ffffff", hex: "#7fb56e", diamond: "#f6d34d", "circle-hex": "#ffffff" };
+
+  const DEFAULT_TASK_PRESETS = {
+    "salegas": {
+      name: "salegas",
+      createBanner: true,
+      useTimeScale: true,
+      rows: [
+        { milestone: "0", caption: "Reduce Feed Gas", shape: "circle", activity: "Isolate Sales Gas Header", duration: "4", showDatetime: true },
+        { milestone: "4", caption: "Sales Gas Isolated", shape: "circle", activity: "Depressurize to Flare", duration: "3", showDatetime: true },
+        { milestone: "7", caption: "Zero Pressure", shape: "circle", activity: "N2 Purging & LOTO", duration: "5", showDatetime: true },
+        { milestone: "12", caption: "Gas Free & Permit Ready", shape: "circle", activity: "Overhaul Control Valve & Filter", duration: "8", showDatetime: true },
+        { milestone: "20", caption: "Maintenance Complete", shape: "circle", activity: "Leak Test & Pressurize", duration: "4", showDatetime: true },
+        { milestone: "24", caption: "Ready for Startup", shape: "hex", activity: "", duration: "0", showDatetime: true }
+      ]
+    },
+    "Refrig": {
+      name: "Refrig",
+      createBanner: true,
+      useTimeScale: true,
+      rows: [
+        { milestone: "0", caption: "Reduce Feed Gas", shape: "circle", activity: "Warm up process", duration: "5", showDatetime: true },
+        { milestone: "5", caption: "Warm up done", shape: "circle", activity: "Isolation / LOTO", duration: "5", showDatetime: true },
+        { milestone: "10", caption: "Depressurize", shape: "circle", activity: "Drain, Vent & N2 Purge", duration: "15", showDatetime: true },
+        { milestone: "25", caption: "Hand Over Unit", shape: "circle", activity: "wvsdvwev2", duration: "10", showDatetime: true },
+        { milestone: "30", caption: "z vsdr", shape: "hex", activity: "vsvdwv", duration: "20", showDatetime: true }
+      ]
+    },
+    "WHB": {
+      name: "WHB",
+      createBanner: true,
+      useTimeScale: true,
+      rows: [
+        { milestone: "0", caption: "Blowdown Boiler", shape: "circle", activity: "Cool down & Depressurize", duration: "6", showDatetime: true },
+        { milestone: "6", caption: "Boiler Cooled", shape: "circle", activity: "Isolation / LOTO / Blind", duration: "4", showDatetime: true },
+        { milestone: "10", caption: "Open Drum Manhole", shape: "circle", activity: "Internal Inspection & Cleaning", duration: "12", showDatetime: true },
+        { milestone: "22", caption: "Inspection Passed", shape: "circle", activity: "Box Up & Hydrotest", duration: "6", showDatetime: true },
+        { milestone: "28", caption: "WHB Ready", shape: "hex", activity: "", duration: "0", showDatetime: true }
+      ]
+    }
+  };
+
+  function getSavedTaskPresets() {
+    try {
+      const stored = localStorage.getItem("cpm_saved_task_templates");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          return Object.assign({}, DEFAULT_TASK_PRESETS, parsed);
+        }
+      }
+    } catch(e) {}
+    return Object.assign({}, DEFAULT_TASK_PRESETS);
+  }
+
+  function saveTaskPresetsToStorage(presets) {
+    try {
+      localStorage.setItem("cpm_saved_task_templates", JSON.stringify(presets));
+    } catch(e) {}
+  }
+
+  function updateSavedTasksDropdown(selectedKey) {
+    if (!tgSavedTasksSelect) return;
+    const presets = getSavedTaskPresets();
+    const keys = Object.keys(presets);
+
+    let html = `<option value="">-- เลือก Task ที่บันทึกไว้ (${keys.length} รายการ) --</option>`;
+    keys.forEach(k => {
+      const p = presets[k];
+      const count = p.rows ? p.rows.length : 0;
+      const isSelected = (selectedKey && selectedKey === k) ? "selected" : "";
+      html += `<option value="${escapeTgHtml(k)}" ${isSelected}>${escapeTgHtml(p.name || k)} (${count} โหนด)</option>`;
+    });
+
+    tgSavedTasksSelect.innerHTML = html;
+  }
+
+  function loadTaskPreset(key) {
+    if (!key) return;
+    const presets = getSavedTaskPresets();
+    const preset = presets[key];
+    if (!preset) return;
+
+    if (tgGroupName) tgGroupName.value = preset.name || key;
+    if (tgCreateBanner) tgCreateBanner.checked = !!preset.createBanner;
+    if (tgUseTimeScale) tgUseTimeScale.checked = (preset.useTimeScale !== undefined ? preset.useTimeScale : true);
+
+    tgRows = (preset.rows || []).map(r => ({
+      id: uid(),
+      milestone: String(r.milestone !== undefined ? r.milestone : ""),
+      caption: String(r.caption || ""),
+      shape: r.shape || "circle",
+      activity: String(r.activity || ""),
+      duration: String(r.duration !== undefined ? r.duration : ""),
+      showDatetime: (r.showDatetime !== undefined ? r.showDatetime : true)
+    }));
+
+    renderTgTable();
+    updateSavedTasksDropdown(key);
+
+    if (tgPresetNotice) {
+      tgPresetNotice.textContent = `✓ โหลด Task "${preset.name || key}" แล้ว (แก้ไข/เพิ่ม/ลดได้)`;
+      tgPresetNotice.style.color = "#16a34a";
+      setTimeout(() => { if (tgPresetNotice.textContent.includes("โหลด")) tgPresetNotice.textContent = ""; }, 4000);
+    }
+  }
 
   function escapeTgHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -6713,16 +6841,22 @@ input:checked + .slider:before {
   function initTgModal() {
     const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
     if (node0 && node0.datetimeDate && node0.datetimeTime) {
-      if (tgStartDate) tgStartDate.value = node0.datetimeDate;
-      if (tgStartTime) tgStartTime.value = node0.datetimeTime;
+      if (tgStartDate && !tgStartDate.value) tgStartDate.value = node0.datetimeDate;
+      if (tgStartTime && !tgStartTime.value) tgStartTime.value = node0.datetimeTime;
     } else {
       const now = new Date();
-      if (tgStartDate) tgStartDate.value = formatDateISO(now);
-      if (tgStartTime) tgStartTime.value = "08:00";
+      if (tgStartDate && !tgStartDate.value) tgStartDate.value = formatDateISO(now);
+      if (tgStartTime && !tgStartTime.value) tgStartTime.value = "08:00";
     }
 
+    updateSavedTasksDropdown();
+
     if (tgRows.length === 0) {
-      // Default initial sequence: 0, 5, 10, 25
+      const presets = getSavedTaskPresets();
+      if (presets["salegas"]) {
+        loadTaskPreset("salegas");
+        return;
+      }
       tgRows = [
         { id: uid(), milestone: "0", caption: "Reduce Feed Gas", shape: "circle", activity: "Warm up process", duration: "5", showDatetime: true },
         { id: uid(), milestone: "5", caption: "Warm up done", shape: "circle", activity: "Isolation / LOTO", duration: "5", showDatetime: true },
@@ -7043,6 +7177,87 @@ input:checked + .slider:before {
   }
   if (tgStartDate) tgStartDate.addEventListener("change", renderTgTable);
   if (tgStartTime) tgStartTime.addEventListener("change", renderTgTable);
+
+  if (tgSavedTasksSelect) {
+    tgSavedTasksSelect.addEventListener("change", (e) => {
+      loadTaskPreset(e.target.value);
+    });
+  }
+
+  if (tgBtnSaveTask) {
+    tgBtnSaveTask.addEventListener("click", () => {
+      syncTgRowsFromDOM();
+
+      if (tgRows.length === 0) {
+        alert("ไม่สามารถบันทึก Task ที่ไม่มีรายการกิจกรรมได้ กรุณาเพิ่มแถวก่อนบันทึก");
+        return;
+      }
+
+      let taskName = tgGroupName ? tgGroupName.value.trim() : "";
+      if (!taskName) {
+        const inputName = prompt("กรุณาตั้งชื่อ Task เพื่อบันทึกเก็บไว้:", "Task ใหม่");
+        if (!inputName || !inputName.trim()) return;
+        taskName = inputName.trim();
+        if (tgGroupName) tgGroupName.value = taskName;
+      }
+
+      const presets = getSavedTaskPresets();
+      if (presets[taskName]) {
+        if (!confirm(`มี Task ชื่อ "${taskName}" อยู่แล้ว ต้องการบันทึกทับ (Update) หรือไม่?`)) {
+          return;
+        }
+      }
+
+      presets[taskName] = {
+        name: taskName,
+        createBanner: tgCreateBanner ? tgCreateBanner.checked : true,
+        useTimeScale: tgUseTimeScale ? tgUseTimeScale.checked : true,
+        rows: tgRows.map(r => ({
+          milestone: r.milestone,
+          caption: r.caption,
+          shape: r.shape,
+          activity: r.activity,
+          duration: r.duration,
+          showDatetime: r.showDatetime
+        }))
+      };
+
+      saveTaskPresetsToStorage(presets);
+      updateSavedTasksDropdown(taskName);
+
+      if (tgPresetNotice) {
+        tgPresetNotice.textContent = `✓ บันทึก Task "${taskName}" สำเร็จ!`;
+        tgPresetNotice.style.color = "#16a34a";
+        setTimeout(() => { if (tgPresetNotice) tgPresetNotice.textContent = ""; }, 4000);
+      }
+
+      setStatus(`บันทึก Task Template "${taskName}" (${tgRows.length} โหนด) เรียบร้อยแล้ว`);
+    });
+  }
+
+  if (tgBtnDeleteTask) {
+    tgBtnDeleteTask.addEventListener("click", () => {
+      const select = document.getElementById("tgSavedTasksSelect");
+      const key = select ? select.value : "";
+      if (!key) {
+        alert("กรุณาเลือก Task ที่ต้องการลบจาก Dropdown ก่อน");
+        return;
+      }
+
+      if (!confirm(`ต้องการลบ Task "${key}" ออกจากรายการที่บันทึกหรือไม่?`)) return;
+
+      const presets = getSavedTaskPresets();
+      delete presets[key];
+      saveTaskPresetsToStorage(presets);
+      updateSavedTasksDropdown("");
+
+      if (tgPresetNotice) {
+        tgPresetNotice.textContent = `ลบ Task "${key}" เรียบร้อยแล้ว`;
+        tgPresetNotice.style.color = "#dc2626";
+        setTimeout(() => { if (tgPresetNotice) tgPresetNotice.textContent = ""; }, 3000);
+      }
+    });
+  }
 
   if (tgTableBody) {
     tgTableBody.addEventListener("input", (e) => {
