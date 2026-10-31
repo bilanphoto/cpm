@@ -1327,7 +1327,7 @@ input:checked + .slider:before {
 
         <div style="margin-top: 10px; font-size: 11.5px; color: #64748b; line-height: 1.5; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border-left: 3px solid #1769aa;">
           💡 <b>คำแนะนำ:</b> สามารถระบุเวลาของแต่ละโหนด (เช่น 0, 5, 10, 25...) หรือใส่ระยะเวลา (ชม.) แล้วกด <b>"⚡ คำนวณเวลาอัตโนมัติ"</b><br>
-          เมื่อกด <b>"สร้าง Task บน Canvas"</b> ทุกโหนดและเส้นเชื่อมจะถูกสร้างลงบนบอร์ด และ<b>ไฮไลท์เลือกทั้งหมดไว้ทันที</b> เพื่อให้สามารถคลิกลากย้ายทั้งกลุ่มไปวางจุดที่ต้องการได้ทันที
+          เมื่อกด <b>"✅ OK"</b> ทุกโหนดและเส้นเชื่อมจะถูกสร้างลงบนบอร์ด และ<b>ไฮไลท์เลือกทั้งหมดไว้ทันที</b> เพื่อให้สามารถคลิกลากย้ายทั้งกลุ่มไปวางจุดที่ต้องการได้ทันที
         </div>
       </div>
 
@@ -1337,7 +1337,7 @@ input:checked + .slider:before {
         <div style="display: flex; gap: 10px;">
           <button type="button" class="btn" id="tgBtnCancel" style="padding: 8px 16px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 6px; font-weight: 600; cursor: pointer;">ยกเลิก</button>
           <button type="button" class="btn primary" id="tgBtnGenerate" style="padding: 8px 22px; background: #16a34a; border: 1px solid #15803d; color: white; border-radius: 6px; font-weight: 700; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-            <span>✅ สร้าง Task บน Canvas (OK)</span>
+            <span>✅ OK</span>
           </button>
         </div>
       </div>
@@ -6617,6 +6617,7 @@ input:checked + .slider:before {
   const tgStatusMsg = document.getElementById("tgStatusMsg");
 
   let tgRows = [];
+  const tgFillDefaults = { circle: "#ffffff", hex: "#7fb56e", diamond: "#f6d34d", "circle-hex": "#ffffff" };
 
   function escapeTgHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -6760,169 +6761,198 @@ input:checked + .slider:before {
     renderTgTable();
   }
 
-  function generateTaskOnCanvas() {
-    if (tgRows.length === 0) {
-      alert("กรุณาเพิ่มกิจกรรมอย่างน้อย 1 รายการก่อนสร้าง");
-      return;
-    }
+  function syncTgRowsFromDOM() {
+    if (!tgTableBody) return;
+    const trs = tgTableBody.querySelectorAll("tr[data-index]");
+    trs.forEach(tr => {
+      const idx = parseInt(tr.dataset.index, 10);
+      if (isNaN(idx) || !tgRows[idx]) return;
+      const milestoneInput = tr.querySelector('[data-field="milestone"]');
+      const captionInput = tr.querySelector('[data-field="caption"]');
+      const shapeSelect = tr.querySelector('[data-field="shape"]');
+      const activityInput = tr.querySelector('[data-field="activity"]');
+      const durInput = tr.querySelector('[data-field="duration"]');
+      const dtCheck = tr.querySelector('[data-field="showDatetime"]');
 
-    const baseTime = getTgBaseDateTime();
-
-    // 1. Determine Y placement
-    let startY = 380;
-    if (state.nodes.length > 0) {
-      const maxY = Math.max(...state.nodes.map(n => n.y));
-      startY = maxY + 180;
-    }
-    if (startY + 150 > (state.canvasHeight || 1800)) {
-      state.canvasHeight = startY + 280;
-      const fH = document.getElementById("fCanvasHeight");
-      if (fH) fH.value = state.canvasHeight;
-      const svgC = document.getElementById("svgCanvas");
-      if (svgC) svgC.setAttribute("height", state.canvasHeight);
-    }
-
-    // 2. Determine X placement
-    const isTimeScale = tgUseTimeScale ? tgUseTimeScale.checked : true;
-    let originX = 200;
-    if (isTimeScale) {
-      const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
-      if (node0) {
-        originX = node0.x;
-      } else {
-        let minVal = 0;
-        state.nodes.forEach(n => {
-          const val = parseNumericLabel(n.label);
-          if (val !== null && val < minVal) minVal = val;
-        });
-        originX = minVal < 0 ? 200 - minVal * 40 : 200;
-      }
-    }
-
-    // 3. Create Nodes
-    const createdNodes = [];
-    const createdConnectors = [];
-    let createdBanner = null;
-
-    tgRows.forEach((row, i) => {
-      let nodeX;
-      const numHour = parseFloat(row.milestone);
-      if (isTimeScale && !isNaN(numHour)) {
-        nodeX = originX + (numHour * 40);
-      } else {
-        nodeX = originX + (i * 180);
-      }
-      if (nodeX < 120) nodeX = 120;
-
-      let nodeDtText = "";
-      let nodeDtDate = "";
-      let nodeDtTime = "";
-      if (baseTime && !isNaN(baseTime.getTime()) && !isNaN(numHour)) {
-        const nodeDt = new Date(baseTime.getTime() + numHour * 3600 * 1000);
-        nodeDtDate = formatDateISO(nodeDt);
-        nodeDtTime = formatTimeISO(nodeDt);
-        nodeDtText = formatNodeDateTimeText(nodeDt);
-      }
-
-      const nodeType = row.shape || "circle";
-      const node = {
-        id: uid(),
-        type: nodeType,
-        x: Math.round(nodeX),
-        y: Math.round(startY),
-        r: nodeType === "hex" ? 34 : 32,
-        fill: fillDefaults[nodeType] || "#ffffff",
-        label: String(row.milestone !== "" ? row.milestone : i),
-        sublabel: String(row.caption || ""),
-        datetime: row.showDatetime ? nodeDtText : "",
-        datetimeDate: nodeDtDate,
-        datetimeTime: nodeDtTime,
-        hideDateTime: !row.showDatetime,
-        autoDateTime: true,
-        completed: false
-      };
-
-      state.nodes.push(node);
-      createdNodes.push(node);
+      if (milestoneInput) tgRows[idx].milestone = milestoneInput.value;
+      if (captionInput) tgRows[idx].caption = captionInput.value;
+      if (shapeSelect) tgRows[idx].shape = shapeSelect.value;
+      if (activityInput) tgRows[idx].activity = activityInput.value;
+      if (durInput) tgRows[idx].duration = durInput.value;
+      if (dtCheck) tgRows[idx].showDatetime = dtCheck.checked;
     });
+  }
 
-    // Ensure canvas has enough width
-    const maxNodeX = Math.max(...createdNodes.map(n => n.x));
-    if (maxNodeX + 240 > (state.canvasWidth || 3000)) {
-      state.canvasWidth = maxNodeX + 360;
-      const fW = document.getElementById("fCanvasWidth");
-      if (fW) fW.value = state.canvasWidth;
-      const svgC = document.getElementById("svgCanvas");
-      if (svgC) svgC.setAttribute("width", state.canvasWidth);
+  function generateTaskOnCanvas() {
+    try {
+      syncTgRowsFromDOM();
+
+      if (tgRows.length === 0) {
+        alert("กรุณาเพิ่มกิจกรรมอย่างน้อย 1 รายการก่อนสร้าง");
+        return;
+      }
+
+      const baseTime = getTgBaseDateTime();
+
+      // 1. Determine Y placement
+      let startY = 380;
+      if (state.nodes && state.nodes.length > 0) {
+        const maxY = Math.max(...state.nodes.map(n => n.y));
+        startY = maxY + 180;
+      }
+      if (startY + 150 > (state.canvasHeight || 1800)) {
+        state.canvasHeight = startY + 280;
+        const fH = document.getElementById("fCanvasHeight");
+        if (fH) fH.value = state.canvasHeight;
+        const svgC = document.getElementById("svgCanvas");
+        if (svgC) svgC.setAttribute("height", state.canvasHeight);
+      }
+
+      // 2. Determine X placement
+      const isTimeScale = tgUseTimeScale ? tgUseTimeScale.checked : true;
+      let originX = 200;
+      if (isTimeScale && state.nodes) {
+        const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
+        if (node0) {
+          originX = node0.x;
+        } else {
+          let minVal = 0;
+          state.nodes.forEach(n => {
+            const val = parseNumericLabel(n.label);
+            if (val !== null && val < minVal) minVal = val;
+          });
+          originX = minVal < 0 ? 200 - minVal * 40 : 200;
+        }
+      }
+
+      // 3. Create Nodes
+      const createdNodes = [];
+      const createdConnectors = [];
+      let createdBanner = null;
+
+      tgRows.forEach((row, i) => {
+        let nodeX;
+        const numHour = parseFloat(row.milestone);
+        if (isTimeScale && !isNaN(numHour)) {
+          nodeX = originX + (numHour * 40);
+        } else {
+          nodeX = originX + (i * 180);
+        }
+        if (nodeX < 120) nodeX = 120;
+
+        let nodeDtText = "";
+        let nodeDtDate = "";
+        let nodeDtTime = "";
+        if (baseTime && !isNaN(baseTime.getTime()) && !isNaN(numHour)) {
+          const nodeDt = new Date(baseTime.getTime() + numHour * 3600 * 1000);
+          nodeDtDate = formatDateISO(nodeDt);
+          nodeDtTime = formatTimeISO(nodeDt);
+          nodeDtText = formatNodeDateTimeText(nodeDt);
+        }
+
+        const nodeType = row.shape || "circle";
+        const node = {
+          id: uid(),
+          type: nodeType,
+          x: Math.round(nodeX),
+          y: Math.round(startY),
+          r: nodeType === "hex" ? 34 : 32,
+          fill: tgFillDefaults[nodeType] || "#ffffff",
+          label: String(row.milestone !== "" && row.milestone !== undefined ? row.milestone : i),
+          sublabel: String(row.caption || ""),
+          datetime: row.showDatetime ? nodeDtText : "",
+          datetimeDate: nodeDtDate,
+          datetimeTime: nodeDtTime,
+          hideDateTime: !row.showDatetime,
+          autoDateTime: true,
+          completed: false
+        };
+
+        state.nodes.push(node);
+        createdNodes.push(node);
+      });
+
+      // Ensure canvas has enough width
+      const maxNodeX = Math.max(...createdNodes.map(n => n.x));
+      if (maxNodeX + 240 > (state.canvasWidth || 3000)) {
+        state.canvasWidth = maxNodeX + 360;
+        const fW = document.getElementById("fCanvasWidth");
+        if (fW) fW.value = state.canvasWidth;
+        const svgC = document.getElementById("svgCanvas");
+        if (svgC) svgC.setAttribute("width", state.canvasWidth);
+      }
+
+      // 4. Create Connectors between consecutive nodes
+      for (let i = 0; i < createdNodes.length - 1; i++) {
+        const row = tgRows[i];
+        const durRaw = row.duration ? String(row.duration).trim() : "";
+        const durStr = durRaw ? (durRaw.startsWith("(") && durRaw.endsWith(")") ? durRaw : `(${durRaw})`) : "";
+
+        const conn = {
+          id: uid(),
+          fromId: createdNodes[i].id,
+          toId: createdNodes[i + 1].id,
+          kind: "arrow",
+          color: "#c0392b",
+          dashed: false,
+          duration: durStr,
+          task: String(row.activity || "")
+        };
+
+        state.connectors.push(conn);
+        createdConnectors.push(conn);
+      }
+
+      // 5. Create Section Banner if requested
+      const groupTitle = tgGroupName ? tgGroupName.value.trim() : "";
+      if (tgCreateBanner && tgCreateBanner.checked && groupTitle && createdNodes.length > 0) {
+        const minX = Math.min(...createdNodes.map(n => n.x)) - 30;
+        const maxX = Math.max(...createdNodes.map(n => n.x)) + 30;
+        const banner = {
+          id: uid(),
+          type: "banner",
+          x: Math.max(20, minX),
+          y: Math.max(20, startY - 88),
+          w: Math.max(280, maxX - minX),
+          h: 42,
+          text: groupTitle,
+          color: "blue",
+          textColor: "white",
+          fontSize: 16,
+          bold: true
+        };
+        state.annotations.push(banner);
+        createdBanner = banner;
+      }
+
+      // 6. SELECT ALL CREATED ELEMENTS (KEY USER REQUIREMENT!)
+      selection = [];
+      createdNodes.forEach(n => selection.push({ kind: "node", id: n.id }));
+      createdConnectors.forEach(c => selection.push({ kind: "connector", id: c.id }));
+      if (createdBanner) selection.push({ kind: "annotation", id: createdBanner.id });
+
+      // 7. Recalculate, Render & Commit
+      recalculateDiagramTimes();
+      renderAll();
+      updateInspector();
+      updateCopyPasteBtns();
+      pushHistory();
+      commit();
+
+      // 8. Close Modal & scroll into view
+      taskGenModal.style.display = "none";
+
+      if (canvasWrap) {
+        canvasWrap.scrollTop = Math.max(0, startY - 260);
+        const minNodeX = createdNodes[0]?.x || 200;
+        canvasWrap.scrollLeft = Math.max(0, minNodeX - 160);
+      }
+
+      setStatus(`สร้างชุด Task เรียบร้อย (${createdNodes.length} โหนด) — เลือกทุกชิ้นแล้ว พร้อมคลิกลากย้ายได้ทันที`);
+    } catch(err) {
+      console.error("Task Generator Error:", err);
+      alert("เกิดข้อผิดพลาดในการสร้าง Task: " + err.message);
     }
-
-    // 4. Create Connectors between consecutive nodes
-    for (let i = 0; i < createdNodes.length - 1; i++) {
-      const row = tgRows[i];
-      const durRaw = row.duration ? String(row.duration).trim() : "";
-      const durStr = durRaw ? (durRaw.startsWith("(") && durRaw.endsWith(")") ? durRaw : `(${durRaw})`) : "";
-
-      const conn = {
-        id: uid(),
-        fromId: createdNodes[i].id,
-        toId: createdNodes[i + 1].id,
-        kind: "arrow",
-        color: "#c0392b",
-        dashed: false,
-        duration: durStr,
-        task: String(row.activity || "")
-      };
-
-      state.connectors.push(conn);
-      createdConnectors.push(conn);
-    }
-
-    // 5. Create Section Banner if requested
-    const groupTitle = tgGroupName ? tgGroupName.value.trim() : "";
-    if (tgCreateBanner && tgCreateBanner.checked && groupTitle && createdNodes.length > 0) {
-      const minX = Math.min(...createdNodes.map(n => n.x)) - 30;
-      const maxX = Math.max(...createdNodes.map(n => n.x)) + 30;
-      const banner = {
-        id: uid(),
-        type: "banner",
-        x: Math.max(20, minX),
-        y: Math.max(20, startY - 88),
-        w: Math.max(280, maxX - minX),
-        h: 42,
-        text: groupTitle,
-        color: "blue",
-        textColor: "white",
-        fontSize: 16,
-        bold: true
-      };
-      state.annotations.push(banner);
-      createdBanner = banner;
-    }
-
-    // 6. SELECT ALL CREATED ELEMENTS (KEY USER REQUIREMENT!)
-    selection = [];
-    createdNodes.forEach(n => selection.push({ kind: "node", id: n.id }));
-    createdConnectors.forEach(c => selection.push({ kind: "connector", id: c.id }));
-    if (createdBanner) selection.push({ kind: "annotation", id: createdBanner.id });
-
-    // 7. Recalculate, Render & Commit
-    recalculateDiagramTimes();
-    renderAll();
-    updateInspector();
-    updateCopyPasteBtns();
-    pushHistory();
-    commit();
-
-    // 8. Close Modal & scroll into view
-    taskGenModal.style.display = "none";
-
-    if (canvasWrap) {
-      canvasWrap.scrollTop = Math.max(0, startY - 260);
-      const minNodeX = createdNodes[0]?.x || 200;
-      canvasWrap.scrollLeft = Math.max(0, minNodeX - 160);
-    }
-
-    setStatus(`สร้างชุด Task เรียบร้อย (${createdNodes.length} โหนด) — เลือกทุกชิ้นแล้ว พร้อมคลิกลากย้ายได้ทันที`);
   }
 
   // Open modal handlers
