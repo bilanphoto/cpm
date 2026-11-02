@@ -402,11 +402,14 @@ html,body{
 .cpm-connector.selected .cpm-connector-line{ stroke:var(--amber) !important; }
 .cpm-connector-task{
   font-family:var(--font-body); font-weight:600; font-size:13.5px;
-  text-anchor:middle; dominant-baseline:central; fill:#15202b; pointer-events:none; user-select:none;
+  text-anchor:middle; dominant-baseline:central; fill:#15202b; pointer-events:auto; cursor:move; user-select:none;
 }
 .cpm-connector-duration{
   font-family:var(--font-mono); font-weight:600; font-size:13.5px;
-  text-anchor:middle; dominant-baseline:central; fill:#1d4ed8; pointer-events:none; user-select:none;
+  text-anchor:middle; dominant-baseline:central; fill:#1d4ed8; pointer-events:auto; cursor:move; user-select:none;
+}
+.cpm-connector-task-group{
+  pointer-events:auto; cursor:move;
 }
 
 /* annotation visuals */
@@ -969,6 +972,7 @@ input:checked + .slider:before {
           <g id="layerConnectors"></g>
           <g id="layerNodes"></g>
           <g id="layerAnnotations"></g>
+          <g id="layerLeaderLines" style="pointer-events:none;"></g>
           <g id="layerOverlay"></g>
         </svg>
       </div>
@@ -1070,6 +1074,9 @@ input:checked + .slider:before {
             </div>
           </div>
         </div>
+        <div class="field" data-field="noderesettext" style="display:none; margin-top:-2px; margin-bottom:8px;">
+          <button type="button" id="btnResetNodeTextOffset" style="width:100%; padding:4px 8px; font-size:11px; background:rgba(37,99,235,0.12); color:#60a5fa; border:1px solid rgba(37,99,235,0.3); border-radius:var(--radius-sm); cursor:pointer;">⟲ คืนตำแหน่งข้อความเดิม (Reset text position)</button>
+        </div>
         <div class="field two-col" data-field="fillrow">
           <div>
             <label>Fill color</label>
@@ -1112,6 +1119,9 @@ input:checked + .slider:before {
         <div class="field" data-field="task">
           <label>Task text (above line)</label>
           <input type="text" id="fTask">
+        </div>
+        <div class="field" data-field="connresettext" style="display:none; margin-top:-2px; margin-bottom:8px;">
+          <button type="button" id="btnResetConnTextOffset" style="width:100%; padding:4px 8px; font-size:11px; background:rgba(37,99,235,0.12); color:#60a5fa; border:1px solid rgba(37,99,235,0.3); border-radius:var(--radius-sm); cursor:pointer;">⟲ คืนตำแหน่งข้อความเดิม (Reset text position)</button>
         </div>
         <div class="field" data-field="connswatches">
           <label>Quick color</label>
@@ -1551,6 +1561,7 @@ input:checked + .slider:before {
   const layerConnectors = $("#layerConnectors");
   const layerNodes = $("#layerNodes");
   const layerAnnotations = $("#layerAnnotations");
+  const layerLeaderLines = $("#layerLeaderLines");
   const layerOverlay = $("#layerOverlay");
   const elCount = $("#elCount");
   const statusLeft = $("#statusLeft");
@@ -2276,11 +2287,22 @@ input:checked + .slider:before {
           e.stopPropagation();
           const isDbl = checkManualDoubleClick("node", n.id);
           if(isDbl){
+            clearLeaderLine();
             selectElement("node", n.id);
             editNodeLabelInline(n);
             return;
           }
           startNodeTextDrag(e, n, "sublabel");
+        });
+        sub.addEventListener("mouseenter", () => {
+          if(!drag && (n.sublabelOffsetX || n.sublabelOffsetY)){
+            updateNodeTextLeaderLine(n, "sublabel");
+          }
+        });
+        sub.addEventListener("mouseleave", () => {
+          if(!drag){
+            clearLeaderLine();
+          }
         });
         g.appendChild(sub);
       }
@@ -2295,11 +2317,22 @@ input:checked + .slider:before {
             e.stopPropagation();
             const isDbl = checkManualDoubleClick("node", n.id);
             if(isDbl){
+              clearLeaderLine();
               selectElement("node", n.id);
               editNodeLabelInline(n);
               return;
             }
             startNodeTextDrag(e, n, "datetime");
+          });
+          dt.addEventListener("mouseenter", () => {
+            if(!drag && (n.datetimeOffsetX || n.datetimeOffsetY)){
+              updateNodeTextLeaderLine(n, "datetime");
+            }
+          });
+          dt.addEventListener("mouseleave", () => {
+            if(!drag){
+              clearLeaderLine();
+            }
           });
           g.appendChild(dt);
         });
@@ -2328,6 +2361,109 @@ input:checked + .slider:before {
       pts.push([r*Math.cos(ang), r*Math.sin(ang)]);
     }
     return pts.map(p=>p.join(",")).join(" ");
+  }
+
+  // ---------------------------------------------------------
+  // Dashed Leader Lines (สำหรับโยงเส้นประระหว่างข้อความกับโหนดหรือเส้นเชื่อม)
+  // ---------------------------------------------------------
+  function textEdgePoint(cx, cy, halfW, halfH, targetX, targetY){
+    const dx = targetX - cx;
+    const dy = targetY - cy;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return { x: cx, y: cy };
+    const scaleX = halfW > 0 ? Math.abs(dx) / halfW : 0;
+    const scaleY = halfH > 0 ? Math.abs(dy) / halfH : 0;
+    const maxScale = Math.max(scaleX, scaleY);
+    if (maxScale < 0.001) return { x: cx, y: cy };
+    return {
+      x: cx + dx / maxScale,
+      y: cy + dy / maxScale
+    };
+  }
+
+  function clearLeaderLine(){
+    if(layerLeaderLines) layerLeaderLines.innerHTML = "";
+  }
+
+  function drawLeaderLine(x1, y1, x2, y2, color = "#2563eb"){
+    if(!layerLeaderLines) return;
+    layerLeaderLines.innerHTML = "";
+    if(isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return;
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    if(dist < 8) return;
+
+    const line = svgElCreate("line", {
+      x1: x1,
+      y1: y1,
+      x2: x2,
+      y2: y2,
+      stroke: color,
+      "stroke-width": 1.6,
+      "stroke-dasharray": "4 3",
+      opacity: "0.85"
+    });
+    const dot1 = svgElCreate("circle", { cx: x1, cy: y1, r: 2.5, fill: color, opacity: "0.9" });
+    const dot2 = svgElCreate("circle", { cx: x2, cy: y2, r: 2.5, fill: color, opacity: "0.9" });
+    layerLeaderLines.appendChild(line);
+    layerLeaderLines.appendChild(dot1);
+    layerLeaderLines.appendChild(dot2);
+  }
+
+  function updateNodeTextLeaderLine(n, textKind){
+    if(!n) return;
+    const r = n.r || 32;
+    let textX, textY, halfW = 40, halfH = 10, color = "#2563eb";
+    if(textKind === "sublabel"){
+      const ox = n.sublabelOffsetX || 0;
+      const oy = n.sublabelOffsetY || 0;
+      textX = n.x + ox;
+      textY = n.y - (r + 14) + oy;
+      halfW = Math.max(20, ((n.sublabel || "").length * 7.5) / 2);
+      halfH = 9;
+      color = n.sublabelColor || "#1c2530";
+    } else {
+      const ox = n.datetimeOffsetX || 0;
+      const oy = n.datetimeOffsetY || 0;
+      const lines = (n.datetime || "").split("\\n");
+      const totalH = (lines.length - 1) * 16;
+      let maxLen = 0;
+      lines.forEach(l => { if (l.length > maxLen) maxLen = l.length; });
+      textX = n.x + ox;
+      textY = n.y + r + 22 + (totalH / 2) + oy;
+      halfW = Math.max(25, (maxLen * 7.5) / 2);
+      halfH = Math.max(10, (lines.length * 16) / 2);
+      color = n.datetimeColor || "#1d4ed8";
+    }
+    const anchor = nodeAnchorPoint(n, textX, textY);
+    const edge = textEdgePoint(textX, textY, halfW, halfH, anchor.x, anchor.y);
+    drawLeaderLine(edge.x, edge.y, anchor.x, anchor.y, color);
+  }
+
+  function updateConnectorTextLeaderLine(c, textKind){
+    if(!c) return;
+    const mid = connectorMidpoint(c);
+    if(!mid) return;
+    let textX, textY, halfW = 40, halfH = 10;
+    const color = c.color || "#c0392b";
+    if(textKind === "task"){
+      const tox = c.taskOffsetX || 0;
+      const toy = c.taskOffsetY || 0;
+      const taskLines = (c.task || "").split("\n");
+      let maxLen = 0;
+      taskLines.forEach(l => { if (l.length > maxLen) maxLen = l.length; });
+      textX = mid.x + tox;
+      textY = mid.y - 18 - ((taskLines.length - 1) * 8) + toy;
+      halfW = Math.max(25, (maxLen * 7.5) / 2);
+      halfH = Math.max(10, (taskLines.length * 16) / 2);
+    } else {
+      const dox = c.durationOffsetX || 0;
+      const doy = c.durationOffsetY || 0;
+      textX = mid.x + dox;
+      textY = mid.y + 22 + doy;
+      halfW = Math.max(16, ((c.duration || "").length * 8) / 2);
+      halfH = 10;
+    }
+    const edge = textEdgePoint(textX, textY, halfW, halfH, mid.x, mid.y);
+    drawLeaderLine(edge.x, edge.y, mid.x, mid.y, color);
   }
 
   // ---------------------------------------------------------
@@ -2622,18 +2758,68 @@ input:checked + .slider:before {
       g.appendChild(line);
 
       const midx = path.mid.x, midy = path.mid.y;
+      c._midx = midx;
+      c._midy = midy;
 
       if(c.task){
+        const tox = c.taskOffsetX || 0;
+        const toy = c.taskOffsetY || 0;
         const taskLines = c.task.split("\n");
+        const taskG = svgElCreate("g", {class:"cpm-connector-task-group"});
         taskLines.forEach((ln,i)=>{
-          const t = svgElCreate("text", {class:"cpm-connector-task", x:midx, y:midy-18-( (taskLines.length-1-i)*16 ), "text-anchor":"middle", "dominant-baseline":"central"});
+          const t = svgElCreate("text", {class:"cpm-connector-task", x:midx + tox, y:midy - 18 - ((taskLines.length-1-i)*16) + toy, "text-anchor":"middle", "dominant-baseline":"central"});
           t.textContent = ln;
-          g.appendChild(t);
+          taskG.appendChild(t);
         });
+        taskG.addEventListener("mousedown", (e)=>{
+          e.stopPropagation();
+          const isDbl = checkManualDoubleClick("connector", c.id);
+          if(isDbl){
+            clearLeaderLine();
+            selectElement("connector", c.id);
+            editConnectorInline(c, midx, midy);
+            return;
+          }
+          startConnectorTextDrag(e, c, "task");
+        });
+        taskG.addEventListener("mouseenter", ()=>{
+          if(!drag && (c.taskOffsetX || c.taskOffsetY)){
+            updateConnectorTextLeaderLine(c, "task");
+          }
+        });
+        taskG.addEventListener("mouseleave", ()=>{
+          if(!drag){
+            clearLeaderLine();
+          }
+        });
+        g.appendChild(taskG);
       }
       if(c.duration){
-        const d = svgElCreate("text", {class:"cpm-connector-duration", x:midx, y:midy+22, "text-anchor":"middle", "dominant-baseline":"central"});
+        const dox = c.durationOffsetX || 0;
+        const doy = c.durationOffsetY || 0;
+        const d = svgElCreate("text", {class:"cpm-connector-duration", x:midx + dox, y:midy + 22 + doy, "text-anchor":"middle", "dominant-baseline":"central"});
         d.textContent = c.duration;
+        d.addEventListener("mousedown", (e)=>{
+          e.stopPropagation();
+          const isDbl = checkManualDoubleClick("connector", c.id);
+          if(isDbl){
+            clearLeaderLine();
+            selectElement("connector", c.id);
+            editConnectorInline(c, midx, midy);
+            return;
+          }
+          startConnectorTextDrag(e, c, "duration");
+        });
+        d.addEventListener("mouseenter", ()=>{
+          if(!drag && (c.durationOffsetX || c.durationOffsetY)){
+            updateConnectorTextLeaderLine(c, "duration");
+          }
+        });
+        d.addEventListener("mouseleave", ()=>{
+          if(!drag){
+            clearLeaderLine();
+          }
+        });
         g.appendChild(d);
       }
 
@@ -3183,6 +3369,7 @@ input:checked + .slider:before {
     updateInspector();
   }
   function deselectAll(){
+    clearLeaderLine();
     consecutivePasteCount = 1;
     selection = [];
     renderAll();
@@ -3206,6 +3393,7 @@ input:checked + .slider:before {
   // Node interaction: move / connect / erase
   // ---------------------------------------------------------
   function onNodeMouseDown(e, node){
+    clearLeaderLine();
     e.stopPropagation();
     if(currentTool === "erase"){ deleteNode(node.id); return; }
     if(currentTool === "connector" || currentTool === "connector-left" || currentTool === "connector-line"){
@@ -3253,6 +3441,7 @@ input:checked + .slider:before {
   }
 
   function onConnectorMouseDown(e, c){
+    clearLeaderLine();
     e.stopPropagation();
     if(currentTool === "erase"){ deleteConnector(c.id); return; }
     if(currentTool.startsWith("node-")){
@@ -3347,6 +3536,25 @@ input:checked + .slider:before {
       origOffsetX: textKind === "sublabel" ? (n.sublabelOffsetX || 0) : (n.datetimeOffsetX || 0),
       origOffsetY: textKind === "sublabel" ? (n.sublabelOffsetY || 0) : (n.datetimeOffsetY || 0)
     };
+    updateNodeTextLeaderLine(n, textKind);
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+  }
+
+  function startConnectorTextDrag(e, c, textKind){
+    if (currentTool !== "select") return;
+    selectElement("connector", c.id);
+    const start = getCanvasPoint(e);
+    drag = {
+      type: "connector-text",
+      id: c.id,
+      textKind: textKind,
+      startX: start.x,
+      startY: start.y,
+      origOffsetX: textKind === "task" ? (c.taskOffsetX || 0) : (c.durationOffsetX || 0),
+      origOffsetY: textKind === "task" ? (c.taskOffsetY || 0) : (c.durationOffsetY || 0)
+    };
+    updateConnectorTextLeaderLine(c, textKind);
     window.addEventListener("mousemove", onWindowMouseMove);
     window.addEventListener("mouseup", onWindowMouseUp);
   }
@@ -3431,6 +3639,20 @@ input:checked + .slider:before {
           n.datetimeOffsetY = drag.origOffsetY + dy;
         }
         renderAll();
+        updateNodeTextLeaderLine(n, drag.textKind);
+      }
+    } else if(drag.type === "connector-text"){
+      const c = findConnector(drag.id);
+      if(c){
+        if (drag.textKind === "task") {
+          c.taskOffsetX = drag.origOffsetX + dx;
+          c.taskOffsetY = drag.origOffsetY + dy;
+        } else {
+          c.durationOffsetX = drag.origOffsetX + dx;
+          c.durationOffsetY = drag.origOffsetY + dy;
+        }
+        renderAll();
+        updateConnectorTextLeaderLine(c, drag.textKind);
       }
     } else if(drag.type === "delay-badge"){
       const dy = pt.y - drag.startY;
@@ -3530,7 +3752,7 @@ input:checked + .slider:before {
       }
       return;
     }
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
+    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "connector-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
       commit();
       if(drag.type === "delay-badge"){
         setStatus("Delay badge position updated");
@@ -3540,6 +3762,19 @@ input:checked + .slider:before {
     drag = null;
     window.removeEventListener("mousemove", onWindowMouseMove);
     window.removeEventListener("mouseup", onWindowMouseUp);
+
+    // If mouse is not hovering over a movable text element, clear leader line
+    const hoveredEl = e ? document.elementFromPoint(e.clientX, e.clientY) : null;
+    const isOverText = hoveredEl && (
+      hoveredEl.classList?.contains("cpm-node-sublabel") ||
+      hoveredEl.classList?.contains("cpm-node-datetime") ||
+      hoveredEl.closest?.(".cpm-connector-task-group") ||
+      hoveredEl.classList?.contains("cpm-connector-task") ||
+      hoveredEl.classList?.contains("cpm-connector-duration")
+    );
+    if (!isOverText) {
+      clearLeaderLine();
+    }
 
     // Apply any remote state update that was queued during drag
     if(wasDragging && typeof remoteUpdatePending === "string") {
@@ -4731,11 +4966,13 @@ input:checked + .slider:before {
     locktime: document.querySelector('[data-field="locktime"]'),
     sublabel: document.querySelector('[data-field="sublabel"]'),
     datetime: document.querySelector('[data-field="datetime"]'),
+    noderesettext: document.querySelector('[data-field="noderesettext"]'),
     fillrow: document.querySelector('[data-field="fillrow"]'),
     nodecompletion: document.querySelector('[data-field="nodecompletion"]'),
     duration: document.querySelector('[data-field="duration"]'),
     lockduration: document.querySelector('[data-field="lockduration"]'),
     task: document.querySelector('[data-field="task"]'),
+    connresettext: document.querySelector('[data-field="connresettext"]'),
     connswatches: document.querySelector('[data-field="connswatches"]'),
     connarrow: document.querySelector('[data-field="connarrow"]'),
     conntracking: document.querySelector('[data-field="conntracking"]'),
@@ -4840,6 +5077,10 @@ input:checked + .slider:before {
       $("#fDtFontSize").value = n.datetimeFontSize || 12;
       $("#fDtBold").checked = !!n.datetimeBold;
 
+      if((n.sublabelOffsetX && n.sublabelOffsetX !== 0) || (n.sublabelOffsetY && n.sublabelOffsetY !== 0) || (n.datetimeOffsetX && n.datetimeOffsetX !== 0) || (n.datetimeOffsetY && n.datetimeOffsetY !== 0)){
+        show(fieldEls.noderesettext);
+      }
+
       show(fieldEls.fillrow);
       $("#fFill").value = n.fill || "#ffffff";
       $("#fSize").value = n.r || 32;
@@ -4867,6 +5108,9 @@ input:checked + .slider:before {
       if(!c) return;
       panelTitle.textContent = "Connector";
       show(fieldEls.task); $("#fTask").value = c.task || "";
+      if((c.taskOffsetX && c.taskOffsetX !== 0) || (c.taskOffsetY && c.taskOffsetY !== 0) || (c.durationOffsetX && c.durationOffsetX !== 0) || (c.durationOffsetY && c.durationOffsetY !== 0)){
+        show(fieldEls.connresettext);
+      }
       show(fieldEls.duration);
       $("#fDuration").value = c.duration || "";
       $("#fDurationUnit").value = c.durationUnit || "hours";
@@ -5120,6 +5364,42 @@ input:checked + .slider:before {
     renderAll();
     commit();
   });
+
+  if ($("#btnResetNodeTextOffset")) {
+    $("#btnResetNodeTextOffset").addEventListener("click", () => {
+      const sel = currentSingle();
+      if (!sel || sel.kind !== "node") return;
+      const n = findNode(sel.id);
+      if (!n) return;
+      n.sublabelOffsetX = 0;
+      n.sublabelOffsetY = 0;
+      n.datetimeOffsetX = 0;
+      n.datetimeOffsetY = 0;
+      clearLeaderLine();
+      renderAll();
+      updateInspector();
+      commit();
+      setStatus("คืนค่าตำแหน่งข้อความโหนดเดิมเรียบร้อยแล้ว");
+    });
+  }
+
+  if ($("#btnResetConnTextOffset")) {
+    $("#btnResetConnTextOffset").addEventListener("click", () => {
+      const sel = currentSingle();
+      if (!sel || sel.kind !== "connector") return;
+      const c = findConnector(sel.id);
+      if (!c) return;
+      c.taskOffsetX = 0;
+      c.taskOffsetY = 0;
+      c.durationOffsetX = 0;
+      c.durationOffsetY = 0;
+      clearLeaderLine();
+      renderAll();
+      updateInspector();
+      commit();
+      setStatus("คืนค่าตำแหน่งข้อความเส้นเชื่อมเดิมเรียบร้อยแล้ว");
+    });
+  }
 
   bindLive("#fFill", ()=>{ findNode(currentSingle().id).fill = $("#fFill").value; });
   bindLive("#fLabelColor", ()=>{ findNode(currentSingle().id).labelColor = $("#fLabelColor").value; });
@@ -6459,10 +6739,14 @@ input:checked + .slider:before {
       const textLines = [n.sublabel||"", ...(n.datetime? n.datetime.split("\\n") : [])];
       const longest = textLines.reduce((m,t)=> Math.max(m, t.length), 0);
       const textHalfWidth = Math.max(n.r, longest * 4.4);
-      minX = Math.min(minX, n.x - textHalfWidth - 20);
-      minY = Math.min(minY, n.y - n.r - 40);
-      maxX = Math.max(maxX, n.x + textHalfWidth + 20);
-      maxY = Math.max(maxY, n.y + n.r + 50);
+      const sox = n.sublabelOffsetX || 0;
+      const soy = n.sublabelOffsetY || 0;
+      const dox = n.datetimeOffsetX || 0;
+      const doy = n.datetimeOffsetY || 0;
+      minX = Math.min(minX, n.x - textHalfWidth - 20, n.x + sox - textHalfWidth - 10, n.x + dox - textHalfWidth - 10);
+      minY = Math.min(minY, n.y - n.r - 40, n.y - n.r - 14 + soy - 20);
+      maxX = Math.max(maxX, n.x + textHalfWidth + 20, n.x + sox + textHalfWidth + 10, n.x + dox + textHalfWidth + 10);
+      maxY = Math.max(maxY, n.y + n.r + 50, n.y + n.r + 22 + doy + 40);
     });
     state.annotations.forEach(a=>{
       minX = Math.min(minX, a.x - 10);
@@ -6477,6 +6761,15 @@ input:checked + .slider:before {
         minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
         minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
       });
+      const mid = connectorMidpoint(c);
+      if(mid){
+        const tox = c.taskOffsetX || 0, toy = c.taskOffsetY || 0;
+        const dox = c.durationOffsetX || 0, doy = c.durationOffsetY || 0;
+        minX = Math.min(minX, mid.x + tox - 40, mid.x + dox - 20);
+        maxX = Math.max(maxX, mid.x + tox + 40, mid.x + dox + 20);
+        minY = Math.min(minY, mid.y - 18 + toy - 10, mid.y + 22 + doy - 10);
+        maxY = Math.max(maxY, mid.y - 18 + toy + 10, mid.y + 22 + doy + 10);
+      }
     });
     if(state.autoDelayBadgeY !== undefined){
       minY = Math.min(minY, state.autoDelayBadgeY - 20);
@@ -6539,6 +6832,7 @@ input:checked + .slider:before {
     clone.querySelectorAll(".connect-handle-connector").forEach(h=>h.remove());
     clone.querySelectorAll(".cpm-resize-handle, .cpm-resize-grip-line").forEach(h=>h.remove());
     clone.querySelectorAll(".selected").forEach(elm=>elm.classList.remove("selected"));
+    clone.querySelector("#layerLeaderLines")?.remove();
 
     // Helper to wrap text lines to fit within a given pixel width for SVG <text> export
     const measureCanvas = document.createElement("canvas");
