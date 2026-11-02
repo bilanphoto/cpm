@@ -1406,15 +1406,21 @@ input:checked + .slider:before {
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
           <!-- Saved Task Preset Bar -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <label style="font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; margin: 0; display: flex; align-items: center; gap: 4px;">
                 <span>📁 Task ที่บันทึกไว้:</span>
               </label>
-              <select id="tgSavedTasksSelect" style="flex: 1; max-width: 320px; padding: 6px 10px; font-size: 12.5px; border: 1px solid #94a3b8; border-radius: 5px; background: white; color: #1e293b; font-weight: 600; cursor: pointer;">
-                <option value="">-- เลือก Task / Template --</option>
+              <select id="tgSavedTasksSelect" style="min-width: 200px; max-width: 280px; padding: 6px 10px; font-size: 12.5px; border: 1px solid #94a3b8; border-radius: 5px; background: white; color: #1e293b; font-weight: 600; cursor: pointer;">
+                <option value="">-- เลือก Task ที่บันทึกไว้ --</option>
               </select>
-              <button type="button" class="btn" id="tgBtnSaveTask" style="background: #0284c7; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="บันทึก Task และรายการโหนดปัจจุบันเก็บไว้ใช้งานซ้ำ">
-                <span>💾 บันทึก Task</span>
+              <button type="button" class="btn" id="tgBtnNewTask" style="background: #10b981; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="สร้างชุด Task ใหม่ ล้างฟอร์มเพื่อกรอกข้อมูลชุดใหม่">
+                <span>＋ สร้าง Task ใหม่</span>
+              </button>
+              <button type="button" class="btn" id="tgBtnSaveTask" style="background: #0284c7; color: white; border: none; padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="บันทึกการแก้ไขลงใน Task เดิมนี้">
+                <span id="tgBtnSaveTaskText">💾 บันทึกแก้ไข Task เดิม</span>
+              </button>
+              <button type="button" class="btn ghost" id="tgBtnSaveAsNewTask" style="border: 1px solid #0284c7; color: #0284c7; background: #f0f9ff; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer;" title="บันทึกข้อมูลปัจจุบันเป็น Task ชุดใหม่">
+                <span>💾 บันทึกเป็น Task ใหม่</span>
               </button>
               <button type="button" class="btn ghost" id="tgBtnDeleteTask" style="border: 1px solid #fecaca; color: #dc2626; padding: 6px 10px; font-size: 12px; border-radius: 5px; cursor: pointer; background: #fff5f5;" title="ลบ Task ที่เลือกออกจากรายการบันทึก">
                 <span>🗑 ลบ</span>
@@ -1499,12 +1505,15 @@ input:checked + .slider:before {
       </div>
 
       <!-- Modal Footer -->
-      <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+      <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <div id="tgStatusMsg" style="font-size: 12px; color: #64748b;"></div>
-        <div style="display: flex; gap: 10px;">
-          <button type="button" class="btn" id="tgBtnCancel" style="padding: 8px 16px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 6px; font-weight: 600; cursor: pointer;">ยกเลิก</button>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button type="button" class="btn" id="tgBtnCancel" style="padding: 8px 16px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 6px; font-weight: 600; cursor: pointer;">ปิดหน้าต่าง</button>
+          <button type="button" class="btn ghost" id="tgBtnSaveOnly" style="padding: 8px 16px; border: 1px solid #0284c7; background: #f0f9ff; color: #0284c7; border-radius: 6px; font-weight: 700; font-size: 13px; cursor: pointer;" title="บันทึกการแก้ไข Task เก็บไว้ โดยไม่ต้องสร้างลงบนบอร์ด">
+            <span>💾 บันทึก Task (ไม่วางบนบอร์ด)</span>
+          </button>
           <button type="button" class="btn primary" id="tgBtnGenerate" style="padding: 8px 22px; background: #16a34a; border: 1px solid #15803d; color: white; border-radius: 6px; font-weight: 700; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-            <span>✅ OK</span>
+            <span>✅ OK (สร้าง/อัปเดตบน Canvas)</span>
           </button>
         </div>
       </div>
@@ -7113,11 +7122,16 @@ input:checked + .slider:before {
   const tgUseTimeScale = document.getElementById("tgUseTimeScale");
   const tgStatusMsg = document.getElementById("tgStatusMsg");
   const tgSavedTasksSelect = document.getElementById("tgSavedTasksSelect");
+  const tgBtnNewTask = document.getElementById("tgBtnNewTask");
   const tgBtnSaveTask = document.getElementById("tgBtnSaveTask");
+  const tgBtnSaveTaskText = document.getElementById("tgBtnSaveTaskText");
+  const tgBtnSaveAsNewTask = document.getElementById("tgBtnSaveAsNewTask");
+  const tgBtnSaveOnly = document.getElementById("tgBtnSaveOnly");
   const tgBtnDeleteTask = document.getElementById("tgBtnDeleteTask");
   const tgPresetNotice = document.getElementById("tgPresetNotice");
 
   let tgRows = [];
+  let currentEditingPresetKey = "";
   const tgFillDefaults = { circle: "#ffffff", hex: "#7fb56e", diamond: "#f6d34d", "circle-hex": "#ffffff" };
 
   const DEFAULT_TASK_PRESETS = {
@@ -7195,11 +7209,28 @@ input:checked + .slider:before {
     tgSavedTasksSelect.innerHTML = html;
   }
 
+  function updateSaveButtonLabels() {
+    if (tgBtnSaveTaskText) {
+      if (currentEditingPresetKey) {
+        tgBtnSaveTaskText.textContent = `💾 บันทึกแก้ไข "${currentEditingPresetKey}"`;
+      } else {
+        tgBtnSaveTaskText.textContent = "💾 บันทึก Task";
+      }
+    }
+  }
+
   function loadTaskPreset(key) {
-    if (!key) return;
+    if (!key) {
+      currentEditingPresetKey = "";
+      updateSaveButtonLabels();
+      return;
+    }
     const presets = getSavedTaskPresets();
     const preset = presets[key];
     if (!preset) return;
+
+    currentEditingPresetKey = key;
+    updateSaveButtonLabels();
 
     if (tgGroupName) tgGroupName.value = preset.name || key;
     if (tgCreateBanner) tgCreateBanner.checked = !!preset.createBanner;
@@ -7219,10 +7250,37 @@ input:checked + .slider:before {
     updateSavedTasksDropdown(key);
 
     if (tgPresetNotice) {
-      tgPresetNotice.textContent = `✓ โหลด Task "${preset.name || key}" แล้ว (แก้ไข/เพิ่ม/ลดได้)`;
+      tgPresetNotice.textContent = `✓ กำลังเปิดแก้ไข: "${preset.name || key}" (แก้ไขแล้วกด "💾 บันทึกแก้ไข" ได้ทันที)`;
       tgPresetNotice.style.color = "#16a34a";
-      setTimeout(() => { if (tgPresetNotice.textContent.includes("โหลด")) tgPresetNotice.textContent = ""; }, 4000);
+      setTimeout(() => { if (tgPresetNotice && tgPresetNotice.textContent.includes("กำลังเปิดแก้ไข")) tgPresetNotice.textContent = ""; }, 5000);
     }
+  }
+
+  function createNewTaskForm() {
+    currentEditingPresetKey = "";
+    if (tgSavedTasksSelect) tgSavedTasksSelect.value = "";
+    if (tgGroupName) {
+      tgGroupName.value = "";
+      tgGroupName.placeholder = "ตั้งชื่อ Task ใหม่ เช่น Piping, Electrical, Compressor";
+      tgGroupName.focus();
+    }
+    if (tgCreateBanner) tgCreateBanner.checked = true;
+    if (tgUseTimeScale) tgUseTimeScale.checked = true;
+
+    tgRows = [
+      { id: uid(), milestone: "0", caption: "", shape: "circle", activity: "", duration: "5", showDatetime: true },
+      { id: uid(), milestone: "5", caption: "", shape: "circle", activity: "", duration: "5", showDatetime: true }
+    ];
+
+    renderTgTable();
+    updateSaveButtonLabels();
+
+    if (tgPresetNotice) {
+      tgPresetNotice.textContent = "📝 พร้อมสร้าง Task ใหม่: กรอกชื่องานและขั้นตอน แล้วกด '💾 บันทึก Task' หรือ '✅ OK'";
+      tgPresetNotice.style.color = "#0284c7";
+      setTimeout(() => { if (tgPresetNotice && tgPresetNotice.textContent.includes("พร้อมสร้าง Task ใหม่")) tgPresetNotice.textContent = ""; }, 5000);
+    }
+    setStatus("เริ่มสร้าง Task ใหม่ — กรอกรายละเอียดกิจกรรมตามต้องการ");
   }
 
   function escapeTgHtml(s) {
@@ -7329,6 +7387,27 @@ input:checked + .slider:before {
 
     updateSavedTasksDropdown();
 
+    // Check if an existing task group is selected on canvas
+    let selectedGroup = "";
+    if (selection && selection.length > 0) {
+      const first = selection[0];
+      if (first.kind === "node") {
+        const n = findNode(first.id);
+        if (n && n.taskGroup) selectedGroup = n.taskGroup;
+      } else if (first.kind === "annotation") {
+        const a = findAnnotation(first.id);
+        if (a && a.type === "banner") selectedGroup = a.taskGroup || a.text;
+      }
+    }
+
+    if (selectedGroup) {
+      const presets = getSavedTaskPresets();
+      if (presets[selectedGroup]) {
+        loadTaskPreset(selectedGroup);
+        return;
+      }
+    }
+
     if (tgRows.length === 0) {
       const presets = getSavedTaskPresets();
       if (presets["salegas"]) {
@@ -7343,6 +7422,7 @@ input:checked + .slider:before {
       ];
     }
 
+    updateSaveButtonLabels();
     renderTgTable();
   }
 
@@ -7404,14 +7484,74 @@ input:checked + .slider:before {
         return;
       }
 
+      const groupTitle = tgGroupName ? tgGroupName.value.trim() : "";
+
+      // Auto-save the template as well so user never loses their changes
+      if (groupTitle) {
+        const presets = getSavedTaskPresets();
+        presets[groupTitle] = {
+          name: groupTitle,
+          createBanner: tgCreateBanner ? tgCreateBanner.checked : true,
+          useTimeScale: tgUseTimeScale ? tgUseTimeScale.checked : true,
+          rows: tgRows.map(r => ({
+            milestone: r.milestone,
+            caption: r.caption,
+            shape: r.shape,
+            activity: r.activity,
+            duration: r.duration,
+            showDatetime: r.showDatetime
+          }))
+        };
+        saveTaskPresetsToStorage(presets);
+        currentEditingPresetKey = groupTitle;
+        updateSavedTasksDropdown(groupTitle);
+        updateSaveButtonLabels();
+      }
+
       const baseTime = getTgBaseDateTime();
 
-      // 1. Determine Y placement
-      let startY = 380;
-      if (state.nodes && state.nodes.length > 0) {
-        const maxY = Math.max(...state.nodes.map(n => n.y));
-        startY = maxY + 180;
+      // Check if this task group already exists on the canvas!
+      let existingNodes = [];
+      let existingConnectors = [];
+      let existingBanner = null;
+
+      if (groupTitle) {
+        existingBanner = state.annotations.find(a => a.type === "banner" && (a.taskGroup === groupTitle || a.text === groupTitle));
+        existingNodes = state.nodes.filter(n => n.taskGroup === groupTitle);
+        if (existingNodes.length === 0 && existingBanner) {
+          const bannerY = existingBanner.y;
+          existingNodes = state.nodes.filter(n => Math.abs(n.y - (bannerY + 88)) < 45);
+        }
+        if (existingNodes.length > 0) {
+          const nodeIds = new Set(existingNodes.map(n => n.id));
+          existingConnectors = state.connectors.filter(c => nodeIds.has(c.fromId) || nodeIds.has(c.toId));
+        }
       }
+
+      let replaceExisting = false;
+      let startY = 380;
+
+      if (existingNodes.length > 0) {
+        replaceExisting = confirm(`พบบล็อกกิจกรรม "${groupTitle}" อยู่บน Canvas แล้ว (${existingNodes.length} โหนด)\n\n• กด [ตกลง / OK] เพื่อ "แก้ไข/แทนที่แถวเดิมบน Canvas" (Update)\n• กด [ยกเลิก / Cancel] เพื่อ "สร้างเป็นแถวใหม่ต่อด้านล่าง"`);
+        if (replaceExisting) {
+          startY = existingNodes[0].y;
+          const oldNodeIds = new Set(existingNodes.map(n => n.id));
+          state.nodes = state.nodes.filter(n => !oldNodeIds.has(n.id));
+          state.connectors = state.connectors.filter(c => !oldNodeIds.has(c.fromId) && !oldNodeIds.has(c.toId));
+          if (existingBanner) {
+            state.annotations = state.annotations.filter(a => a.id !== existingBanner.id);
+          }
+        }
+      }
+
+      if (!replaceExisting) {
+        // 1. Determine Y placement below existing nodes
+        if (state.nodes && state.nodes.length > 0) {
+          const maxY = Math.max(...state.nodes.map(n => n.y));
+          startY = maxY + 180;
+        }
+      }
+
       if (startY + 150 > (state.canvasHeight || 1800)) {
         state.canvasHeight = startY + 280;
         const fH = document.getElementById("fCanvasHeight");
@@ -7465,6 +7605,7 @@ input:checked + .slider:before {
         const nodeType = row.shape || "circle";
         const node = {
           id: uid(),
+          taskGroup: groupTitle,
           type: nodeType,
           x: Math.round(nodeX),
           y: Math.round(startY),
@@ -7502,6 +7643,7 @@ input:checked + .slider:before {
 
         const conn = {
           id: uid(),
+          taskGroup: groupTitle,
           fromId: createdNodes[i].id,
           toId: createdNodes[i + 1].id,
           kind: "arrow",
@@ -7516,12 +7658,12 @@ input:checked + .slider:before {
       }
 
       // 5. Create Section Banner if requested
-      const groupTitle = tgGroupName ? tgGroupName.value.trim() : "";
       if (tgCreateBanner && tgCreateBanner.checked && groupTitle && createdNodes.length > 0) {
         const minX = Math.min(...createdNodes.map(n => n.x)) - 30;
         const maxX = Math.max(...createdNodes.map(n => n.x)) + 30;
         const banner = {
           id: uid(),
+          taskGroup: groupTitle,
           type: "banner",
           x: Math.max(20, minX),
           y: Math.max(20, startY - 88),
@@ -7560,7 +7702,9 @@ input:checked + .slider:before {
         canvasWrap.scrollLeft = Math.max(0, minNodeX - 160);
       }
 
-      setStatus(`สร้างชุด Task เรียบร้อย (${createdNodes.length} โหนด) — เลือกทุกชิ้นแล้ว พร้อมคลิกลากย้ายได้ทันที`);
+      const actionMsg = replaceExisting ? `อัปเดตแทนที่แถว "${groupTitle}" บน Canvas เรียบร้อยแล้ว` : `สร้างชุด Task "${groupTitle || 'ใหม่'}" เรียบร้อย`;
+      setStatus(`${actionMsg} (${createdNodes.length} โหนด) — เลือกทุกชิ้นแล้ว พร้อมคลิกลากย้ายได้ทันที`);
+      showSaveNotification("สำเร็จ", `${actionMsg} (${createdNodes.length} โหนด)`);
     } catch(err) {
       console.error("Task Generator Error:", err);
       alert("เกิดข้อผิดพลาดในการสร้าง Task: " + err.message);
@@ -7662,54 +7806,85 @@ input:checked + .slider:before {
     });
   }
 
+  function saveCurrentTask(isSaveAsNew = false) {
+    syncTgRowsFromDOM();
+
+    if (tgRows.length === 0) {
+      alert("ไม่สามารถบันทึก Task ที่ไม่มีรายการกิจกรรมได้ กรุณาเพิ่มแถวก่อนบันทึก");
+      return false;
+    }
+
+    let taskName = tgGroupName ? tgGroupName.value.trim() : "";
+    if (!taskName || isSaveAsNew) {
+      const defaultPrompt = isSaveAsNew && taskName ? `${taskName} (สำเนา)` : (taskName || "Task ใหม่");
+      const inputName = prompt("กรุณาระบุชื่อ Task เพื่อบันทึก:", defaultPrompt);
+      if (!inputName || !inputName.trim()) return false;
+      taskName = inputName.trim();
+      if (tgGroupName) tgGroupName.value = taskName;
+    }
+
+    const presets = getSavedTaskPresets();
+
+    // If updating existing preset without save-as-new, clean up old key if renamed
+    if (!isSaveAsNew && currentEditingPresetKey && currentEditingPresetKey !== taskName) {
+      if (presets[currentEditingPresetKey]) {
+        delete presets[currentEditingPresetKey];
+      }
+    }
+
+    presets[taskName] = {
+      name: taskName,
+      createBanner: tgCreateBanner ? tgCreateBanner.checked : true,
+      useTimeScale: tgUseTimeScale ? tgUseTimeScale.checked : true,
+      rows: tgRows.map(r => ({
+        milestone: r.milestone,
+        caption: r.caption,
+        shape: r.shape,
+        activity: r.activity,
+        duration: r.duration,
+        showDatetime: r.showDatetime
+      }))
+    };
+
+    saveTaskPresetsToStorage(presets);
+    currentEditingPresetKey = taskName;
+    updateSavedTasksDropdown(taskName);
+    updateSaveButtonLabels();
+
+    if (tgPresetNotice) {
+      tgPresetNotice.textContent = `✓ บันทึก Task "${taskName}" (${tgRows.length} โหนด) สำเร็จ!`;
+      tgPresetNotice.style.color = "#16a34a";
+      setTimeout(() => { if (tgPresetNotice && tgPresetNotice.textContent.includes("สำเร็จ")) tgPresetNotice.textContent = ""; }, 4000);
+    }
+
+    setStatus(`บันทึก Task Template "${taskName}" (${tgRows.length} โหนด) เรียบร้อยแล้ว`);
+    return true;
+  }
+
+  if (tgBtnNewTask) {
+    tgBtnNewTask.addEventListener("click", createNewTaskForm);
+  }
+
   if (tgBtnSaveTask) {
     tgBtnSaveTask.addEventListener("click", () => {
-      syncTgRowsFromDOM();
+      saveCurrentTask(false);
+    });
+  }
 
-      if (tgRows.length === 0) {
-        alert("ไม่สามารถบันทึก Task ที่ไม่มีรายการกิจกรรมได้ กรุณาเพิ่มแถวก่อนบันทึก");
-        return;
+  if (tgBtnSaveAsNewTask) {
+    tgBtnSaveAsNewTask.addEventListener("click", () => {
+      saveCurrentTask(true);
+    });
+  }
+
+  if (tgBtnSaveOnly) {
+    tgBtnSaveOnly.addEventListener("click", () => {
+      const ok = saveCurrentTask(false);
+      if (ok) {
+        const name = tgGroupName ? tgGroupName.value.trim() : "Task";
+        showSaveNotification("บันทึก Task สำเร็จ", `บันทึกข้อมูลชุดกิจกรรม "${name}" เรียบร้อยแล้ว (ไม่วางบนบอร์ด)`);
+        taskGenModal.style.display = "none";
       }
-
-      let taskName = tgGroupName ? tgGroupName.value.trim() : "";
-      if (!taskName) {
-        const inputName = prompt("กรุณาตั้งชื่อ Task เพื่อบันทึกเก็บไว้:", "Task ใหม่");
-        if (!inputName || !inputName.trim()) return;
-        taskName = inputName.trim();
-        if (tgGroupName) tgGroupName.value = taskName;
-      }
-
-      const presets = getSavedTaskPresets();
-      if (presets[taskName]) {
-        if (!confirm(`มี Task ชื่อ "${taskName}" อยู่แล้ว ต้องการบันทึกทับ (Update) หรือไม่?`)) {
-          return;
-        }
-      }
-
-      presets[taskName] = {
-        name: taskName,
-        createBanner: tgCreateBanner ? tgCreateBanner.checked : true,
-        useTimeScale: tgUseTimeScale ? tgUseTimeScale.checked : true,
-        rows: tgRows.map(r => ({
-          milestone: r.milestone,
-          caption: r.caption,
-          shape: r.shape,
-          activity: r.activity,
-          duration: r.duration,
-          showDatetime: r.showDatetime
-        }))
-      };
-
-      saveTaskPresetsToStorage(presets);
-      updateSavedTasksDropdown(taskName);
-
-      if (tgPresetNotice) {
-        tgPresetNotice.textContent = `✓ บันทึก Task "${taskName}" สำเร็จ!`;
-        tgPresetNotice.style.color = "#16a34a";
-        setTimeout(() => { if (tgPresetNotice) tgPresetNotice.textContent = ""; }, 4000);
-      }
-
-      setStatus(`บันทึก Task Template "${taskName}" (${tgRows.length} โหนด) เรียบร้อยแล้ว`);
     });
   }
 
@@ -7727,7 +7902,9 @@ input:checked + .slider:before {
       const presets = getSavedTaskPresets();
       delete presets[key];
       saveTaskPresetsToStorage(presets);
+      if (currentEditingPresetKey === key) currentEditingPresetKey = "";
       updateSavedTasksDropdown("");
+      updateSaveButtonLabels();
 
       if (tgPresetNotice) {
         tgPresetNotice.textContent = `ลบ Task "${key}" เรียบร้อยแล้ว`;
