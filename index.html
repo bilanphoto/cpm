@@ -726,6 +726,164 @@ input:checked + .slider:before {
 .cpm-auto-delay-badge:active {
   cursor: grabbing;
 }
+
+/* ==========================================================================
+   ADVANCED CPM FEATURES: CRITICAL PATH, SHIFT REPORT, SWIMLANES, MINI-MAP, BLUEPRINT
+   ========================================================================== */
+
+/* Critical Path Visuals */
+.cpm-connector.cpm-cp-active .cpm-connector-line {
+  stroke: #dc2626 !important;
+  stroke-width: 5px !important;
+  filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.85)) !important;
+}
+.cpm-connector.cpm-dimmed {
+  opacity: 0.3 !important;
+  transition: opacity 0.2s ease;
+}
+.cpm-node.cpm-cp-active .cpm-node-shape {
+  stroke: #dc2626 !important;
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.7)) !important;
+}
+.cpm-node.cpm-dimmed {
+  opacity: 0.3 !important;
+  transition: opacity 0.2s ease;
+}
+
+/* CPM Float Badge */
+.cpm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cpm-badge-critical {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.cpm-badge-slack {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+/* Mini-Map Radar */
+.minimap-radar {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+  width: 224px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+.minimap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+.minimap-header button {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.minimap-header button:hover {
+  color: white;
+}
+.minimap-body {
+  position: relative;
+  width: 224px;
+  height: 124px;
+  background: #090d16;
+  cursor: crosshair;
+}
+.minimap-body canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.minimap-viewport {
+  position: absolute;
+  border: 2px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.22);
+  pointer-events: auto;
+  cursor: grab;
+  box-sizing: border-box;
+}
+.minimap-viewport:active {
+  cursor: grabbing;
+}
+
+/* KPI Card Styles */
+.kpi-card {
+  flex: 1;
+  min-width: 130px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+.kpi-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.kpi-value {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+/* Print Stylesheet for Shift Report and Blueprint */
+@media print {
+  body > *:not(.modal-overlay) {
+    display: none !important;
+  }
+  .modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+  .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .modal-header button, .modal-footer, #btnCopyShiftReportLine, #btnPrintShiftReport {
+    display: none !important;
+  }
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="application/json" id="embeddedState"></script>
@@ -773,6 +931,7 @@ input:checked + .slider:before {
             <button class="dropdown-item" id="btnImportImage"><span>Import Diagram from Image (AI)...</span></button>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item" id="btnMenuExport"><span>Export Image (PNG)...</span></button>
+            <button class="dropdown-item" id="btnMenuExportBlueprint"><span>Export Blueprint Drawing (A3 / A4)...</span></button>
           </div>
         </div>
 
@@ -797,6 +956,9 @@ input:checked + .slider:before {
           <div class="menu-dropdown" id="menuDropdownView">
             <button class="dropdown-item" id="btnGrid"><span>Toggle Grid</span> <span class="menu-check" id="menuCheckGrid">✓</span></button>
             <button class="dropdown-item" id="btnTimeScale"><span>Time-Scale Layout (1 ชม. = 1 ช่อง)</span> <span class="menu-check" id="menuCheckTimeScale"></span></button>
+            <button class="dropdown-item" id="btnMenuCriticalPath"><span>Critical Path Analysis</span> <span class="menu-check" id="menuCheckCP"></span></button>
+            <button class="dropdown-item" id="btnMenuSwimlanes"><span>Plant Swimlanes (เลนโซนอุปกรณ์)</span> <span class="menu-check" id="menuCheckSwimlanes">✓</span></button>
+            <button class="dropdown-item" id="btnMenuMiniMap"><span>Radar Mini-Map</span> <span class="menu-check" id="menuCheckMiniMap">✓</span></button>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item" id="menuBtnZoomIn"><span>Zoom In</span> <span class="shortcut">+</span></button>
             <button class="dropdown-item" id="menuBtnZoomOut"><span>Zoom Out</span> <span class="shortcut">-</span></button>
@@ -826,7 +988,13 @@ input:checked + .slider:before {
 
         <!-- Task Menu -->
         <div class="menu-item" data-menu="task">
-          <button class="menu-btn" id="btnAddTaskModal" style="color: #38bdf8; font-weight: 600;">📋 เพิ่ม Task...</button>
+          <button class="menu-btn" id="menuBtnTask" style="color: #38bdf8; font-weight: 600;">Task ▾</button>
+          <div class="menu-dropdown" id="menuDropdownTask">
+            <button class="dropdown-item" id="btnAddTaskModal"><span>📋 เพิ่ม Task (Turnaround Generator)...</span></button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" id="btnOpenShiftReport"><span>📋 สรุปความก้าวหน้าส่งกะ (Shift Report)...</span></button>
+            <button class="dropdown-item" id="btnOpenSwimlaneModal"><span>🏷️ จัดการเลนโซนอุปกรณ์ (Swimlanes)...</span></button>
+          </div>
         </div>
 
         <!-- Share Menu -->
@@ -846,6 +1014,7 @@ input:checked + .slider:before {
 
     <!-- Right Section: Auto-save status indicator & Export button -->
     <div class="topbar-right">
+        <button class="btn" id="btnToggleCriticalPath" style="font-size:12px; font-weight:700; padding:5px 11px; display:inline-flex; align-items:center; gap:5px; background:rgba(220,38,38,0.12); color:#ef4444; border:1px solid rgba(220,38,38,0.3); border-radius:6px; cursor:pointer;" title="เปิด/ปิด การไฮไลต์สายวิกฤต (Critical Path Auto-Highlight & Float)">🔴 Critical Path</button>
       <span id="autoSaveIndicator" style="font-size:11.5px; color:#16a34a; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; background:rgba(22,163,74,0.08);" title="Auto-saved in browser">☁️ Auto-saved</span>
       <button class="btn primary" id="btnExportPng" style="font-size:12px; font-weight:700; padding:6px 14px;">Export image</button>
     </div>
@@ -968,7 +1137,15 @@ input:checked + .slider:before {
         <svg id="grid" width="100%" height="100%"></svg>
         <svg id="svgCanvas" width="3000" height="1800" xmlns="http://www.w3.org/2000/svg">
           <defs>
+          <filter id="cpmCriticalGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
           </defs>
+          <g id="layerSwimlanes" style="pointer-events:none;"></g>
           <g id="layerConnectors"></g>
           <g id="layerNodes"></g>
           <g id="layerAnnotations"></g>
@@ -977,6 +1154,18 @@ input:checked + .slider:before {
         </svg>
       </div>
 
+    
+      <!-- ============ MINI-MAP RADAR ============ -->
+      <div id="miniMapRadar" class="minimap-radar">
+        <div class="minimap-header">
+          <span>🗺️ MINI-MAP RADAR</span>
+          <button id="btnToggleMiniMapCollapse" title="ย่อ/ขยาย Mini-map">−</button>
+        </div>
+        <div id="miniMapBody" class="minimap-body">
+          <canvas id="miniMapCanvas" width="224" height="124"></canvas>
+          <div id="miniMapViewport" class="minimap-viewport"></div>
+        </div>
+      </div>
     </main>
 
     <!-- ============ RIGHT INSPECTOR ============ -->
@@ -1088,6 +1277,25 @@ input:checked + .slider:before {
           </div>
         </div>
         <!-- node status & completion confirmation -->
+        
+        <!-- CPM Schedule & Float Analysis Card -->
+        <div id="cpmFloatInspectorCard" style="display:none; margin: 12px 0; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">CPM Schedule & Float</span>
+            <span id="cpmInspectorBadge" class="cpm-badge cpm-badge-critical">Critical Path</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11.5px; color: #334155;">
+            <div>Early Start (ES): <b id="cpmInspectorES" style="color:#0f172a;">0</b></div>
+            <div>Early Finish (EF): <b id="cpmInspectorEF" style="color:#0f172a;">5</b></div>
+            <div>Late Start (LS): <b id="cpmInspectorLS" style="color:#0f172a;">0</b></div>
+            <div>Late Finish (LF): <b id="cpmInspectorLF" style="color:#0f172a;">5</b></div>
+          </div>
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px;">
+            <span style="color: #64748b;">Total Float (Slack):</span>
+            <b id="cpmInspectorTF" style="color: #dc2626; font-size: 13px;">0 ชม. (วิกฤต)</b>
+          </div>
+        </div>
+
         <div class="field" data-field="nodecompletion" style="margin-top: 6px; padding: 10px; background: rgba(30,41,59,0.04); border: 1px solid var(--chrome-line); border-radius: var(--radius-sm);">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12.5px; font-weight:700; color:#16a34a; user-select:none; margin:0;">
             <input type="checkbox" id="fNodeCompleted" style="width:16px; height:16px; cursor:pointer;">
@@ -1385,6 +1593,203 @@ input:checked + .slider:before {
     </div>
   </div>
 
+  
+  <!-- ============ SHIFT REPORT MODAL ============ -->
+  <div id="shiftReportModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="width: 860px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+      <div class="modal-header" style="background: #1e293b; color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">📋</span>
+          <div>
+            <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">สรุปความก้าวหน้ารายกะ (Turnaround Shift Handover Report)</h3>
+            <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">
+              คำนวณจากสถานะงานเทียบกับเส้น Time Actual สำหรับส่งเวรและสรุปความก้าวหน้า
+            </div>
+          </div>
+        </div>
+        <button class="modal-close" id="shiftReportClose" style="color: #cbd5e1; font-size: 26px; line-height: 1; background: none; border: none; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+        <!-- KPI Cards -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div class="kpi-card" style="border-left: 4px solid #3b82f6;">
+            <div class="kpi-title">กิจกรรมทั้งหมด (Total)</div>
+            <div class="kpi-value" id="srKpiTotal" style="color: #1e293b;">0</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">งานและ Milestone ทั้งหมด</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #10b981;">
+            <div class="kpi-title">เสร็จสิ้นแล้ว (Completed)</div>
+            <div class="kpi-value" id="srKpiCompleted" style="color: #10b981;">0</div>
+            <div style="font-size: 11px; color: #10b981; font-weight: 600; margin-top: 2px;" id="srKpiPercent">0%</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+            <div class="kpi-title">กำลังดำเนินการ (In Progress)</div>
+            <div class="kpi-value" id="srKpiInProgress" style="color: #f59e0b;">0</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">งานที่คาบเกี่ยวกับกะปัจจุบัน</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #ef4444;">
+            <div class="kpi-title">ล่าช้ากว่าแผน (Overdue)</div>
+            <div class="kpi-value" id="srKpiDelayed" style="color: #ef4444;">0</div>
+            <div style="font-size: 11px; color: #ef4444; font-weight: 600; margin-top: 2px;">เกินเส้น Time Actual</div>
+          </div>
+        </div>
+
+        <!-- Progress S-Curve Bar -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 12.5px; font-weight: 700; color: #1e293b;">ภาพรวมความก้าวหน้าโครงการ (Overall Progress)</span>
+            <span id="srProgressLabel" style="font-size: 13px; font-weight: 800; color: #10b981;">0%</span>
+          </div>
+          <div style="width: 100%; height: 16px; background: #e2e8f0; border-radius: 8px; overflow: hidden; display: flex;">
+            <div id="srProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #059669); transition: width 0.3s ease;"></div>
+          </div>
+        </div>
+
+        <!-- Tasks Table -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+          <div style="padding: 10px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-size: 12px; font-weight: 700; color: #334155; display: flex; justify-content: space-between; align-items: center;">
+            <span>รายการกิจกรรมในกะ (Shift Activities & Milestones)</span>
+            <span style="font-size: 11px; color: #64748b;" id="srTableSub">เรียงตามลำดับเวลา</span>
+          </div>
+          <div style="max-height: 280px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+              <thead>
+                <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600;">
+                  <th style="padding: 8px 12px; width: 40px;">#</th>
+                  <th style="padding: 8px 12px;">ชื่องาน / กิจกรรม</th>
+                  <th style="padding: 8px 12px; width: 90px;">เวลา (ชม.)</th>
+                  <th style="padding: 8px 12px; width: 150px;">วัน-เวลา</th>
+                  <th style="padding: 8px 12px; width: 140px; text-align: center;">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="srTaskTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn" id="btnCopyShiftReportLine" style="background: #0284c7; color: white; border: none; padding: 7px 16px; font-size: 12.5px; font-weight: 700; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          <span>📋 คัดลอกสรุปสำหรับส่ง LINE</span>
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn" id="btnPrintShiftReport" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: pointer;">
+            🖨️ พิมพ์รายงาน
+          </button>
+          <button type="button" class="btn" id="btnCloseShiftReport" style="background: #e2e8f0; color: #1e293b; border: none; padding: 7px 16px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: pointer;">
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SWIMLANES MODAL ============ -->
+  <div id="swimlaneModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="width: 640px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+      <div class="modal-header" style="background: #1e293b; color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">🏷️</span>
+          <div>
+            <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">จัดการเลนแบ่งโซนอุปกรณ์ (Plant Equipment Swimlanes)</h3>
+            <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">
+              แบ่งแคนวาสเป็นโซนตามผังอุปกรณ์ เช่น Sales Gas, Refrigeration, WHB Steam
+            </div>
+          </div>
+        </div>
+        <button class="modal-close" id="swimlaneModalClose" style="color: #cbd5e1; font-size: 26px; line-height: 1; background: none; border: none; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 18px 20px; overflow-y: auto; flex: 1; background: #ffffff;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #1e293b; cursor: pointer;">
+            <input type="checkbox" id="chkEnableSwimlanes" checked style="width: 16px; height: 16px;">
+            <span>เปิดใช้งานเลนโซนอุปกรณ์บนบอร์ด (Show Swimlanes)</span>
+          </label>
+          <button type="button" class="btn small" id="btnLoadPresetSwimlanes" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 5px; cursor: pointer;">
+            ⟳ โหลดโซนมาตรฐาน Turnaround
+          </button>
+        </div>
+
+        <div id="swimlaneListContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Dynamically populated swimlane rows -->
+        </div>
+
+        <button type="button" class="btn" id="btnAddSwimlaneRow" style="margin-top: 14px; width: 100%; border: 1px dashed #0284c7; color: #0284c7; background: #f0f9ff; padding: 8px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer;">
+          ＋ เพิ่มโซนอุปกรณ์ใหม่ (Add Swimlane)
+        </button>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn" id="btnCancelSwimlanes" style="background: white; border: 1px solid #cbd5e1; padding: 6px 14px; font-size: 12px; border-radius: 6px; cursor: pointer;">ยกเลิก</button>
+        <button type="button" class="btn primary" id="btnSaveSwimlanes" style="background: #0284c7; color: white; border: none; padding: 6px 18px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer;">บันทึกและปรับปรุงผัง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BLUEPRINT EXPORT MODAL ============ -->
+  <div id="blueprintExportModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="width: 720px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+      <div class="modal-header" style="background: #0f172a; color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">📐</span>
+          <div>
+            <h3 style="margin: 0; color: white; font-size: 16px; font-weight: 700;">ส่งออกภาพพิมพ์เขียววิศวกรรม (Export Engineering Blueprint A3/A4)</h3>
+            <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">
+              พร้อมตาราง Title Block มาตรฐาน PTT GSP Rayong, พิกัด Grid (A-D, 1-6) และ Legend
+            </div>
+          </div>
+        </div>
+        <button class="modal-close" id="blueprintModalClose" style="color: #cbd5e1; font-size: 26px; line-height: 1; background: none; border: none; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 18px 20px; overflow-y: auto; flex: 1; background: #ffffff;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: block;">ขนาดกระดาษ (Paper Format)</label>
+            <select id="bpPaperFormat" style="width: 100%; padding: 7px 10px; font-size: 12.5px; border: 1px solid #cbd5e1; border-radius: 5px; background: white;">
+              <option value="A3">A3 Landscape (420 x 297 mm) - มาตรฐานพิมพ์เขียว</option>
+              <option value="A4">A4 Landscape (297 x 210 mm) - รายงานทั่วไป</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: block;">เลขที่แบบ (Drawing No.)</label>
+            <input type="text" id="bpDrawingNo" value="PTT-GSP-CPM-2026-001" style="width: 100%; padding: 7px 10px; font-size: 12.5px; border: 1px solid #cbd5e1; border-radius: 5px; background: white;">
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: block;">ผู้จัดทำแบบ (Prepared By)</label>
+            <input type="text" id="bpPreparedBy" value="Phalat 490047" style="width: 100%; padding: 7px 10px; font-size: 12.5px; border: 1px solid #cbd5e1; border-radius: 5px; background: white;">
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px; display: block;">Revision / Version</label>
+            <input type="text" id="bpRevision" value="Rev. 0" style="width: 100%; padding: 7px 10px; font-size: 12.5px; border: 1px solid #cbd5e1; border-radius: 5px; background: white;">
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+          <div style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 6px;">ตัวอย่างกรอบแบบและ Title Block ที่จะรวมในภาพ:</div>
+          <div style="font-size: 11.5px; color: #64748b; line-height: 1.6;">
+            • <b>Outer Grid Frame:</b> เส้นขอบคู่พร้อมพิกัดอ้างอิง A, B, C, D (แนวตั้ง) และ 1, 2, 3, 4, 5, 6 (แนวนอน)<br>
+            • <b>Title Block:</b> PTT GSP Rayong, CPM Turnaround Schedule, วันที่ออกรายงาน, Scale Time (1 Hr = 40px)<br>
+            • <b>Legend Reference:</b> สัญลักษณ์สายวิกฤต (Critical Path), งานทั่วไป, Milestone, และเส้น Time Actual
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11px; color: #64748b;">แนะนำความละเอียดสูง 300 DPI สำหรับพิมพ์ A3</span>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn" id="btnCancelBlueprint" style="background: white; border: 1px solid #cbd5e1; padding: 7px 14px; font-size: 12.5px; border-radius: 6px; cursor: pointer;">ยกเลิก</button>
+          <button type="button" class="btn" id="btnPrintBlueprintDirect" style="background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: pointer;">🖨️ สั่งพิมพ์ A3/A4</button>
+          <button type="button" class="btn primary" id="btnDownloadBlueprintPng" style="background: #0284c7; color: white; border: none; padding: 7px 18px; font-size: 12.5px; font-weight: 700; border-radius: 6px; cursor: pointer;">💾 ดาวน์โหลดภาพพิมพ์เขียว</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ TASK GENERATOR MODAL ============ -->
   <div id="taskGenModal" class="modal-overlay" style="display: none;">
     <div class="modal-content" style="width: 1040px; max-width: 95vw; max-height: 92vh; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.25);">
@@ -1541,7 +1946,16 @@ input:checked + .slider:before {
     nextId: 1,
     timeScaleMode: false,
     canvasWidth: 3000,
-    canvasHeight: 1800
+    canvasHeight: 1800,
+    highlightCriticalPath: false,
+    showSwimlanes: true,
+    showMiniMap: true,
+    swimlanes: [
+      { id: 1, name: "Sales Gas System", y: 40, height: 320, color: "rgba(59, 130, 246, 0.04)", stroke: "#93c5fd" },
+      { id: 2, name: "Refrigeration System", y: 380, height: 340, color: "rgba(16, 185, 129, 0.04)", stroke: "#86efac" },
+      { id: 3, name: "WHB / Steam System", y: 740, height: 340, color: "rgba(245, 158, 11, 0.04)", stroke: "#fde68a" },
+      { id: 4, name: "Offsite & Utilities", y: 1100, height: 340, color: "rgba(139, 92, 246, 0.04)", stroke: "#d8b4fe" }
+    ]
   };
 
   let history = [];
@@ -1567,6 +1981,7 @@ input:checked + .slider:before {
   const canvasInner = $("#canvasInner");
   const svg = $("#svgCanvas");
   const svgDefs = svg.querySelector("defs");
+  const layerSwimlanes = $("#layerSwimlanes");
   const layerConnectors = $("#layerConnectors");
   const layerNodes = $("#layerNodes");
   const layerAnnotations = $("#layerAnnotations");
@@ -2246,6 +2661,21 @@ input:checked + .slider:before {
       const isCompleted = !!n.completed;
       const isDelayed = isNodeDelayed(n, actualLine);
 
+      if (state.highlightCriticalPath) {
+        if (n._isCritical) {
+          g.classList.add("cpm-cp-active");
+          const cpBadge = svgElCreate("g", { class: "cpm-node-cp-badge", transform: `translate(${-r * 0.72}, ${-r * 0.72})` });
+          const cpCircle = svgElCreate("circle", { cx: 0, cy: 0, r: 8, fill: "#dc2626", stroke: "#ffffff", "stroke-width": 1.5 });
+          const cpText = svgElCreate("text", { x: 0, y: 1, fill: "#ffffff", "font-size": "9px", "font-weight": "800", "text-anchor": "middle", "dominant-baseline": "central" });
+          cpText.textContent = "CP";
+          cpBadge.appendChild(cpCircle);
+          cpBadge.appendChild(cpText);
+          g.appendChild(cpBadge);
+        } else {
+          g.classList.add("cpm-dimmed");
+        }
+      }
+
       if (isCompleted) {
         // Green completed badge at top-right: (r * 0.72, -r * 0.72)
         const badgeG = svgElCreate("g", { class: "cpm-node-status-badge", transform: `translate(${r * 0.72}, ${-r * 0.72})` });
@@ -2763,6 +3193,19 @@ input:checked + .slider:before {
       const line = svgElCreate("path", lineAttrs);
       if(c.dashed) line.setAttribute("stroke-dasharray", c.thick ? "12 8" : "8 5");
 
+      if (state.highlightCriticalPath) {
+        if (c._isCritical) {
+          g.classList.add("cpm-cp-active");
+          line.setAttribute("stroke", "#dc2626");
+          line.style.strokeWidth = (c.thick ? 7 : 4.5) + "px";
+          line.setAttribute("filter", "url(#cpmCriticalGlow)");
+          if (isRightArrow) line.setAttribute("marker-end", `url(#${ensureArrowMarker("#dc2626", c.thick ? 7 : 4.5)})`);
+          if (isLeftArrow) line.setAttribute("marker-start", `url(#${ensureArrowStartMarker("#dc2626", c.thick ? 7 : 4.5)})`);
+        } else {
+          g.classList.add("cpm-dimmed");
+        }
+      }
+
       g.appendChild(hit);
       g.appendChild(line);
 
@@ -3105,10 +3548,13 @@ input:checked + .slider:before {
   function renderAll(){
     updateTimeScaleButtonVisual();
     applyCanvasSize();
+    if(state.highlightCriticalPath) calculateCriticalPath();
+    renderSwimlanes();
     renderConnectors();
     renderNodes();
     renderAnnotations();
     refreshCount();
+    updateMiniMap();
   }
 
   // ---------------------------------------------------------
@@ -4531,6 +4977,12 @@ input:checked + .slider:before {
     if (chkGrid) chkGrid.textContent = gridOn ? "✓" : "";
     const chkTs = document.getElementById("menuCheckTimeScale");
     if (chkTs) chkTs.textContent = (state && state.timeScaleMode) ? "✓" : "";
+    const chkCp = document.getElementById("menuCheckCP");
+    if (chkCp) chkCp.textContent = (state && state.highlightCriticalPath) ? "✓" : "";
+    const chkSw = document.getElementById("menuCheckSwimlanes");
+    if (chkSw) chkSw.textContent = (state && state.showSwimlanes) ? "✓" : "";
+    const chkMm = document.getElementById("menuCheckMiniMap");
+    if (chkMm) chkMm.textContent = (state && state.showMiniMap !== false) ? "✓" : "";
   }
   updateViewMenuCheckmarks();
 
@@ -4550,8 +5002,11 @@ input:checked + .slider:before {
         if(payload.title    !== undefined) $("#diagramTitle").value    = payload.title;
         if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
         state = payload.state || payload;
-        initNodesDatetimeFields(state.nodes);
+                initNodesDatetimeFields(state.nodes);
         recalculateDiagramTimes();
+        initDefaultSwimlanes();
+        syncCriticalPathBtn();
+        updateViewMenuCheckmarks();
         selection = [];
         history = []; historyIndex = -1;
         renderAll(); updateInspector(); applyCanvasBg();
@@ -5008,6 +5463,8 @@ input:checked + .slider:before {
       inspectorEmpty.style.display = "block";
       inspectorPanel.style.display = "none";
       inspectorMulti.style.display = "none";
+      const fc = $("#cpmFloatInspectorCard");
+      if(fc) fc.style.display = "none";
       setPanelExpanded(false);
       return;
     }
@@ -5017,6 +5474,8 @@ input:checked + .slider:before {
       inspectorEmpty.style.display = "none";
       inspectorPanel.style.display = "none";
       inspectorMulti.style.display = "block";
+      const fc = $("#cpmFloatInspectorCard");
+      if(fc) fc.style.display = "none";
       multiTitle.textContent = selection.length + " selected";
 
       const hasNodes = selection.some(s=> s.kind === "node");
@@ -5091,6 +5550,7 @@ input:checked + .slider:before {
       }
 
       show(fieldEls.fillrow);
+      updateInspectorCpmFloat(n);
       $("#fFill").value = n.fill || "#ffffff";
       $("#fSize").value = n.r || 32;
 
@@ -5121,6 +5581,7 @@ input:checked + .slider:before {
         show(fieldEls.connresettext);
       }
       show(fieldEls.duration);
+      updateInspectorCpmFloat(c);
       $("#fDuration").value = c.duration || "";
       $("#fDurationUnit").value = c.durationUnit || "hours";
       show(fieldEls.lockduration); $("#fConnectorLockDuration").checked = !!c.lockDuration;
@@ -6395,7 +6856,7 @@ input:checked + .slider:before {
   $("#btnClear").addEventListener("click", ()=>{
     if(!confirm("Clear the entire canvas? This cannot be undone after closing this dialog.")) return;
     const keepBg = state.canvasBg;
-    state = {nodes:[], connectors:[], annotations:[], nextId:1, canvasBg:keepBg, timeScaleMode:state.timeScaleMode || false, canvasWidth:state.canvasWidth || 3000, canvasHeight:state.canvasHeight || 1800};
+    state = {nodes:[], connectors:[], annotations:[], nextId:1, canvasBg:keepBg, timeScaleMode:state.timeScaleMode || false, canvasWidth:state.canvasWidth || 3000, canvasHeight:state.canvasHeight || 1800, highlightCriticalPath:state.highlightCriticalPath || false, showSwimlanes:state.showSwimlanes !== false, showMiniMap:state.showMiniMap !== false, swimlanes:state.swimlanes || []};
     selection = [];
     renderAll(); updateInspector(); applyCanvasBg(); commit();
     setStatus("Canvas cleared");
@@ -6406,7 +6867,7 @@ input:checked + .slider:before {
   // ---------------------------------------------------------
   $("#btnNewCpm").addEventListener("click", ()=>{
     if(!confirm("Start a new CPM diagram? Any unsaved changes to the current canvas will be lost.")) return;
-    state = {nodes:[], connectors:[], annotations:[], nextId:1, timeScaleMode:state.timeScaleMode || false, canvasWidth:state.canvasWidth || 3000, canvasHeight:state.canvasHeight || 1800};
+    state = {nodes:[], connectors:[], annotations:[], nextId:1, timeScaleMode:state.timeScaleMode || false, canvasWidth:state.canvasWidth || 3000, canvasHeight:state.canvasHeight || 1800, highlightCriticalPath:state.highlightCriticalPath || false, showSwimlanes:state.showSwimlanes !== false, showMiniMap:state.showMiniMap !== false, swimlanes:state.swimlanes || []};
     selection = [];
     $("#diagramTitle").value = "NEW CPM DIAGRAM";
     $("#diagramSubtitle").value = "";
@@ -8152,8 +8613,11 @@ input:checked + .slider:before {
         if (state.timeScaleMode === undefined) state.timeScaleMode = false;
         
         // Re-run setup fields if needed
-        initNodesDatetimeFields(state.nodes);
+                initNodesDatetimeFields(state.nodes);
         recalculateDiagramTimes();
+        initDefaultSwimlanes();
+        syncCriticalPathBtn();
+        updateViewMenuCheckmarks();
         
         // Clear selection to avoid stale references
         selection = [];
@@ -8626,7 +9090,949 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
     });
   }
 
-  (function bootstrap(){
+
+  // =========================================================================
+  // ADVANCED CPM FEATURES IMPLEMENTATION
+  // =========================================================================
+
+  // 1. Critical Path Calculation & Schedule Float Analysis
+  function calculateCriticalPath() {
+    state.nodes.forEach(n => {
+      n._isCritical = false;
+      n._es = 0; n._ef = 0; n._ls = 0; n._lf = 0; n._tf = 0;
+    });
+    state.connectors.forEach(c => {
+      c._isCritical = false;
+      c._es = 0; c._ef = 0; c._ls = 0; c._lf = 0; c._tf = 0;
+    });
+
+    if (!state.nodes || state.nodes.length === 0) return;
+
+    const nodeMap = new Map();
+    state.nodes.forEach(n => nodeMap.set(n.id, n));
+
+    const connMap = new Map();
+    state.connectors.forEach(c => connMap.set(c.id, c));
+
+    function parseDuration(c) {
+      if (!c.duration) return 0;
+      const num = parseFloat(String(c.duration).replace(/[^0-9.]/g, ''));
+      if (isNaN(num)) return 0;
+      return c.durationUnit === 'days' ? num * 24 : num;
+    }
+
+    const validConns = [];
+    state.connectors.forEach(c => {
+      let fromId = c.fromId;
+      if (!fromId && c.fromConnectorId) {
+        const parent = connMap.get(c.fromConnectorId);
+        if (parent) fromId = parent.fromId;
+      }
+      let toId = c.toId;
+      if (!toId && c.toConnectorId) {
+        const parent = connMap.get(c.toConnectorId);
+        if (parent) toId = parent.toId;
+      }
+      c._resolvedFromId = fromId;
+      c._resolvedToId = toId;
+
+      if (fromId && toId && nodeMap.has(fromId) && nodeMap.has(toId)) {
+        validConns.push(c);
+      }
+    });
+
+    const inEdges = new Map();
+    const outEdges = new Map();
+    state.nodes.forEach(n => {
+      inEdges.set(n.id, []);
+      outEdges.set(n.id, []);
+    });
+
+    validConns.forEach(c => {
+      inEdges.get(c._resolvedToId).push(c);
+      outEdges.get(c._resolvedFromId).push(c);
+    });
+
+    // Forward pass
+    const inDegree = new Map();
+    state.nodes.forEach(n => inDegree.set(n.id, inEdges.get(n.id).length));
+    
+    const queue = [];
+    state.nodes.forEach(n => {
+      if (inDegree.get(n.id) === 0) {
+        queue.push(n.id);
+        n._es = 0;
+        n._ef = 0;
+      }
+    });
+
+    const topoOrder = [];
+    while (queue.length > 0) {
+      const uId = queue.shift();
+      topoOrder.push(uId);
+      const uNode = nodeMap.get(uId);
+
+      const outs = outEdges.get(uId) || [];
+      for (const c of outs) {
+        const vId = c._resolvedToId;
+        const vNode = nodeMap.get(vId);
+        const dur = parseDuration(c);
+        
+        c._es = uNode._ef;
+        c._ef = c._es + dur;
+
+        if (vNode._es === undefined || c._ef > vNode._es) {
+          vNode._es = c._ef;
+          vNode._ef = c._ef;
+        }
+
+        inDegree.set(vId, inDegree.get(vId) - 1);
+        if (inDegree.get(vId) === 0) {
+          queue.push(vId);
+        }
+      }
+    }
+
+    state.nodes.forEach(n => {
+      if (!topoOrder.includes(n.id)) {
+        topoOrder.push(n.id);
+        n._es = 0;
+        n._ef = 0;
+      }
+    });
+
+    // Backward pass
+    let maxProjectTime = 0;
+    state.nodes.forEach(n => {
+      if (n._ef > maxProjectTime) maxProjectTime = n._ef;
+    });
+
+    state.nodes.forEach(n => {
+      const outs = outEdges.get(n.id) || [];
+      if (outs.length === 0) {
+        n._lf = maxProjectTime;
+        n._ls = maxProjectTime;
+      } else {
+        n._lf = Infinity;
+        n._ls = Infinity;
+      }
+    });
+
+    for (let i = topoOrder.length - 1; i >= 0; i--) {
+      const uId = topoOrder[i];
+      const uNode = nodeMap.get(uId);
+      const outs = outEdges.get(uId) || [];
+      
+      if (outs.length > 0) {
+        let minLS = Infinity;
+        for (const c of outs) {
+          const vNode = nodeMap.get(c._resolvedToId);
+          const dur = parseDuration(c);
+          c._lf = vNode._ls;
+          c._ls = c._lf - dur;
+          c._tf = Math.max(0, Math.round((c._ls - c._es) * 100) / 100);
+          if (c._ls < minLS) minLS = c._ls;
+        }
+        uNode._lf = minLS;
+        uNode._ls = minLS;
+      }
+      uNode._tf = Math.max(0, Math.round((uNode._lf - uNode._ef) * 100) / 100);
+    }
+
+    // Mark critical elements
+    validConns.forEach(c => {
+      if (c._tf <= 0.01) {
+        c._isCritical = true;
+        const u = nodeMap.get(c._resolvedFromId);
+        const v = nodeMap.get(c._resolvedToId);
+        if (u) u._isCritical = true;
+        if (v) v._isCritical = true;
+      }
+    });
+  }
+
+    // Float Inspector Card Updater
+  function updateInspectorCpmFloat(item) {
+    const card = $("#cpmFloatInspectorCard");
+    if (!card) return;
+    if (!item) { card.style.display = "none"; return; }
+    card.style.display = "block";
+
+    calculateCriticalPath();
+
+    const es = item._es !== undefined ? item._es : 0;
+    const ef = item._ef !== undefined ? item._ef : 0;
+    const ls = (item._ls !== undefined && item._ls !== Infinity) ? item._ls : ef;
+    const lf = (item._lf !== undefined && item._lf !== Infinity) ? item._lf : ef;
+    const tf = item._tf !== undefined ? item._tf : (ls - es);
+
+    $("#cpmInspectorES").textContent = es + " ชม.";
+    $("#cpmInspectorEF").textContent = ef + " ชม.";
+    $("#cpmInspectorLS").textContent = ls + " ชม.";
+    $("#cpmInspectorLF").textContent = lf + " ชม.";
+
+    const badge = $("#cpmInspectorBadge");
+    const tfEl = $("#cpmInspectorTF");
+
+    if (item._isCritical || tf <= 0.01) {
+      if (badge) {
+        badge.className = "cpm-badge cpm-badge-critical";
+        badge.textContent = "🔴 Critical Path (Float = 0)";
+      }
+      if (tfEl) {
+        tfEl.textContent = "0 ชม. (สายวิกฤต ห้ามล่าช้า)";
+        tfEl.style.color = "#dc2626";
+      }
+    } else {
+      if (badge) {
+        badge.className = "cpm-badge cpm-badge-slack";
+        badge.textContent = "🟢 Non-Critical (Slack)";
+      }
+      if (tfEl) {
+        tfEl.textContent = `+${tf} ชม. (มีระยะหย่อน)`;
+        tfEl.style.color = "#16a34a";
+      }
+    }
+  }
+
+  // Topbar Critical Path Toggle Button & View Menu
+  const btnToggleCriticalPath = document.getElementById("btnToggleCriticalPath");
+  function syncCriticalPathBtn() {
+    if (!btnToggleCriticalPath) return;
+    if (state.highlightCriticalPath) {
+      btnToggleCriticalPath.style.background = "#dc2626";
+      btnToggleCriticalPath.style.color = "#ffffff";
+      btnToggleCriticalPath.style.borderColor = "#b91c1c";
+      btnToggleCriticalPath.innerHTML = "🔴 Critical Path (ON)";
+    } else {
+      btnToggleCriticalPath.style.background = "rgba(220,38,38,0.12)";
+      btnToggleCriticalPath.style.color = "#ef4444";
+      btnToggleCriticalPath.style.borderColor = "rgba(220,38,38,0.3)";
+      btnToggleCriticalPath.innerHTML = "🔴 Critical Path";
+    }
+  }
+
+  if (btnToggleCriticalPath) {
+    btnToggleCriticalPath.addEventListener("click", () => {
+      state.highlightCriticalPath = !state.highlightCriticalPath;
+      syncCriticalPathBtn();
+      updateViewMenuCheckmarks();
+      renderAll();
+      commit();
+      showSaveNotification(
+        state.highlightCriticalPath ? "เปิดไฮไลต์ Critical Path" : "ปิดไฮไลต์ Critical Path",
+        state.highlightCriticalPath ? "ระบบคำนวณและแสดงสายวิกฤต (Float = 0) ด้วยเส้นสีแดงเรืองแสง" : "กลับสู่มุมมองปกติ"
+      );
+    });
+  }
+
+  const btnMenuCriticalPath = document.getElementById("btnMenuCriticalPath");
+  if (btnMenuCriticalPath) {
+    btnMenuCriticalPath.addEventListener("click", () => {
+      state.highlightCriticalPath = !state.highlightCriticalPath;
+      syncCriticalPathBtn();
+      updateViewMenuCheckmarks();
+      renderAll();
+      commit();
+    });
+  }
+
+  // 2. Plant Equipment Swimlanes Implementation
+  function initDefaultSwimlanes() {
+    if (!state.swimlanes || !Array.isArray(state.swimlanes) || state.swimlanes.length === 0) {
+      state.swimlanes = [
+        { id: 1, name: "Sales Gas System", y: 40, height: 320, color: "rgba(59, 130, 246, 0.04)", stroke: "#93c5fd" },
+        { id: 2, name: "Refrigeration System", y: 380, height: 340, color: "rgba(16, 185, 129, 0.04)", stroke: "#86efac" },
+        { id: 3, name: "WHB / Steam System", y: 740, height: 340, color: "rgba(245, 158, 11, 0.04)", stroke: "#fde68a" },
+        { id: 4, name: "Offsite & Utilities", y: 1100, height: 340, color: "rgba(139, 92, 246, 0.04)", stroke: "#d8b4fe" }
+      ];
+    }
+    if (state.showSwimlanes === undefined) state.showSwimlanes = true;
+  }
+  initDefaultSwimlanes();
+
+  function renderSwimlanes() {
+    if (!layerSwimlanes) return;
+    layerSwimlanes.innerHTML = "";
+    if (!state.showSwimlanes || !state.swimlanes) return;
+    const cw = state.canvasWidth || 3000;
+
+    state.swimlanes.forEach((sw) => {
+      const g = svgElCreate("g", { class: "cpm-swimlane-group", "data-id": sw.id });
+      const rect = svgElCreate("rect", {
+        x: 0, y: sw.y, width: cw, height: sw.height,
+        fill: sw.color || "rgba(59, 130, 246, 0.04)",
+        stroke: sw.stroke || "#cbd5e1",
+        "stroke-width": 1,
+        "stroke-dasharray": "6 4"
+      });
+      g.appendChild(rect);
+
+      const headerG = svgElCreate("g", { class: "cpm-swimlane-header" });
+      const badgeW = 200;
+      const badgeH = 26;
+      const badgeBg = svgElCreate("rect", {
+        x: 10, y: sw.y + 6, width: badgeW, height: badgeH, rx: 4,
+        fill: "#1e293b", opacity: 0.85
+      });
+      const badgeText = svgElCreate("text", {
+        x: 20, y: sw.y + 23, fill: "#ffffff",
+        style: "font-family: var(--font-body); font-size: 11.5px; font-weight: 700; letter-spacing: 0.3px;"
+      });
+      badgeText.textContent = `🏷️ ${sw.name}`;
+      headerG.appendChild(badgeBg);
+      headerG.appendChild(badgeText);
+      g.appendChild(headerG);
+
+      layerSwimlanes.appendChild(g);
+    });
+  }
+
+  // Swimlanes Modal & Event Handlers
+  const swimlaneModal = document.getElementById("swimlaneModal");
+  const swimlaneModalClose = document.getElementById("swimlaneModalClose");
+  const btnCancelSwimlanes = document.getElementById("btnCancelSwimlanes");
+  const btnSaveSwimlanes = document.getElementById("btnSaveSwimlanes");
+  const btnOpenSwimlaneModal = document.getElementById("btnOpenSwimlaneModal");
+  const btnMenuSwimlanes = document.getElementById("btnMenuSwimlanes");
+  const btnAddSwimlaneRow = document.getElementById("btnAddSwimlaneRow");
+  const btnLoadPresetSwimlanes = document.getElementById("btnLoadPresetSwimlanes");
+  const chkEnableSwimlanes = document.getElementById("chkEnableSwimlanes");
+  const swimlaneListContainer = document.getElementById("swimlaneListContainer");
+
+  function openSwimlaneModal() {
+    initDefaultSwimlanes();
+    if (chkEnableSwimlanes) chkEnableSwimlanes.checked = state.showSwimlanes !== false;
+    renderSwimlaneModalRows();
+    if (swimlaneModal) swimlaneModal.style.display = "flex";
+  }
+
+  function renderSwimlaneModalRows() {
+    if (!swimlaneListContainer) return;
+    swimlaneListContainer.innerHTML = "";
+    (state.swimlanes || []).forEach((sw, idx) => {
+      const row = document.createElement("div");
+      row.className = "swimlane-row-item";
+      row.style.cssText = "display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;";
+      row.innerHTML = `
+        <span style="font-size: 11px; font-weight: 700; color: #64748b; width: 20px;">#${idx+1}</span>
+        <input type="text" class="sw-name" value="${sw.name}" placeholder="ชื่อโซนอุปกรณ์" style="flex: 2; padding: 5px 8px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 11px; color: #64748b;">Y:</span>
+          <input type="number" class="sw-y" value="${sw.y}" style="width: 65px; padding: 5px 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" step="20">
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 11px; color: #64748b;">สูง:</span>
+          <input type="number" class="sw-h" value="${sw.height}" style="width: 65px; padding: 5px 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px;" step="20">
+        </div>
+        <button type="button" class="btn small sw-del" style="color: #ef4444; border: 1px solid #fecaca; background: #fff5f5; padding: 4px 8px; cursor: pointer; border-radius: 4px;">🗑️</button>
+      `;
+      row.querySelector(".sw-del").addEventListener("click", () => {
+        state.swimlanes.splice(idx, 1);
+        renderSwimlaneModalRows();
+      });
+      swimlaneListContainer.appendChild(row);
+    });
+  }
+
+  if (btnAddSwimlaneRow) {
+    btnAddSwimlaneRow.addEventListener("click", () => {
+      const last = (state.swimlanes && state.swimlanes.length) ? state.swimlanes[state.swimlanes.length-1] : { y: 40, height: 300 };
+      state.swimlanes = state.swimlanes || [];
+      state.swimlanes.push({
+        id: Date.now(),
+        name: `Zone ${state.swimlanes.length+1}`,
+        y: last.y + last.height + 20,
+        height: 320,
+        color: "rgba(59, 130, 246, 0.04)",
+        stroke: "#93c5fd"
+      });
+      renderSwimlaneModalRows();
+    });
+  }
+
+  if (btnLoadPresetSwimlanes) {
+    btnLoadPresetSwimlanes.addEventListener("click", () => {
+      state.swimlanes = [
+        { id: 1, name: "Sales Gas System", y: 40, height: 320, color: "rgba(59, 130, 246, 0.04)", stroke: "#93c5fd" },
+        { id: 2, name: "Refrigeration System", y: 380, height: 340, color: "rgba(16, 185, 129, 0.04)", stroke: "#86efac" },
+        { id: 3, name: "WHB / Steam System", y: 740, height: 340, color: "rgba(245, 158, 11, 0.04)", stroke: "#fde68a" },
+        { id: 4, name: "Offsite & Utilities", y: 1100, height: 340, color: "rgba(139, 92, 246, 0.04)", stroke: "#d8b4fe" }
+      ];
+      renderSwimlaneModalRows();
+    });
+  }
+
+  if (btnSaveSwimlanes) {
+    btnSaveSwimlanes.addEventListener("click", () => {
+      const rows = swimlaneListContainer.querySelectorAll(".swimlane-row-item");
+      const newSw = [];
+      rows.forEach((r, idx) => {
+        const name = r.querySelector(".sw-name").value.trim() || `Zone ${idx+1}`;
+        const y = parseInt(r.querySelector(".sw-y").value, 10) || 40;
+        const height = parseInt(r.querySelector(".sw-h").value, 10) || 280;
+        const orig = (state.swimlanes && state.swimlanes[idx]) || {};
+        newSw.push({
+          id: orig.id || idx + 1,
+          name,
+          y,
+          height,
+          color: orig.color || "rgba(59, 130, 246, 0.04)",
+          stroke: orig.stroke || "#93c5fd"
+        });
+      });
+      state.swimlanes = newSw;
+      state.showSwimlanes = chkEnableSwimlanes ? chkEnableSwimlanes.checked : true;
+      updateViewMenuCheckmarks();
+      renderAll();
+      commit();
+      if (swimlaneModal) swimlaneModal.style.display = "none";
+      showSaveNotification("ปรับปรุงโซนสำเร็จ", `บันทึกเลนแบ่งโซนอุปกรณ์ ${state.swimlanes.length} โซนเรียบร้อยแล้ว`);
+    });
+  }
+
+  if (btnOpenSwimlaneModal) btnOpenSwimlaneModal.addEventListener("click", openSwimlaneModal);
+  if (swimlaneModalClose) swimlaneModalClose.addEventListener("click", () => { if (swimlaneModal) swimlaneModal.style.display = "none"; });
+  if (btnCancelSwimlanes) btnCancelSwimlanes.addEventListener("click", () => { if (swimlaneModal) swimlaneModal.style.display = "none"; });
+
+  if (btnMenuSwimlanes) {
+    btnMenuSwimlanes.addEventListener("click", () => {
+      state.showSwimlanes = !state.showSwimlanes;
+      updateViewMenuCheckmarks();
+      renderAll();
+      commit();
+    });
+  }
+
+  // 3. Mini-Map Radar Implementation
+  let isMiniMapDragging = false;
+  let miniMapCollapsed = false;
+  var miniMapRadar = document.getElementById("miniMapRadar");
+  var miniMapCanvas = document.getElementById("miniMapCanvas");
+  var miniMapViewport = document.getElementById("miniMapViewport");
+  var btnToggleMiniMapCollapse = document.getElementById("btnToggleMiniMapCollapse");
+
+  function updateMiniMap() {
+    if (!miniMapCanvas) miniMapCanvas = document.getElementById("miniMapCanvas");
+    if (!miniMapRadar) miniMapRadar = document.getElementById("miniMapRadar");
+    if (!miniMapViewport) miniMapViewport = document.getElementById("miniMapViewport");
+    if (!miniMapCanvas || !miniMapRadar) return;
+    if (state.showMiniMap === false) {
+      miniMapRadar.style.display = "none";
+      return;
+    }
+    miniMapRadar.style.display = "flex";
+
+    const ctx = miniMapCanvas.getContext("2d");
+    const mw = miniMapCanvas.width;
+    const mh = miniMapCanvas.height;
+    ctx.clearRect(0, 0, mw, mh);
+
+    const cw = state.canvasWidth || 3000;
+    const ch = state.canvasHeight || 1800;
+    const scaleX = mw / cw;
+    const scaleY = mh / ch;
+
+    // Swimlanes in minimap
+    if (state.showSwimlanes && state.swimlanes) {
+      state.swimlanes.forEach(sw => {
+        ctx.fillStyle = "rgba(255,255,255,0.04)";
+        ctx.fillRect(0, sw.y * scaleY, mw, sw.height * scaleY);
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.strokeRect(0, sw.y * scaleY, mw, sw.height * scaleY);
+      });
+    }
+
+    // Connectors in minimap
+    state.connectors.forEach(c => {
+      const p1 = resolveConnectorEndpoint(c, "from");
+      const p2 = resolveConnectorEndpoint(c, "to");
+      if (!p1 || !p2) return;
+      ctx.beginPath();
+      ctx.moveTo(p1.x * scaleX, p1.y * scaleY);
+      ctx.lineTo(p2.x * scaleX, p2.y * scaleY);
+      if (state.highlightCriticalPath && c._isCritical) {
+        ctx.strokeStyle = "#dc2626";
+        ctx.lineWidth = 2.5;
+      } else {
+        ctx.strokeStyle = c.color || "#64748b";
+        ctx.lineWidth = 1;
+      }
+      ctx.stroke();
+    });
+
+    // Nodes in minimap
+    state.nodes.forEach(n => {
+      const nx = n.x * scaleX;
+      const ny = n.y * scaleY;
+      ctx.beginPath();
+      ctx.arc(nx, ny, 3.5, 0, Math.PI * 2);
+      if (state.highlightCriticalPath && n._isCritical) {
+        ctx.fillStyle = "#dc2626";
+      } else if (n.completed) {
+        ctx.fillStyle = "#16a34a";
+      } else {
+        ctx.fillStyle = "#38bdf8";
+      }
+      ctx.fill();
+    });
+
+    updateMiniMapViewport();
+  }
+
+  function updateMiniMapViewport() {
+    if (!miniMapCanvas) miniMapCanvas = document.getElementById("miniMapCanvas");
+    if (!miniMapViewport) miniMapViewport = document.getElementById("miniMapViewport");
+    if (!miniMapViewport || !canvasWrap || !miniMapCanvas) return;
+    const mw = miniMapCanvas.width;
+    const mh = miniMapCanvas.height;
+    const cw = state.canvasWidth || 3000;
+    const ch = state.canvasHeight || 1800;
+
+    const curZoom = zoom || 1;
+    const viewW = (canvasWrap.clientWidth / curZoom) * (mw / cw);
+    const viewH = (canvasWrap.clientHeight / curZoom) * (mh / ch);
+    const viewX = (canvasWrap.scrollLeft / curZoom) * (mw / cw);
+    const viewY = (canvasWrap.scrollTop / curZoom) * (mh / ch);
+
+    miniMapViewport.style.width = Math.min(mw, Math.max(16, viewW)) + "px";
+    miniMapViewport.style.height = Math.min(mh, Math.max(12, viewH)) + "px";
+    miniMapViewport.style.left = Math.max(0, Math.min(mw - 16, viewX)) + "px";
+    miniMapViewport.style.top = Math.max(0, Math.min(mh - 12, viewY)) + "px";
+  }
+
+  function panFromMiniMap(e) {
+    if (!miniMapCanvas || !canvasWrap) return;
+    const rect = miniMapCanvas.getBoundingClientRect();
+    const mx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const my = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+
+    const cw = state.canvasWidth || 3000;
+    const ch = state.canvasHeight || 1800;
+    const targetX = (mx / rect.width) * cw;
+    const targetY = (my / rect.height) * ch;
+
+    const curZoom = zoom || 1;
+    canvasWrap.scrollLeft = targetX * curZoom - canvasWrap.clientWidth / 2;
+    canvasWrap.scrollTop = targetY * curZoom - canvasWrap.clientHeight / 2;
+    updateMiniMapViewport();
+  }
+
+  if (miniMapCanvas) {
+    miniMapCanvas.addEventListener("mousedown", (e) => {
+      isMiniMapDragging = true;
+      panFromMiniMap(e);
+    });
+  }
+  if (miniMapViewport) {
+    miniMapViewport.addEventListener("mousedown", (e) => {
+      isMiniMapDragging = true;
+      panFromMiniMap(e);
+    });
+  }
+  window.addEventListener("mousemove", (e) => {
+    if (isMiniMapDragging) panFromMiniMap(e);
+  });
+  window.addEventListener("mouseup", () => {
+    isMiniMapDragging = false;
+  });
+  if (canvasWrap) canvasWrap.addEventListener("scroll", updateMiniMapViewport);
+
+  if (btnToggleMiniMapCollapse) {
+    btnToggleMiniMapCollapse.addEventListener("click", () => {
+      const body = document.getElementById("miniMapBody");
+      miniMapCollapsed = !miniMapCollapsed;
+      if (body) body.style.display = miniMapCollapsed ? "none" : "block";
+      btnToggleMiniMapCollapse.textContent = miniMapCollapsed ? "+" : "−";
+    });
+  }
+
+  const btnMenuMiniMap = document.getElementById("btnMenuMiniMap");
+  if (btnMenuMiniMap) {
+    btnMenuMiniMap.addEventListener("click", () => {
+      state.showMiniMap = state.showMiniMap === false ? true : false;
+      updateViewMenuCheckmarks();
+      updateMiniMap();
+      commit();
+    });
+  }
+
+  // 4. Turnaround Shift Handover & Progress Report Implementation
+  const shiftReportModal = document.getElementById("shiftReportModal");
+  const shiftReportClose = document.getElementById("shiftReportClose");
+  const btnCloseShiftReport = document.getElementById("btnCloseShiftReport");
+  const btnCopyShiftReportLine = document.getElementById("btnCopyShiftReportLine");
+  const btnPrintShiftReport = document.getElementById("btnPrintShiftReport");
+  const btnOpenShiftReport = document.getElementById("btnOpenShiftReport");
+
+  function openShiftReportModal() {
+    calculateCriticalPath();
+    const actualLine = findActiveTimeActualLine();
+    const nodes = state.nodes || [];
+    const conns = state.connectors || [];
+
+    const totalNodes = nodes.length;
+    let completedCount = 0;
+    let inProgressCount = 0;
+    let delayedCount = 0;
+
+    const activities = [];
+
+    conns.forEach((c, idx) => {
+      const fromNode = findNode(c.fromId);
+      const toNode = findNode(c.toId);
+      const taskName = c.task || `Activity #${idx+1}`;
+      const dur = c.duration || "-";
+      let status = "pending";
+      let statusText = "⏱️ ตามแผนงาน";
+      let statusColor = "#64748b";
+
+      const isCompleted = toNode && toNode.completed;
+      if (isCompleted) {
+        status = "completed";
+        statusText = "✅ เสร็จสิ้นแล้ว";
+        statusColor = "#16a34a";
+        completedCount++;
+      } else if (actualLine) {
+        if (toNode && toNode.x < actualLine.x) {
+          status = "delayed";
+          statusText = "⚠️ ล่าช้ากว่ากำหนด";
+          statusColor = "#ef4444";
+          delayedCount++;
+        } else if (fromNode && fromNode.x <= actualLine.x && toNode && toNode.x >= actualLine.x) {
+          status = "inprogress";
+          statusText = "⏳ กำลังดำเนินการ";
+          statusColor = "#f59e0b";
+          inProgressCount++;
+        }
+      }
+
+      activities.push({
+        id: c.id,
+        name: taskName,
+        fromLabel: fromNode ? fromNode.label : "?",
+        toLabel: toNode ? toNode.label : "?",
+        duration: dur,
+        datetime: (fromNode && fromNode.datetime) ? fromNode.datetime : "-",
+        status,
+        statusText,
+        statusColor,
+        isCritical: !!c._isCritical
+      });
+    });
+
+    const totalActs = conns.length || totalNodes;
+    const pct = totalActs > 0 ? Math.round((completedCount / totalActs) * 100) : 0;
+
+    document.getElementById("srKpiTotal").textContent = totalActs;
+    document.getElementById("srKpiCompleted").textContent = completedCount;
+    document.getElementById("srKpiPercent").textContent = `${pct}% ของทั้งหมด`;
+    document.getElementById("srKpiInProgress").textContent = inProgressCount;
+    document.getElementById("srKpiDelayed").textContent = delayedCount;
+
+    document.getElementById("srProgressLabel").textContent = `${pct}% เสร็จสิ้น`;
+    document.getElementById("srProgressBar").style.width = `${pct}%`;
+
+    const tbody = document.getElementById("srTaskTableBody");
+    if (tbody) {
+      tbody.innerHTML = "";
+      if (activities.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">ยังไม่มีข้อมูลกิจกรรมบนบอร์ด</td></tr>`;
+      } else {
+        activities.forEach((act, i) => {
+          const tr = document.createElement("tr");
+          tr.style.borderBottom = "1px solid #f1f5f9";
+          tr.innerHTML = `
+            <td style="padding:8px 12px; color:#64748b;">${i+1}</td>
+            <td style="padding:8px 12px; font-weight:600; color:#1e293b;">
+              ${act.isCritical ? '<span style="color:#dc2626; font-size:10px; font-weight:800; background:#fee2e2; padding:1px 5px; border-radius:3px; margin-right:4px;">CP</span>' : ''}
+              ${act.name}
+            </td>
+            <td style="padding:8px 12px; color:#475569;">${act.duration}</td>
+            <td style="padding:8px 12px; font-family:var(--font-mono); font-size:11px; color:#475569;">${act.datetime}</td>
+            <td style="padding:8px 12px; text-align:center;">
+              <span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; color:${act.statusColor}; background:${act.statusColor}15; border:1px solid ${act.statusColor}30;">
+                ${act.statusText}
+              </span>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    if (shiftReportModal) shiftReportModal.style.display = "flex";
+  }
+
+  function copyShiftReportLine() {
+    const title = $("#diagramTitle").value || "CPM Turnaround";
+    const sub = $("#diagramSubtitle").value || "";
+    const total = document.getElementById("srKpiTotal").textContent;
+    const completed = document.getElementById("srKpiCompleted").textContent;
+    const pct = document.getElementById("srKpiPercent").textContent;
+    const inProg = document.getElementById("srKpiInProgress").textContent;
+    const delayed = document.getElementById("srKpiDelayed").textContent;
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    let msg = `📊 สรุปความก้าวหน้ารายกะ (Turnaround Shift Report)\n`;
+    msg += `🏭 โครงการ: ${title} ${sub ? '(' + sub + ')' : ''}\n`;
+    msg += `📅 เวลาที่ออกรายงาน: ${dateStr}\n`;
+    msg += `---------------------------------\n`;
+    msg += `📈 ภาพรวมความก้าวหน้า: ${pct}\n`;
+    msg += `• งานทั้งหมด: ${total} รายการ\n`;
+    msg += `• ✅ เสร็จสิ้นแล้ว: ${completed} รายการ\n`;
+    msg += `• ⏳ กำลังดำเนินการ: ${inProg} รายการ\n`;
+    msg += `• ⚠️ ล่าช้ากว่าแผน: ${delayed} รายการ\n`;
+    msg += `---------------------------------\n`;
+    msg += `👷 จัดทำโดย: Phalat 490047 (PTT GSP Rayong)\n`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(msg).then(() => {
+        showSaveNotification("คัดลอกสำเร็จ", "คัดลอกข้อความสรุปสำหรับส่ง LINE เรียบร้อยแล้ว");
+      }).catch(() => {
+        prompt("คัดลอกข้อความด้านล่างนี้:", msg);
+      });
+    } else {
+      prompt("คัดลอกข้อความด้านล่างนี้:", msg);
+    }
+  }
+
+  if (btnOpenShiftReport) btnOpenShiftReport.addEventListener("click", openShiftReportModal);
+  if (shiftReportClose) shiftReportClose.addEventListener("click", () => { if (shiftReportModal) shiftReportModal.style.display = "none"; });
+  if (btnCloseShiftReport) btnCloseShiftReport.addEventListener("click", () => { if (shiftReportModal) shiftReportModal.style.display = "none"; });
+  if (btnCopyShiftReportLine) btnCopyShiftReportLine.addEventListener("click", copyShiftReportLine);
+  if (btnPrintShiftReport) btnPrintShiftReport.addEventListener("click", () => window.print());
+
+  // 5. Engineering Blueprint Export (A3 / A4) Implementation
+  const blueprintExportModal = document.getElementById("blueprintExportModal");
+  const blueprintModalClose = document.getElementById("blueprintModalClose");
+  const btnCancelBlueprint = document.getElementById("btnCancelBlueprint");
+  const btnMenuExportBlueprint = document.getElementById("btnMenuExportBlueprint");
+  const btnDownloadBlueprintPng = document.getElementById("btnDownloadBlueprintPng");
+  const btnPrintBlueprintDirect = document.getElementById("btnPrintBlueprintDirect");
+
+  function openBlueprintExportModal() {
+    if (blueprintExportModal) blueprintExportModal.style.display = "flex";
+  }
+
+  if (btnMenuExportBlueprint) btnMenuExportBlueprint.addEventListener("click", openBlueprintExportModal);
+  if (blueprintModalClose) blueprintModalClose.addEventListener("click", () => { if (blueprintExportModal) blueprintExportModal.style.display = "none"; });
+  if (btnCancelBlueprint) btnCancelBlueprint.addEventListener("click", () => { if (blueprintExportModal) blueprintExportModal.style.display = "none"; });
+
+  if (btnDownloadBlueprintPng) {
+    btnDownloadBlueprintPng.addEventListener("click", () => {
+      const format = document.getElementById("bpPaperFormat").value;
+      const drawingNo = document.getElementById("bpDrawingNo").value.trim() || "PTT-GSP-CPM-2026-001";
+      const preparedBy = document.getElementById("bpPreparedBy").value.trim() || "Phalat 490047";
+      const revision = document.getElementById("bpRevision").value.trim() || "Rev. 0";
+      if (blueprintExportModal) blueprintExportModal.style.display = "none";
+      exportA3Blueprint(format, drawingNo, preparedBy, revision);
+    });
+  }
+
+  if (btnPrintBlueprintDirect) {
+    btnPrintBlueprintDirect.addEventListener("click", () => {
+      if (blueprintExportModal) blueprintExportModal.style.display = "none";
+      window.print();
+    });
+  }
+
+  function exportA3Blueprint(format, drawingNo, preparedBy, revision) {
+    setStatus("Generating blueprint drawing…");
+    const bounds = computeContentBounds();
+    const pad = 60;
+    const framePad = 40;
+    const titleBlockW = 340;
+    const titleBlockH = 130;
+    const legendW = 280;
+    const legendH = 120;
+
+    const contentW = Math.max(800, bounds.maxX - bounds.minX + pad * 2);
+    const contentH = Math.max(500, bounds.maxY - bounds.minY + pad * 2);
+
+    const w = contentW + framePad * 2;
+    const h = contentH + framePad * 2 + titleBlockH + 20;
+
+    const clone = svg.cloneNode(true);
+    clone.querySelector("#layerOverlay")?.remove();
+    clone.querySelector("#layerLeaderLines")?.remove();
+
+    const docStyle = document.querySelector("style");
+    if (docStyle) {
+      const styleClone = svgElCreate("style");
+      styleClone.textContent = (docStyle.textContent || "")
+        .replace(/@import\s+url\([^)]*\)\s*;?/gi, "")
+        .replace(/:root\s*\{/, ":root, svg {");
+      clone.insertBefore(styleClone, clone.firstChild);
+    }
+
+    const startX = bounds.minX - pad - framePad;
+    const startY = bounds.minY - pad - framePad;
+
+    clone.setAttribute("width", w);
+    clone.setAttribute("height", h);
+    clone.setAttribute("viewBox", `${startX} ${startY} ${w} ${h}`);
+
+    // Outer Blueprint Frame
+    const bg = svgElCreate("rect", { x: startX, y: startY, width: w, height: h, fill: "#fcfbf7" });
+    clone.insertBefore(bg, clone.firstChild);
+
+    // Frame Borders
+    const outerBorder = svgElCreate("rect", {
+      x: startX + 15, y: startY + 15, width: w - 30, height: h - 30,
+      fill: "none", stroke: "#1e293b", "stroke-width": 2
+    });
+    const innerBorder = svgElCreate("rect", {
+      x: startX + 24, y: startY + 24, width: w - 48, height: h - 48,
+      fill: "none", stroke: "#1e293b", "stroke-width": 1
+    });
+    clone.appendChild(outerBorder);
+    clone.appendChild(innerBorder);
+
+    // Grid Coordinates
+    const gridCols = ["1", "2", "3", "4", "5", "6"];
+    const colStep = (w - 48) / 6;
+    gridCols.forEach((num, i) => {
+      const tx = startX + 24 + (i + 0.5) * colStep;
+      const tTop = svgElCreate("text", { x: tx, y: startY + 21, fill: "#64748b", "font-size": "10px", "font-weight": "bold", "text-anchor": "middle" });
+      tTop.textContent = num;
+      const tBot = svgElCreate("text", { x: tx, y: startY + h - 17, fill: "#64748b", "font-size": "10px", "font-weight": "bold", "text-anchor": "middle" });
+      tBot.textContent = num;
+      clone.appendChild(tTop);
+      clone.appendChild(tBot);
+    });
+
+    const gridRows = ["A", "B", "C", "D"];
+    const rowStep = (h - 48) / 4;
+    gridRows.forEach((lettr, i) => {
+      const ty = startY + 24 + (i + 0.5) * rowStep;
+      const tL = svgElCreate("text", { x: startX + 19, y: ty + 4, fill: "#64748b", "font-size": "10px", "font-weight": "bold", "text-anchor": "middle" });
+      tL.textContent = lettr;
+      const tR = svgElCreate("text", { x: startX + w - 19, y: ty + 4, fill: "#64748b", "font-size": "10px", "font-weight": "bold", "text-anchor": "middle" });
+      tR.textContent = lettr;
+      clone.appendChild(tL);
+      clone.appendChild(tR);
+    });
+
+    // Title Block
+    const tbX = startX + w - 24 - titleBlockW;
+    const tbY = startY + h - 24 - titleBlockH;
+    const tbG = svgElCreate("g", { class: "title-block" });
+
+    const tbBg = svgElCreate("rect", { x: tbX, y: tbY, width: titleBlockW, height: titleBlockH, fill: "#ffffff", stroke: "#1e293b", "stroke-width": 1.5 });
+    tbG.appendChild(tbBg);
+
+    const tbLine1 = svgElCreate("line", { x1: tbX, y1: tbY + 40, x2: tbX + titleBlockW, y2: tbY + 40, stroke: "#1e293b", "stroke-width": 1 });
+    const tbLine2 = svgElCreate("line", { x1: tbX, y1: tbY + 80, x2: tbX + titleBlockW, y2: tbY + 80, stroke: "#1e293b", "stroke-width": 1 });
+    const tbLineV = svgElCreate("line", { x1: tbX + 180, y1: tbY + 40, x2: tbX + 180, y2: tbY + titleBlockH, stroke: "#1e293b", "stroke-width": 1 });
+    tbG.appendChild(tbLine1);
+    tbG.appendChild(tbLine2);
+    tbG.appendChild(tbLineV);
+
+    const txtCompany = svgElCreate("text", { x: tbX + 14, y: tbY + 26, fill: "#0f172a", "font-size": "15px", "font-weight": "bold", style: "font-family: var(--font-display);" });
+    txtCompany.textContent = "PTT GSP RAYONG — PLANT ENGINEERING";
+    tbG.appendChild(txtCompany);
+
+    const txtTitle = svgElCreate("text", { x: tbX + 14, y: tbY + 60, fill: "#1e293b", "font-size": "12.5px", "font-weight": "bold" });
+    txtTitle.textContent = ($("#diagramTitle").value || "CPM DIAGRAM").substring(0, 32);
+    tbG.appendChild(txtTitle);
+
+    const txtSub = svgElCreate("text", { x: tbX + 14, y: tbY + 74, fill: "#64748b", "font-size": "10.5px" });
+    txtSub.textContent = ($("#diagramSubtitle").value || "").substring(0, 36);
+    tbG.appendChild(txtSub);
+
+    const txtDwg = svgElCreate("text", { x: tbX + 190, y: tbY + 58, fill: "#475569", "font-size": "10px" });
+    txtDwg.textContent = "DRAWING NO:";
+    const txtDwgVal = svgElCreate("text", { x: tbX + 190, y: tbY + 74, fill: "#0f172a", "font-size": "11.5px", "font-weight": "bold" });
+    txtDwgVal.textContent = drawingNo;
+    tbG.appendChild(txtDwg);
+    tbG.appendChild(txtDwgVal);
+
+    const txtPrep = svgElCreate("text", { x: tbX + 14, y: tbY + 98, fill: "#475569", "font-size": "10px" });
+    txtPrep.textContent = `PREPARED: ${preparedBy}`;
+    const txtDate = svgElCreate("text", { x: tbX + 14, y: tbY + 116, fill: "#475569", "font-size": "10px" });
+    txtDate.textContent = `DATE: ${new Date().toLocaleDateString("en-GB")}`;
+    tbG.appendChild(txtPrep);
+    tbG.appendChild(txtDate);
+
+    const txtRev = svgElCreate("text", { x: tbX + 190, y: tbY + 98, fill: "#475569", "font-size": "10px" });
+    txtRev.textContent = `REVISION: ${revision}`;
+    const txtScale = svgElCreate("text", { x: tbX + 190, y: tbY + 116, fill: "#475569", "font-size": "10px" });
+    txtScale.textContent = `SCALE: Time-Scale (1 Hr = 40px)`;
+    tbG.appendChild(txtRev);
+    tbG.appendChild(txtScale);
+
+    clone.appendChild(tbG);
+
+    // Legend Block
+    const lgX = startX + 24;
+    const lgY = startY + h - 24 - legendH;
+    const lgG = svgElCreate("g", { class: "drawing-legend" });
+    const lgBg = svgElCreate("rect", { x: lgX, y: lgY, width: legendW, height: legendH, fill: "#ffffff", stroke: "#1e293b", "stroke-width": 1.5 });
+    lgG.appendChild(lgBg);
+
+    const lgTitle = svgElCreate("text", { x: lgX + 12, y: lgY + 20, fill: "#0f172a", "font-size": "11px", "font-weight": "bold" });
+    lgTitle.textContent = "DRAWING SYMBOLS & LEGEND";
+    lgG.appendChild(lgTitle);
+
+    const l1 = svgElCreate("line", { x1: lgX + 12, y1: lgY + 40, x2: lgX + 45, y2: lgY + 40, stroke: "#dc2626", "stroke-width": 4 });
+    const t1 = svgElCreate("text", { x: lgX + 54, y: lgY + 44, fill: "#1e293b", "font-size": "10.5px" });
+    t1.textContent = "Critical Path (Float = 0)";
+    lgG.appendChild(l1);
+    lgG.appendChild(t1);
+
+    const l2 = svgElCreate("line", { x1: lgX + 12, y1: lgY + 62, x2: lgX + 45, y2: lgY + 62, stroke: "#c0392b", "stroke-width": 2 });
+    const t2 = svgElCreate("text", { x: lgX + 54, y: lgY + 66, fill: "#1e293b", "font-size": "10.5px" });
+    t2.textContent = "Process Activity (Normal)";
+    lgG.appendChild(l2);
+    lgG.appendChild(t2);
+
+    const c1 = svgElCreate("circle", { cx: lgX + 28, cy: lgY + 86, r: 8, fill: "#ffffff", stroke: "#23303c", "stroke-width": 2 });
+    const t3 = svgElCreate("text", { x: lgX + 54, y: lgY + 90, fill: "#1e293b", "font-size": "10.5px" });
+    t3.textContent = "Process Milestone Node";
+    lgG.appendChild(c1);
+    lgG.appendChild(t3);
+
+    const l3 = svgElCreate("line", { x1: lgX + 12, y1: lgY + 108, x2: lgX + 45, y2: lgY + 108, stroke: "#16a34a", "stroke-width": 2, "stroke-dasharray": "4 2" });
+    const t4 = svgElCreate("text", { x: lgX + 54, y: lgY + 112, fill: "#1e293b", "font-size": "10.5px" });
+    t4.textContent = "Time Actual Status Line";
+    lgG.appendChild(l3);
+    lgG.appendChild(t4);
+
+    clone.appendChild(lgG);
+
+    const xml = new XMLSerializer().serializeToString(clone);
+    const svgBlob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement("canvas");
+      canvas.width = w * 1.5;
+      canvas.height = h * 1.5;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(1.5, 1.5);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      canvas.toBlob(function (blob) {
+        if (!blob) { setStatus("Blueprint export failed"); return; }
+        const filename = `${drawingNo}_Blueprint_${format}.png`;
+        downloadBlobFallback(blob, filename);
+        showSaveNotification("พิมพ์เขียวสำเร็จ", `ดาวน์โหลดแบบ ${filename} เรียบร้อยแล้ว`);
+        setStatus("Blueprint exported");
+      }, "image/png");
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      setStatus("Blueprint generation failed");
+    };
+    img.src = url;
+  }
+
+
+    (function bootstrap(){
     // 1. Check if state passed in URL hash (from local file opening online)
     if (window.location.hash && window.location.hash.includes("state=")) {
       try {
@@ -8665,8 +10071,11 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
         if(payload.title !== undefined) $("#diagramTitle").value = payload.title;
         if(payload.subtitle !== undefined) $("#diagramSubtitle").value = payload.subtitle;
         state = payload.state || payload;
-        initNodesDatetimeFields(state.nodes);
+                initNodesDatetimeFields(state.nodes);
         recalculateDiagramTimes();
+        initDefaultSwimlanes();
+        syncCriticalPathBtn();
+        updateViewMenuCheckmarks();
         selection = [];
         renderAll(); updateInspector(); applyCanvasBg();
         history = []; historyIndex = -1;
