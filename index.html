@@ -2063,27 +2063,44 @@ input:checked + .slider:before {
     restoreSnapshot(history[historyIndex]);
     setStatus("Redo");
   }
+  let saveDebounceTimer = null;
   function commit(){
     pushHistory();
     refreshCount();
-    try {
-      localStorage.setItem("cpm_current_canvas", JSON.stringify({
-        title: $("#diagramTitle").value,
-        subtitle: $("#diagramSubtitle").value,
-        state
-      }));
-      const ind = document.getElementById("autoSaveIndicator");
-      if(ind){
-        const now = new Date();
-        const timeStr = String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0') + ":" + String(now.getSeconds()).padStart(2,'0');
-        ind.textContent = `☁️ Auto-saved ${timeStr}`;
-        ind.style.display = "inline-flex";
-      }
-    } catch(e){}
+    if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(() => {
+      try {
+        localStorage.setItem("cpm_current_canvas", JSON.stringify({
+          title: $("#diagramTitle").value,
+          subtitle: $("#diagramSubtitle").value,
+          state
+        }));
+        const ind = document.getElementById("autoSaveIndicator");
+        if(ind){
+          const now = new Date();
+          const timeStr = String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0') + ":" + String(now.getSeconds()).padStart(2,'0');
+          ind.textContent = `☁️ Auto-saved ${timeStr}`;
+          ind.style.display = "inline-flex";
+        }
+      } catch(e){}
+    }, 300);
     if (isCollabActive) {
       pushLocalStateUpdate();
     }
   }
+
+  window.addEventListener("beforeunload", () => {
+    if (saveDebounceTimer) {
+      clearTimeout(saveDebounceTimer);
+      try {
+        localStorage.setItem("cpm_current_canvas", JSON.stringify({
+          title: $("#diagramTitle").value,
+          subtitle: $("#diagramSubtitle").value,
+          state
+        }));
+      } catch(e){}
+    }
+  });
 
   function setStatus(msg){ statusLeft.textContent = msg; }
 
@@ -2268,6 +2285,20 @@ input:checked + .slider:before {
     const nodeTimes = {};
     const connTimes = {}; // { id: { start, end } }
 
+    const nodeMap = new Map();
+    state.nodes.forEach(n => nodeMap.set(n.id, n));
+    const connMap = new Map();
+    state.connectors.forEach(c => connMap.set(c.id, c));
+
+    const incomingByNode = new Map();
+    state.connectors.forEach(c => {
+      if (c.toId) {
+        let arr = incomingByNode.get(c.toId);
+        if (!arr) { arr = []; incomingByNode.set(c.toId, arr); }
+        arr.push(c);
+      }
+    });
+
     // Start with explicitly set node times
     let anchorFound = false;
     state.nodes.forEach(n => {
@@ -2302,14 +2333,15 @@ input:checked + .slider:before {
     // Iterative relaxation (bidirectional: forward and backward)
     let changed = true;
     let iter = 0;
-    const maxIter = (state.nodes.length + state.connectors.length) * 5 + 50;
+    const maxIter = Math.min(50, state.nodes.length + 10);
 
     while (changed && iter < maxIter) {
       changed = false;
       iter++;
 
       // Update connectors forward
-      state.connectors.forEach(c => {
+      for (let i = 0; i < state.connectors.length; i++) {
+        const c = state.connectors[i];
         const duration = parseNumericLabel(c.duration) || 0;
         const unit = c.durationUnit || "hours";
 
@@ -2319,7 +2351,7 @@ input:checked + .slider:before {
         } else if (c.fromConnectorId) {
           const parent = connTimes[c.fromConnectorId];
           if (parent && parent.start) {
-            const parentConn = findConnector(c.fromConnectorId);
+            const parentConn = connMap.get(c.fromConnectorId);
             if (parentConn) {
               const parentDur = parseNumericLabel(parentConn.duration) || 0;
               const parentUnit = parentConn.durationUnit || "hours";
@@ -2337,21 +2369,22 @@ input:checked + .slider:before {
             changed = true;
           }
         }
-      });
+      }
 
       // Update nodes forward (toId receives end of connector)
-      state.nodes.forEach(n => {
-        if (n.lockTime) return; // locked nodes preserve their time
-        const incoming = state.connectors.filter(c => c.toId === n.id);
-        if (incoming.length === 0) return;
+      for (let i = 0; i < state.nodes.length; i++) {
+        const n = state.nodes[i];
+        if (n.lockTime) continue; // locked nodes preserve their time
+        const incoming = incomingByNode.get(n.id);
+        if (!incoming || incoming.length === 0) continue;
 
         let maxTime = null;
-        incoming.forEach(c => {
-          const ct = connTimes[c.id];
+        for (let j = 0; j < incoming.length; j++) {
+          const ct = connTimes[incoming[j].id];
           if (ct && ct.end) {
             if (!maxTime || ct.end > maxTime) maxTime = ct.end;
           }
-        });
+        }
 
         if (maxTime) {
           const oldTime = nodeTimes[n.id];
@@ -2360,13 +2393,14 @@ input:checked + .slider:before {
             changed = true;
           }
         }
-      });
+      }
 
       // Update backward: if toNode has a time, calculate fromNode backward (startTime = endTime - duration)
-      state.connectors.forEach(c => {
-        if (!c.fromId || !c.toId) return;
-        const sourceNode = findNode(c.fromId);
-        if (sourceNode && sourceNode.lockTime) return;
+      for (let i = 0; i < state.connectors.length; i++) {
+        const c = state.connectors[i];
+        if (!c.fromId || !c.toId) continue;
+        const sourceNode = nodeMap.get(c.fromId);
+        if (sourceNode && sourceNode.lockTime) continue;
 
         const targetTime = nodeTimes[c.toId];
         if (targetTime && !nodeTimes[c.fromId]) {
@@ -2376,7 +2410,7 @@ input:checked + .slider:before {
           nodeTimes[c.fromId] = calculatedStart;
           changed = true;
         }
-      });
+      }
     }
 
     // Write back to all nodes
@@ -2934,16 +2968,27 @@ input:checked + .slider:before {
   // a straight line from p1 to p2, so the connector can be bent around them.
   function findObstructions(p1, p2, excludeIds){
     const hits = [];
-    state.nodes.forEach(n=>{
-      if(excludeIds.includes(n.id)) return;
+    const margin = 50;
+    const minX = Math.min(p1.x, p2.x) - margin;
+    const maxX = Math.max(p1.x, p2.x) + margin;
+    const minY = Math.min(p1.y, p2.y) - margin;
+    const maxY = Math.max(p1.y, p2.y) + margin;
+
+    const excludeSet = new Set(excludeIds);
+
+    for(let i = 0; i < state.nodes.length; i++){
+      const n = state.nodes[i];
+      if(excludeSet.has(n.id)) continue;
+      // Fast 2D bounding-box rejection: skips 95%+ of distant nodes instantly
+      if(n.x < minX || n.x > maxX || n.y < minY || n.y > maxY) continue;
       const cp = closestPointOnSegment(n.x, n.y, p1.x, p1.y, p2.x, p2.y);
       // ignore near the very ends (that's just the node we're leaving/arriving at)
-      if(cp.t < 0.06 || cp.t > 0.94) return;
+      if(cp.t < 0.06 || cp.t > 0.94) continue;
       const clearance = n.r + 16;
       if(cp.dist < clearance){
         hits.push({ node:n, t:cp.t, dist:cp.dist, clearance });
       }
-    });
+    }
     return hits;
   }
 
@@ -2961,11 +3006,12 @@ input:checked + .slider:before {
 
   // Does this quadratic curve (sampled) stay clear of all given obstruction nodes?
   function curveClearsObstructions(p1, ctrl, p2, obstructions){
-    const SAMPLES = 24;
+    const SAMPLES = 12;
     for(let i=1;i<SAMPLES;i++){
       const t = i/SAMPLES;
       const pt = quadAt(p1, ctrl, p2, t);
-      for(const ob of obstructions){
+      for(let j=0; j<obstructions.length; j++){
+        const ob = obstructions[j];
         const d = Math.hypot(pt.x-ob.node.x, pt.y-ob.node.y);
         if(d < ob.node.r + 14) return false;
       }
@@ -3010,48 +3056,52 @@ input:checked + .slider:before {
   }
 
 
-  function resolveConnectorEndpoint(c, direction, visited = new Set()) {
+  function resolveConnectorEndpoint(c, direction, visited = new Set(), nodeMap = null, connMap = null) {
     if (!c) return { x: 0, y: 0 };
     if (visited.has(c.id)) return { x: 0, y: 0 };
 
+    const getNode = (id) => nodeMap ? nodeMap.get(id) : findNode(id);
+    const getConn = (id) => connMap ? connMap.get(id) : findConnector(id);
+
     if (direction === "from") {
       if (c.fromId) {
-        const node = findNode(c.fromId);
+        const node = getNode(c.fromId);
         return node ? { x: node.x, y: node.y } : (c.fromPt || { x: 0, y: 0 });
       } else if (c.fromConnectorId) {
-        const parent = findConnector(c.fromConnectorId);
+        const parent = getConn(c.fromConnectorId);
         const t = c.fromConnectorT !== undefined && c.fromConnectorT !== null ? c.fromConnectorT : 0.5;
         const nextVisited = new Set(visited);
         nextVisited.add(c.id);
-        return parent ? connectorPointAtT(parent, t, nextVisited) : (c.fromPt || { x: 0, y: 0 });
+        return parent ? connectorPointAtT(parent, t, nextVisited, nodeMap, connMap) : (c.fromPt || { x: 0, y: 0 });
       } else {
         return c.fromPt || { x: 0, y: 0 };
       }
     } else { // "to"
       if (c.toId) {
-        const node = findNode(c.toId);
+        const node = getNode(c.toId);
         return node ? { x: node.x, y: node.y } : (c.toPt || { x: 0, y: 0 });
       } else if (c.toConnectorId) {
-        const parent = findConnector(c.toConnectorId);
+        const parent = getConn(c.toConnectorId);
         const t = c.toConnectorT !== undefined && c.toConnectorT !== null ? c.toConnectorT : 0.5;
         const nextVisited = new Set(visited);
         nextVisited.add(c.id);
-        return parent ? connectorPointAtT(parent, t, nextVisited) : (c.toPt || { x: 0, y: 0 });
+        return parent ? connectorPointAtT(parent, t, nextVisited, nodeMap, connMap) : (c.toPt || { x: 0, y: 0 });
       } else {
         return c.toPt || { x: 0, y: 0 };
       }
     }
   }
 
-  function connectorPointAtT(c, t, visited = new Set()) {
+  function connectorPointAtT(c, t, visited = new Set(), nodeMap = null, connMap = null) {
     if (!c) return { x: 0, y: 0 };
     if (visited.has(c.id)) return { x: 0, y: 0 };
     
-    const p1 = resolveConnectorEndpoint(c, "from", visited);
-    const p2 = resolveConnectorEndpoint(c, "to", visited);
+    const p1 = resolveConnectorEndpoint(c, "from", visited, nodeMap, connMap);
+    const p2 = resolveConnectorEndpoint(c, "to", visited, nodeMap, connMap);
 
-    const a = c.fromId ? findNode(c.fromId) : null;
-    const b = c.toId ? findNode(c.toId) : null;
+    const getNode = (id) => nodeMap ? nodeMap.get(id) : findNode(id);
+    const a = c.fromId ? getNode(c.fromId) : null;
+    const b = c.toId ? getNode(c.toId) : null;
 
     const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
     const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
@@ -3071,8 +3121,8 @@ input:checked + .slider:before {
     }
   }
 
-  function connectorMidpoint(c, visited = new Set()){
-    return connectorPointAtT(c, 0.5, visited);
+  function connectorMidpoint(c, visited = new Set(), nodeMap = null, connMap = null){
+    return connectorPointAtT(c, 0.5, visited, nodeMap, connMap);
   }
 
   function closestPointOnConnector(px, py, c) {
@@ -3152,13 +3202,18 @@ input:checked + .slider:before {
 
   function renderConnectors(){
     layerConnectors.innerHTML = "";
+    const nodeMap = new Map();
+    state.nodes.forEach(n => nodeMap.set(n.id, n));
+    const connMap = new Map();
+    state.connectors.forEach(c => connMap.set(c.id, c));
+
     state.connectors.forEach(c=>{
-      const p1 = resolveConnectorEndpoint(c, "from");
-      const p2 = resolveConnectorEndpoint(c, "to");
+      const p1 = resolveConnectorEndpoint(c, "from", new Set(), nodeMap, connMap);
+      const p2 = resolveConnectorEndpoint(c, "to", new Set(), nodeMap, connMap);
       if(!p1 || !p2) return;
 
-      const a = c.fromId ? findNode(c.fromId) : null;
-      const b = c.toId ? findNode(c.toId) : null;
+      const a = c.fromId ? nodeMap.get(c.fromId) : null;
+      const b = c.toId ? nodeMap.get(c.toId) : null;
 
       const start = a ? nodeAnchorPoint(a, p2.x, p2.y) : p1;
       const end   = b ? nodeAnchorPoint(b, p1.x, p1.y) : p2;
@@ -3543,6 +3598,16 @@ input:checked + .slider:before {
 
     g.appendChild(badgeG);
     return g;
+  }
+
+  let renderAllPending = false;
+  function requestRenderAll(){
+    if(renderAllPending) return;
+    renderAllPending = true;
+    requestAnimationFrame(()=>{
+      renderAllPending = false;
+      renderAll();
+    });
   }
 
   function renderAll(){
@@ -4024,13 +4089,13 @@ input:checked + .slider:before {
       if(!n) return;
       n.x = snap(drag.origX + dx);
       n.y = snap(drag.origY + dy);
-      renderAll();
+      requestRenderAll();
     } else if(drag.type === "annotation"){
       const a = findAnnotation(drag.id);
       if(!a) return;
       a.x = snap(drag.origX + dx);
       a.y = snap(drag.origY + dy);
-      renderAll();
+      requestRenderAll();
     } else if(drag.type === "group"){
       let hourChangeOccurred = false;
       drag.items.forEach(item=>{
@@ -4058,10 +4123,9 @@ input:checked + .slider:before {
         }
       });
       if (state.timeScaleMode && hourChangeOccurred) {
-        adjustConnectorDurationsToMatchNodeLabels();
-        recalculateDiagramTimes();
+        drag.hourChanged = true;
       }
-      renderAll();
+      requestRenderAll();
     } else if(drag.type === "pan"){
       canvasWrap.scrollLeft = drag.scrollLeft0 - (e.clientX - drag.clientX0);
       canvasWrap.scrollTop = drag.scrollTop0 - (e.clientY - drag.clientY0);
@@ -4074,14 +4138,14 @@ input:checked + .slider:before {
       if(a){
         a.textOffsetX = drag.origOffsetX + dx;
         a.textOffsetY = drag.origOffsetY + dy;
-        renderAll();
+        requestRenderAll();
       }
     } else if(drag.type === "ann-resize"){
       const a = findAnnotation(drag.id);
       if(a){
         a.w = Math.max(60, drag.origW + dx);
         a.h = Math.max(20, drag.origH + dy);
-        renderAll();
+        requestRenderAll();
       }
     } else if(drag.type === "node-text"){
       const n = findNode(drag.id);
@@ -4093,7 +4157,7 @@ input:checked + .slider:before {
           n.datetimeOffsetX = drag.origOffsetX + dx;
           n.datetimeOffsetY = drag.origOffsetY + dy;
         }
-        renderAll();
+        requestRenderAll();
         updateNodeTextLeaderLine(n, drag.textKind);
       }
     } else if(drag.type === "connector-text"){
@@ -4106,7 +4170,7 @@ input:checked + .slider:before {
           c.durationOffsetX = drag.origOffsetX + dx;
           c.durationOffsetY = drag.origOffsetY + dy;
         }
-        renderAll();
+        requestRenderAll();
         updateConnectorTextLeaderLine(c, drag.textKind);
       }
     } else if(drag.type === "delay-badge"){
@@ -4114,7 +4178,7 @@ input:checked + .slider:before {
       const dx = pt.x - drag.startX;
       state.autoDelayBadgeY = Math.max(10, Math.min(state.canvasHeight - 30, snap(drag.origY + dy)));
       state.autoDelayBadgeXOffset = snap(drag.origXOff + dx);
-      renderAll();
+      requestRenderAll();
     } else if(drag.type === "marquee"){
       const pt = getCanvasPoint(e);
       const x = Math.min(drag.startX, pt.x);
@@ -4208,6 +4272,11 @@ input:checked + .slider:before {
       return;
     }
     if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "connector-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
+      if(drag.type === "group" && state.timeScaleMode && drag.hourChanged){
+        adjustConnectorDurationsToMatchNodeLabels();
+        recalculateDiagramTimes();
+      }
+      renderAll();
       commit();
       if(drag.type === "delay-badge"){
         setStatus("Delay badge position updated");
@@ -6579,11 +6648,12 @@ input:checked + .slider:before {
       const now = new Date();
       const formatted = formatLiveTimestamp(now);
 
-      let needsRender = false;
+      let textChanged = false;
+      let posChanged = false;
       liveTimelines.forEach(a => {
         if (a.sublabel !== formatted) {
           a.sublabel = formatted;
-          needsRender = true;
+          textChanged = true;
         }
 
         // Auto-move line along timeline based on Milestone 0
@@ -6591,14 +6661,31 @@ input:checked + .slider:before {
           const newX = calculateTimeActualX(a, now);
           if (newX !== undefined && Math.abs(newX - a.x) >= 1) {
             a.x = newX;
-            needsRender = true;
+            posChanged = true;
           }
         }
       });
 
-      if (needsRender) {
+      if (posChanged) {
         renderAnnotations();
         renderNodes();
+      } else if (textChanged) {
+        // Targeted DOM update: update badge text directly without destroying SVG nodes
+        let updatedDirectly = false;
+        liveTimelines.forEach(a => {
+          const badgeText = document.querySelector(`#layerAnnotations g[data-id="${a.id}"] text`);
+          if (badgeText) {
+            const label = a.label || (a.timelineKind === "actual" ? "Time Actual" : (a.timelineKind === "plan" ? "Plan" : "Delay"));
+            badgeText.textContent = label + (a.sublabel ? ` ${a.sublabel}` : "");
+            updatedDirectly = true;
+          }
+        });
+        if (!updatedDirectly) {
+          renderAnnotations();
+        }
+      }
+
+      if (textChanged || posChanged) {
         const sel = currentSingle();
         if (sel && sel.kind === "annotation") {
           const selA = findAnnotation(sel.id);
@@ -9544,9 +9631,14 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
     }
 
     // Connectors in minimap
+    const nodeMap = new Map();
+    state.nodes.forEach(n => nodeMap.set(n.id, n));
+    const connMap = new Map();
+    state.connectors.forEach(c => connMap.set(c.id, c));
+
     state.connectors.forEach(c => {
-      const p1 = resolveConnectorEndpoint(c, "from");
-      const p2 = resolveConnectorEndpoint(c, "to");
+      const p1 = resolveConnectorEndpoint(c, "from", new Set(), nodeMap, connMap);
+      const p2 = resolveConnectorEndpoint(c, "to", new Set(), nodeMap, connMap);
       if (!p1 || !p2) return;
       ctx.beginPath();
       ctx.moveTo(p1.x * scaleX, p1.y * scaleY);
