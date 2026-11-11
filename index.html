@@ -2750,10 +2750,16 @@ input:checked + .slider:before {
             if(isDbl){
               clearLeaderLine();
               selectElement("node", n.id);
-              editNodeLabelInline(n);
+              editNodeLabelInline(n, "caption");
               return;
             }
             startNodeTextDrag(e, n, "sublabel");
+          });
+          subG.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            clearLeaderLine();
+            selectElement("node", n.id);
+            editNodeLabelInline(n, "caption");
           });
           subG.addEventListener("mouseenter", () => {
             if(!drag && (n.sublabelOffsetX || n.sublabelOffsetY)){
@@ -2781,10 +2787,16 @@ input:checked + .slider:before {
             if(isDbl){
               clearLeaderLine();
               selectElement("node", n.id);
-              editNodeLabelInline(n);
+              editNodeLabelInline(n, "time");
               return;
             }
             startNodeTextDrag(e, n, "datetime");
+          });
+          dt.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            clearLeaderLine();
+            selectElement("node", n.id);
+            editNodeLabelInline(n, "time");
           });
           dt.addEventListener("mouseenter", () => {
             if(!drag && (n.datetimeOffsetX || n.datetimeOffsetY)){
@@ -2811,6 +2823,12 @@ input:checked + .slider:before {
       });
 
       g.addEventListener("mousedown", (e)=> onNodeMouseDown(e, n));
+      g.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        clearLeaderLine();
+        selectElement("node", n.id);
+        editNodeLabelInline(n, "caption");
+      });
 
       layerNodes.appendChild(g);
     });
@@ -3280,10 +3298,16 @@ input:checked + .slider:before {
           if(isDbl){
             clearLeaderLine();
             selectElement("connector", c.id);
-            editConnectorInline(c, midx, midy);
+            editConnectorInline(c, midx, midy, "task");
             return;
           }
           startConnectorTextDrag(e, c, "task");
+        });
+        taskG.addEventListener("dblclick", (e)=>{
+          e.stopPropagation();
+          clearLeaderLine();
+          selectElement("connector", c.id);
+          editConnectorInline(c, midx, midy, "task");
         });
         taskG.addEventListener("mouseenter", ()=>{
           if(!drag && (c.taskOffsetX || c.taskOffsetY)){
@@ -3308,10 +3332,16 @@ input:checked + .slider:before {
           if(isDbl){
             clearLeaderLine();
             selectElement("connector", c.id);
-            editConnectorInline(c, midx, midy);
+            editConnectorInline(c, midx, midy, "duration");
             return;
           }
           startConnectorTextDrag(e, c, "duration");
+        });
+        d.addEventListener("dblclick", (e)=>{
+          e.stopPropagation();
+          clearLeaderLine();
+          selectElement("connector", c.id);
+          editConnectorInline(c, midx, midy, "duration");
         });
         d.addEventListener("mouseenter", ()=>{
           if(!drag && (c.durationOffsetX || c.durationOffsetY)){
@@ -3335,6 +3365,13 @@ input:checked + .slider:before {
       g.appendChild(h);
 
       g.addEventListener("mousedown", (e)=> onConnectorMouseDown(e, c));
+      g.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        clearLeaderLine();
+        selectElement("connector", c.id);
+        const mid = connectorMidpoint(c);
+        editConnectorInline(c, mid.x, mid.y, "task");
+      });
 
       layerConnectors.appendChild(g);
     });
@@ -3899,7 +3936,7 @@ input:checked + .slider:before {
   // replaces the DOM node the second click needs to land on, so the browser
   // never registers the pair as a double-click. We track it ourselves instead.
   let lastClickInfo = null; // {kind, id, time}
-  const DBLCLICK_MS = 420;
+  const DBLCLICK_MS = 500;
   function checkManualDoubleClick(kind, id){
     const now = Date.now();
     const isDouble = lastClickInfo && lastClickInfo.kind === kind && lastClickInfo.id === id && (now - lastClickInfo.time) < DBLCLICK_MS;
@@ -5239,12 +5276,35 @@ input:checked + .slider:before {
     });
   }
 
-  function editNodeLabelInline(n){
+  function editNodeLabelInline(n, focusTarget = "time"){
+    // Remove existing inline editors
+    document.querySelectorAll(".inline-node-edit, .inline-connector-edit, .inline-edit").forEach(el => el.remove());
+
     const container = document.createElement("div");
     container.className = "inline-node-edit";
-    const pos = screenPosFor(n.x - 80, n.y - n.r - 88);
-    container.style.left = pos.left + "px";
-    container.style.top = pos.top + "px";
+
+    // Safe positioning: clamp to screen, avoid clipping topbar
+    const pos = screenPosFor(n.x - 90, n.y - n.r - 130);
+    let top = pos.top;
+    let left = pos.left;
+
+    // If too close to the topbar (< 60px), position below the node
+    if (top < 60) {
+      const belowPos = screenPosFor(n.x - 90, n.y + n.r + 16);
+      top = belowPos.top;
+    }
+
+    top = Math.max(56, Math.min(window.innerHeight - 340, top));
+    left = Math.max(10, Math.min(window.innerWidth - 290, left));
+
+    container.style.left = left + "px";
+    container.style.top = top + "px";
+    container.style.zIndex = "10000";
+
+    // Prevent mousedown inside container from bubbling or closing itself
+    container.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
 
     const captionDiv = document.createElement("div");
     captionDiv.style.marginBottom = "6px";
@@ -5262,7 +5322,7 @@ input:checked + .slider:before {
     const btnAddCaption = document.createElement("button");
     btnAddCaption.type = "button";
     btnAddCaption.textContent = "+ เพิ่ม Caption";
-    btnAddCaption.title = "คลิกเพื่อเพิ่มบรรทัดข้อความ Caption |+|";
+    btnAddCaption.title = "คลิกเพื่อเพิ่มบรรทัดข้อความ Caption";
     btnAddCaption.style.cssText = "background: #0284c7; color: #ffffff; border: none; border-radius: 4px; font-size: 10px; font-weight: 700; padding: 2px 7px; cursor: pointer;";
 
     captionHeader.appendChild(captionLabel);
@@ -5274,6 +5334,8 @@ input:checked + .slider:before {
     captionInputsContainer.style.flexDirection = "column";
     captionInputsContainer.style.gap = "4px";
     captionDiv.appendChild(captionInputsContainer);
+
+    let firstCaptionInput = null;
 
     function addCaptionRow(val = "", showDelete = false) {
       const row = document.createElement("div");
@@ -5302,6 +5364,7 @@ input:checked + .slider:before {
         row.appendChild(delBtn);
       }
       captionInputsContainer.appendChild(row);
+      if (!firstCaptionInput) firstCaptionInput = inp;
       return inp;
     }
 
@@ -5388,14 +5451,58 @@ input:checked + .slider:before {
       }
     });
 
+    // Action buttons row: Save & Cancel
+    const btnRow = document.createElement("div");
+    btnRow.style.display = "flex";
+    btnRow.style.justifyContent = "flex-end";
+    btnRow.style.gap = "6px";
+    btnRow.style.marginTop = "6px";
+    btnRow.style.paddingTop = "6px";
+    btnRow.style.borderTop = "1px solid #f1f5f9";
+
+    const btnSave = document.createElement("button");
+    btnSave.type = "button";
+    btnSave.textContent = "✓ บันทึก";
+    btnSave.style.cssText = "background: #2563eb; color: #fff; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 4px 10px; cursor: pointer;";
+    btnSave.addEventListener("click", (e) => {
+      e.stopPropagation();
+      finish();
+    });
+
+    const btnCancel = document.createElement("button");
+    btnCancel.type = "button";
+    btnCancel.textContent = "✕ ปิด";
+    btnCancel.style.cssText = "background: #e2e8f0; color: #475569; border: none; border-radius: 4px; font-size: 11px; font-weight: 600; padding: 4px 8px; cursor: pointer;";
+    btnCancel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cancel();
+    });
+
+    btnRow.appendChild(btnCancel);
+    btnRow.appendChild(btnSave);
+
     container.appendChild(captionDiv);
     container.appendChild(timeDiv);
     container.appendChild(statusDiv);
+    container.appendChild(btnRow);
     document.body.appendChild(container);
 
-    setTimeout(() => { timeInput.focus(); timeInput.select(); }, 0);
+    setTimeout(() => {
+      if (focusTarget === "caption" && firstCaptionInput) {
+        firstCaptionInput.focus();
+        firstCaptionInput.select();
+      } else {
+        timeInput.focus();
+        timeInput.select();
+      }
+    }, 50);
 
+    let isDone = false;
     function finish() {
+      if (isDone) return;
+      isDone = true;
+      cleanup();
+
       const inputs = captionInputsContainer.querySelectorAll("input");
       const lines = [];
       inputs.forEach(inp => {
@@ -5408,46 +5515,71 @@ input:checked + .slider:before {
       n.completed = completedCheckbox.checked;
       updateNodeLabelAndAdjust(n, timeVal);
       
-      container.removeEventListener("focusout", onFocusOut);
-      container.remove();
-      
       updateInspector();
       renderAll();
       commit();
     }
 
-    let isRemoving = false;
-    function onFocusOut(e) {
-      setTimeout(() => {
-        if (!container.contains(document.activeElement) && !isRemoving) {
-          isRemoving = true;
-          finish();
-        }
-      }, 50);
+    function cancel() {
+      if (isDone) return;
+      isDone = true;
+      cleanup();
     }
-    
-    const handleKeyDown = (e) => {
+
+    function cleanup() {
+      window.removeEventListener("mousedown", onOutsideMouseDown, true);
+      window.removeEventListener("keydown", onGlobalKeyDown, true);
+      container.remove();
+    }
+
+    function onOutsideMouseDown(e) {
+      if (!container.contains(e.target)) {
+        finish();
+      }
+    }
+
+    function onGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    }
+
+    function handleKeyDown(e) {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (!isRemoving) {
-          isRemoving = true;
-          finish();
-        }
+        finish();
       } else if (e.key === "Escape") {
-        container.removeEventListener("focusout", onFocusOut);
-        container.remove();
+        e.preventDefault();
+        cancel();
       }
-    };
+    }
     timeInput.addEventListener("keydown", handleKeyDown);
 
-    container.addEventListener("focusout", onFocusOut);
+    setTimeout(() => {
+      if (!isDone) {
+        window.addEventListener("mousedown", onOutsideMouseDown, true);
+        window.addEventListener("keydown", onGlobalKeyDown, true);
+      }
+    }, 180);
   }
-  function editConnectorInline(c, midx, midy){
+
+  function editConnectorInline(c, midx, midy, focusTarget = "task"){
+    document.querySelectorAll(".inline-node-edit, .inline-connector-edit, .inline-edit").forEach(el => el.remove());
+
     const container = document.createElement("div");
     container.className = "inline-connector-edit";
+
     const pos = screenPosFor(midx - 80, midy - 45);
-    container.style.left = pos.left + "px";
-    container.style.top = pos.top + "px";
+    let top = Math.max(55, Math.min(window.innerHeight - 200, pos.top));
+    let left = Math.max(10, Math.min(window.innerWidth - 260, pos.left));
+    container.style.left = left + "px";
+    container.style.top = top + "px";
+    container.style.zIndex = "10000";
+
+    container.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
 
     const taskDiv = document.createElement("div");
     const taskLabel = document.createElement("label");
@@ -5467,21 +5599,59 @@ input:checked + .slider:before {
     durDiv.appendChild(durLabel);
     durDiv.appendChild(durInput);
 
+    const btnRow = document.createElement("div");
+    btnRow.style.display = "flex";
+    btnRow.style.justifyContent = "flex-end";
+    btnRow.style.gap = "6px";
+    btnRow.style.marginTop = "4px";
+
+    const btnSave = document.createElement("button");
+    btnSave.type = "button";
+    btnSave.textContent = "✓ บันทึก";
+    btnSave.style.cssText = "background: #2563eb; color: #fff; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 3px 8px; cursor: pointer;";
+    btnSave.addEventListener("click", (e) => {
+      e.stopPropagation();
+      finish();
+    });
+
+    const btnCancel = document.createElement("button");
+    btnCancel.type = "button";
+    btnCancel.textContent = "✕";
+    btnCancel.style.cssText = "background: #e2e8f0; color: #475569; border: none; border-radius: 4px; font-size: 11px; font-weight: 600; padding: 3px 6px; cursor: pointer;";
+    btnCancel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cancel();
+    });
+
+    btnRow.appendChild(btnCancel);
+    btnRow.appendChild(btnSave);
+
     container.appendChild(taskDiv);
     container.appendChild(durDiv);
+    container.appendChild(btnRow);
     document.body.appendChild(container);
 
-    setTimeout(() => { taskInput.focus(); taskInput.select(); }, 0);
+    setTimeout(() => {
+      if (focusTarget === "duration") {
+        durInput.focus();
+        durInput.select();
+      } else {
+        taskInput.focus();
+        taskInput.select();
+      }
+    }, 50);
 
+    let isDone = false;
     function finish() {
+      if (isDone) return;
+      isDone = true;
+      cleanup();
+
       const taskVal = taskInput.value;
       const durVal = durInput.value;
       
       c.task = taskVal;
       c.duration = durVal;
-      
-      container.removeEventListener("focusout", onFocusOut);
-      container.remove();
       
       propagateFromConnector(c.id);
       recalculateDiagramTimes();
@@ -5490,32 +5660,49 @@ input:checked + .slider:before {
       commit();
     }
 
-    let isRemoving = false;
-    function onFocusOut(e) {
-      setTimeout(() => {
-        if (!container.contains(document.activeElement) && !isRemoving) {
-          isRemoving = true;
-          finish();
-        }
-      }, 50);
+    function cancel() {
+      if (isDone) return;
+      isDone = true;
+      cleanup();
     }
-    
+
+    function cleanup() {
+      window.removeEventListener("mousedown", onOutsideMouseDown, true);
+      window.removeEventListener("keydown", onGlobalKeyDown, true);
+      container.remove();
+    }
+
+    function onOutsideMouseDown(e) {
+      if (!container.contains(e.target)) {
+        finish();
+      }
+    }
+
+    function onGlobalKeyDown(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    }
+
     const handleKeyDown = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (!isRemoving) {
-          isRemoving = true;
-          finish();
-        }
+        finish();
       } else if (e.key === "Escape") {
-        container.removeEventListener("focusout", onFocusOut);
-        container.remove();
+        e.preventDefault();
+        cancel();
       }
     };
     taskInput.addEventListener("keydown", handleKeyDown);
     durInput.addEventListener("keydown", handleKeyDown);
 
-    container.addEventListener("focusout", onFocusOut);
+    setTimeout(() => {
+      if (!isDone) {
+        window.addEventListener("mousedown", onOutsideMouseDown, true);
+        window.addEventListener("keydown", onGlobalKeyDown, true);
+      }
+    }, 180);
   }
   function editAnnotationInline(a){
     if(a.type === "note"){
