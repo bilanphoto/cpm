@@ -772,71 +772,6 @@ input:checked + .slider:before {
   border: 1px solid #bbf7d0;
 }
 
-/* Mini-Map Radar */
-.minimap-radar {
-  position: absolute;
-  right: 20px;
-  bottom: 24px;
-  width: 224px;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  z-index: 85;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  user-select: none;
-}
-.minimap-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 10px;
-  font-weight: 700;
-  color: #94a3b8;
-  letter-spacing: 0.5px;
-}
-.minimap-header button {
-  background: none;
-  border: none;
-  color: #cbd5e1;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-}
-.minimap-header button:hover {
-  color: white;
-}
-.minimap-body {
-  position: relative;
-  width: 224px;
-  height: 124px;
-  background: #090d16;
-  cursor: crosshair;
-}
-.minimap-body canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.minimap-viewport {
-  position: absolute;
-  border: 2px solid #38bdf8;
-  background: rgba(56, 189, 248, 0.22);
-  pointer-events: auto;
-  cursor: grab;
-  box-sizing: border-box;
-}
-.minimap-viewport:active {
-  cursor: grabbing;
-}
-
 /* KPI Card Styles */
 .kpi-card {
   flex: 1;
@@ -955,17 +890,26 @@ input:checked + .slider:before {
           <button class="menu-btn" id="menuBtnView">View</button>
           <div class="menu-dropdown" id="menuDropdownView">
             <button class="dropdown-item" id="btnGrid"><span>Toggle Grid</span> <span class="menu-check" id="menuCheckGrid">✓</span></button>
-            <button class="dropdown-item" id="btnTimeScale"><span>Time-Scale Layout (1 ชม. = 1 ช่อง)</span> <span class="menu-check" id="menuCheckTimeScale"></span></button>
+            <button class="dropdown-item" id="btnTimeScale"><span>Time-Scale Layout (สเกลเวลา)</span> <span class="menu-check" id="menuCheckTimeScale"></span></button>
             <button class="dropdown-item" id="btnMenuCriticalPath"><span>Critical Path Analysis</span> <span class="menu-check" id="menuCheckCP"></span></button>
             <button class="dropdown-item" id="btnMenuSwimlanes"><span>Plant Swimlanes (เลนโซนอุปกรณ์)</span> <span class="menu-check" id="menuCheckSwimlanes">✓</span></button>
-            <button class="dropdown-item" id="btnMenuMiniMap"><span>Radar Mini-Map</span> <span class="menu-check" id="menuCheckMiniMap">✓</span></button>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item" id="menuBtnZoomIn"><span>Zoom In</span> <span class="shortcut">+</span></button>
             <button class="dropdown-item" id="menuBtnZoomOut"><span>Zoom Out</span> <span class="shortcut">-</span></button>
             <button class="dropdown-item" id="menuBtnZoomReset"><span>Reset Zoom (100%)</span> <span class="shortcut">100%</span></button>
             <div class="dropdown-divider"></div>
             <div style="padding: 8px 12px; background: rgba(0,0,0,0.15); border-radius: 4px; margin: 4px 0;">
-              <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px;">Canvas Settings</div>
+              <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px;">Canvas & Grid Settings</div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 11px; color: #cbd5e1;" title="ขยายระยะช่องกริด / สเกลเวลาต่อ 1 ชั่วโมงเพื่อไม่ให้โหนดชิดกัน">ขนาดกริด (1 ชม.):</span>
+                <select id="selGridSize" style="font-size: 11px; padding: 2px 5px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: 3px; cursor: pointer;">
+                  <option value="40">40px (แคบ)</option>
+                  <option value="60">60px (พอดี)</option>
+                  <option value="80">80px (แนะนำ - โหนดไม่ชิด)</option>
+                  <option value="100">100px (กว้าง)</option>
+                  <option value="120">120px (กว้างมาก)</option>
+                </select>
+              </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <span style="font-size: 12px; color: #cbd5e1;">Background</span>
                 <input type="color" id="canvasBgColor" value="#f3f1ea" style="width: 32px; height: 22px; padding: 0; border: 1px solid var(--chrome-line); border-radius: 3px; cursor: pointer; background: none;">
@@ -1153,19 +1097,6 @@ input:checked + .slider:before {
           <g id="layerOverlay"></g>
         </svg>
       </div>
-
-    
-      <!-- ============ MINI-MAP RADAR ============ -->
-      <div id="miniMapRadar" class="minimap-radar">
-        <div class="minimap-header">
-          <span>🗺️ MINI-MAP RADAR</span>
-          <button id="btnToggleMiniMapCollapse" title="ย่อ/ขยาย Mini-map">−</button>
-        </div>
-        <div id="miniMapBody" class="minimap-body">
-          <canvas id="miniMapCanvas" width="224" height="124"></canvas>
-          <div id="miniMapViewport" class="minimap-viewport"></div>
-        </div>
-      </div>
     </main>
 
     <!-- ============ RIGHT INSPECTOR ============ -->
@@ -1176,6 +1107,20 @@ input:checked + .slider:before {
         <p>Select an element on the canvas to edit its properties, or pick a tool on the left to start drawing.</p>
         <div style="margin: 12px 0 16px 0;">
           <button class="btn small" id="btnPasteEmpty" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; font-weight: 600;" title="วาง Node หรือ Connector ที่คัดลอกไว้ (Ctrl+V / ⌘V)">📋 Paste (วางข้อมูลที่คัดลอกไว้)</button>
+        </div>
+        <div style="background: rgba(0,0,0,0.18); border: 1px solid var(--chrome-line); border-radius: 6px; padding: 10px; margin-bottom: 14px; text-align: left;">
+          <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px;">ขนาดช่องกริด / สเกลเวลา (Grid Size)</div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; color: #cbd5e1;">1 ชั่วโมง =</span>
+            <select id="selGridSizeEmpty" style="font-size: 12px; padding: 3px 6px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: 4px; cursor: pointer;">
+              <option value="40">40px (แคบ)</option>
+              <option value="60">60px (พอดี)</option>
+              <option value="80">80px (แนะนำ - โหนดไม่ชิด)</option>
+              <option value="100">100px (กว้าง)</option>
+              <option value="120">120px (กว้างมาก)</option>
+            </select>
+          </div>
+          <div style="font-size: 10.5px; color: #94a3b8; margin-top: 5px; line-height: 1.3;">* ขยายช่องเพื่อไม่ให้โหนดห่าง 1-2 ชม. ชิดหรือทับกัน</div>
         </div>
         <div class="legend">
           <div class="legend-title">Legend reference</div>
@@ -1216,8 +1161,11 @@ input:checked + .slider:before {
         <!-- node specific -->
         <div class="field two-col" data-field="sublabel">
           <div>
-            <label>Caption (above node)</label>
-            <input type="text" id="fSublabel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <label style="margin: 0;">Caption (above node)</label>
+              <span style="font-size: 10px; color: #94a3b8;">Enter = เพิ่มแถว</span>
+            </div>
+            <textarea id="fSublabel" rows="2" placeholder="Caption ข้อความกำกับโหนด" style="width: 100%; font-size: 12px; padding: 5px 6px; background: var(--chrome-800); border: 1px solid var(--chrome-line); color: var(--chrome-text); border-radius: var(--radius-sm); resize: vertical; box-sizing: border-box; font-family: inherit;"></textarea>
           </div>
           <div>
             <label>Caption color</label>
@@ -1858,7 +1806,7 @@ input:checked + .slider:before {
               <div style="display: flex; flex-direction: column; gap: 6px;">
                 <label style="font-size: 12px; color: #475569; display: flex; align-items: center; gap: 5px; cursor: pointer; margin: 0; user-select: none;">
                   <input type="checkbox" id="tgUseTimeScale" checked style="cursor: pointer;">
-                  <span>จัดตำแหน่งตามสเกลเวลา (1 ชม. = 40px)</span>
+                  <span id="tgTimeScaleOptionLabel">จัดตำแหน่งตามสเกลเวลา (1 ชม. = 40px)</span>
                 </label>
                 <label style="font-size: 12px; color: #475569; display: flex; align-items: center; gap: 5px; cursor: pointer; margin: 0; user-select: none;">
                   <input type="checkbox" id="tgCreateBanner" style="cursor: pointer;">
@@ -1945,6 +1893,7 @@ input:checked + .slider:before {
     annotations: [],   // {id, type:'note'|'banner'|'pin'|'text', x,y,w,h,text,color,textColor,fontSize,bold}
     nextId: 1,
     timeScaleMode: false,
+    gridSize: 40,
     canvasWidth: 3000,
     canvasHeight: 1800,
     highlightCriticalPath: false,
@@ -2047,6 +1996,7 @@ input:checked + .slider:before {
     if (state.timeScaleMode === undefined) state.timeScaleMode = false;
     if (state.canvasWidth === undefined) state.canvasWidth = 3000;
     if (state.canvasHeight === undefined) state.canvasHeight = 1800;
+    if (state.gridSize === undefined) state.gridSize = 40;
     selection = [];
     renderAll();
     updateInspector();
@@ -2434,8 +2384,13 @@ input:checked + .slider:before {
     applyCanvasSize();
   }
 
+  function getGridSize() {
+    return state.gridSize || 40;
+  }
+
   function applyTimeScalePositions() {
     if (!state.timeScaleMode) return;
+    const gSize = getGridSize();
     const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
     let originX = 200;
     if (node0 && node0.x) {
@@ -2446,15 +2401,28 @@ input:checked + .slider:before {
         const val = parseNumericLabel(n.label);
         if (val !== null && val < minVal) minVal = val;
       });
-      originX = minVal < 0 ? 200 - minVal * 40 : 200;
+      originX = minVal < 0 ? 200 - minVal * gSize : 200;
     }
 
     state.nodes.forEach(n => {
       const val = parseNumericLabel(n.label);
       if (val !== null) {
-        n.x = originX + val * 40;
+        n.x = originX + val * gSize;
       }
     });
+  }
+
+  function setGridSize(newSize) {
+    state.gridSize = parseInt(newSize, 10) || 40;
+    applyCanvasSize();
+    if (state.timeScaleMode) {
+      applyTimeScalePositions();
+      adjustConnectorDurationsToMatchNodeLabels();
+      recalculateDiagramTimes();
+    }
+    renderAll();
+    commit();
+    setStatus(`ขนาดช่องกริดปรับเป็น ${state.gridSize}px (1 ชม. = ${state.gridSize}px)`);
   }
 
   function updateTimeScaleButtonVisual() {
@@ -2475,10 +2443,12 @@ input:checked + .slider:before {
   function applyCanvasSize() {
     const w = state.canvasWidth || 3000;
     const h = state.canvasHeight || 1800;
+    const gSize = getGridSize();
     const canvasInner = $("#canvasInner");
     if (canvasInner) {
       canvasInner.style.width = w + "px";
       canvasInner.style.height = h + "px";
+      canvasInner.style.backgroundSize = `${gSize}px ${gSize}px`;
     }
     const svgCanvas = $("#svgCanvas");
     if (svgCanvas) {
@@ -2489,6 +2459,10 @@ input:checked + .slider:before {
     if (fWidth) fWidth.value = w;
     const fHeight = $("#fCanvasHeight");
     if (fHeight) fHeight.value = h;
+    const selGrid = $("#selGridSize");
+    if (selGrid) selGrid.value = String(gSize);
+    const selGridEmpty = $("#selGridSizeEmpty");
+    if (selGridEmpty) selGridEmpty.value = String(gSize);
   }
 
 
@@ -2547,9 +2521,9 @@ input:checked + .slider:before {
       if (anchorDt && !isNaN(anchorDt.getTime())) {
         const diffMs = now.getTime() - anchorDt.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
-        // In CPM TimeScale: 1 hour = 40px
-        const targetX = Math.round(node0.x + diffHours * 40);
-        return Math.max(40, Math.min((state.canvasWidth || 3000) - 40, targetX));
+        const gSize = getGridSize();
+        const targetX = Math.round(node0.x + diffHours * gSize);
+        return Math.max(gSize, Math.min((state.canvasWidth || 3000) - gSize, targetX));
       }
     }
     return actualLine.x;
@@ -2754,30 +2728,45 @@ input:checked + .slider:before {
       if(n.sublabel){
         const ox = n.sublabelOffsetX || 0;
         const oy = n.sublabelOffsetY || 0;
-        const sub = svgElCreate("text", {class:"cpm-node-sublabel", x:ox, y:-(r+14) + oy, "text-anchor":"middle", "dominant-baseline":"central", style:`fill:${n.sublabelColor || '#1c2530'}; cursor:move;`});
-        sub.textContent = n.sublabel;
-        sub.addEventListener("mousedown", (e) => {
-          e.stopPropagation();
-          const isDbl = checkManualDoubleClick("node", n.id);
-          if(isDbl){
-            clearLeaderLine();
-            selectElement("node", n.id);
-            editNodeLabelInline(n);
-            return;
-          }
-          startNodeTextDrag(e, n, "sublabel");
-        });
-        sub.addEventListener("mouseenter", () => {
-          if(!drag && (n.sublabelOffsetX || n.sublabelOffsetY)){
-            updateNodeTextLeaderLine(n, "sublabel");
-          }
-        });
-        sub.addEventListener("mouseleave", () => {
-          if(!drag){
-            clearLeaderLine();
-          }
-        });
-        g.appendChild(sub);
+        const subLines = String(n.sublabel).split("\n").map(s => s.trim()).filter(Boolean);
+        if (subLines.length > 0) {
+          const subG = svgElCreate("g", {class:"cpm-node-sublabel-group"});
+          subLines.forEach((ln, idx) => {
+            const lineY = -(r+14) - ((subLines.length - 1 - idx) * 16) + oy;
+            const sub = svgElCreate("text", {
+              class:"cpm-node-sublabel",
+              x:ox,
+              y:lineY,
+              "text-anchor":"middle",
+              "dominant-baseline":"central",
+              style:`fill:${n.sublabelColor || '#1c2530'}; cursor:move;`
+            });
+            sub.textContent = ln;
+            subG.appendChild(sub);
+          });
+          subG.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+            const isDbl = checkManualDoubleClick("node", n.id);
+            if(isDbl){
+              clearLeaderLine();
+              selectElement("node", n.id);
+              editNodeLabelInline(n);
+              return;
+            }
+            startNodeTextDrag(e, n, "sublabel");
+          });
+          subG.addEventListener("mouseenter", () => {
+            if(!drag && (n.sublabelOffsetX || n.sublabelOffsetY)){
+              updateNodeTextLeaderLine(n, "sublabel");
+            }
+          });
+          subG.addEventListener("mouseleave", () => {
+            if(!drag){
+              clearLeaderLine();
+            }
+          });
+          g.appendChild(subG);
+        }
       }
       if(n.datetime && !n.hideDateTime){
         const ox = n.datetimeOffsetX || 0;
@@ -2888,10 +2877,15 @@ input:checked + .slider:before {
     if(textKind === "sublabel"){
       const ox = n.sublabelOffsetX || 0;
       const oy = n.sublabelOffsetY || 0;
+      const lines = String(n.sublabel || "").split("\n").filter(Boolean);
+      let maxLen = 0;
+      lines.forEach(l => { if (l.length > maxLen) maxLen = l.length; });
+      const lineCount = Math.max(1, lines.length);
+      const totalH = (lineCount - 1) * 16;
       textX = n.x + ox;
-      textY = n.y - (r + 14) + oy;
-      halfW = Math.max(20, ((n.sublabel || "").length * 7.5) / 2);
-      halfH = 9;
+      textY = n.y - (r + 14) - (totalH / 2) + oy;
+      halfW = Math.max(20, (maxLen * 7.5) / 2);
+      halfH = Math.max(9, (lineCount * 16) / 2);
       color = n.sublabelColor || "#1c2530";
     } else {
       const ox = n.datetimeOffsetX || 0;
@@ -2951,7 +2945,9 @@ input:checked + .slider:before {
 
   function snap(val) {
     if (!gridOn) return val;
-    return Math.round(val / 20) * 20;
+    const gSize = getGridSize();
+    const step = gSize >= 40 ? Math.round(gSize / 2) : 20;
+    return Math.round(val / step) * step;
   }
 
   // Closest point on segment AB to point P, plus the parametric t (0..1) and distance.
@@ -3697,6 +3693,7 @@ input:checked + .slider:before {
     const fillDefaults = { circle:"#ffffff", hex:"#7fb56e", diamond:"#f6d34d", "circle-hex":"#ffffff" };
     let initialLabel = String(state.nodes.length);
     if (state.timeScaleMode) {
+      const gSize = getGridSize();
       const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
       let originX = 200;
       if (node0) {
@@ -3707,9 +3704,9 @@ input:checked + .slider:before {
           const val = parseNumericLabel(n.label);
           if (val !== null && val < minVal) minVal = val;
         });
-        originX = minVal < 0 ? 200 - minVal * 40 : 200;
+        originX = minVal < 0 ? 200 - minVal * gSize : 200;
       }
-      const hours = Math.round((x - originX) / 40);
+      const hours = Math.round((x - originX) / gSize);
       initialLabel = String(hours);
     }
     const node = {
@@ -3745,6 +3742,7 @@ input:checked + .slider:before {
     const toVal = parseNumericLabel(toNode.label) || 0;
 
     if (state.timeScaleMode) {
+      const gSize = getGridSize();
       const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
       let originX = 200;
       if (node0) {
@@ -3755,9 +3753,9 @@ input:checked + .slider:before {
           const val = parseNumericLabel(n.label);
           if (val !== null && val < minVal) minVal = val;
         });
-        originX = minVal < 0 ? 200 - minVal * 40 : 200;
+        originX = minVal < 0 ? 200 - minVal * gSize : 200;
       }
-      const hours = Math.round((x - originX) / 40);
+      const hours = Math.round((x - originX) / gSize);
       initialLabel = String(hours);
     } else {
       const origDur = parseNumericLabel(c.duration) || 0;
@@ -4009,7 +4007,8 @@ input:checked + .slider:before {
         const val = parseNumericLabel(n.label);
         if (val !== null && val < minVal) minVal = val;
       });
-      originX = minVal < 0 ? 200 - minVal * 40 : 200;
+      const gSize = getGridSize();
+      originX = minVal < 0 ? 200 - minVal * gSize : 200;
     }
 
     selection.forEach(sel=>{
@@ -4105,8 +4104,9 @@ input:checked + .slider:before {
             if (state.timeScaleMode) {
               n.y = snap(item.origY + dy);
               const newX = item.origX + dx;
-              const hours = Math.round((newX - drag.originX) / 40);
-              n.x = drag.originX + hours * 40;
+              const gSize = getGridSize();
+              const hours = Math.round((newX - drag.originX) / gSize);
+              n.x = drag.originX + hours * gSize;
               const currentHours = parseNumericLabel(n.label);
               if (hours !== currentHours) {
                 n.label = String(hours);
@@ -4291,6 +4291,7 @@ input:checked + .slider:before {
     const hoveredEl = e ? document.elementFromPoint(e.clientX, e.clientY) : null;
     const isOverText = hoveredEl && (
       hoveredEl.classList?.contains("cpm-node-sublabel") ||
+      hoveredEl.closest?.(".cpm-node-sublabel-group") ||
       hoveredEl.classList?.contains("cpm-node-datetime") ||
       hoveredEl.closest?.(".cpm-connector-task-group") ||
       hoveredEl.classList?.contains("cpm-connector-task") ||
@@ -5050,8 +5051,6 @@ input:checked + .slider:before {
     if (chkCp) chkCp.textContent = (state && state.highlightCriticalPath) ? "✓" : "";
     const chkSw = document.getElementById("menuCheckSwimlanes");
     if (chkSw) chkSw.textContent = (state && state.showSwimlanes) ? "✓" : "";
-    const chkMm = document.getElementById("menuCheckMiniMap");
-    if (chkMm) chkMm.textContent = (state && state.showMiniMap !== false) ? "✓" : "";
   }
   updateViewMenuCheckmarks();
 
@@ -5248,13 +5247,78 @@ input:checked + .slider:before {
     container.style.top = pos.top + "px";
 
     const captionDiv = document.createElement("div");
+    captionDiv.style.marginBottom = "6px";
+
+    const captionHeader = document.createElement("div");
+    captionHeader.style.display = "flex";
+    captionHeader.style.justifyContent = "space-between";
+    captionHeader.style.alignItems = "center";
+    captionHeader.style.marginBottom = "4px";
+
     const captionLabel = document.createElement("label");
     captionLabel.textContent = "Caption";
-    const captionInput = document.createElement("input");
-    captionInput.type = "text";
-    captionInput.value = n.sublabel || "";
-    captionDiv.appendChild(captionLabel);
-    captionDiv.appendChild(captionInput);
+    captionLabel.style.margin = "0";
+
+    const btnAddCaption = document.createElement("button");
+    btnAddCaption.type = "button";
+    btnAddCaption.textContent = "+ เพิ่ม Caption";
+    btnAddCaption.title = "คลิกเพื่อเพิ่มบรรทัดข้อความ Caption |+|";
+    btnAddCaption.style.cssText = "background: #0284c7; color: #ffffff; border: none; border-radius: 4px; font-size: 10px; font-weight: 700; padding: 2px 7px; cursor: pointer;";
+
+    captionHeader.appendChild(captionLabel);
+    captionHeader.appendChild(btnAddCaption);
+    captionDiv.appendChild(captionHeader);
+
+    const captionInputsContainer = document.createElement("div");
+    captionInputsContainer.style.display = "flex";
+    captionInputsContainer.style.flexDirection = "column";
+    captionInputsContainer.style.gap = "4px";
+    captionDiv.appendChild(captionInputsContainer);
+
+    function addCaptionRow(val = "", showDelete = false) {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "4px";
+
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = val;
+      inp.placeholder = "ข้อความ Caption";
+      inp.style.flex = "1";
+      inp.addEventListener("keydown", handleKeyDown);
+      row.appendChild(inp);
+
+      if (showDelete) {
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.textContent = "×";
+        delBtn.title = "ลบแถวข้อความนี้";
+        delBtn.style.cssText = "background: none; border: none; color: #ef4444; font-size: 16px; font-weight: 700; cursor: pointer; padding: 0 4px; line-height: 1;";
+        delBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          row.remove();
+        });
+        row.appendChild(delBtn);
+      }
+      captionInputsContainer.appendChild(row);
+      return inp;
+    }
+
+    const existingLines = (n.sublabel || "").split("\n").map(s => s.trim()).filter(Boolean);
+    if (existingLines.length === 0) {
+      addCaptionRow("", false);
+    } else {
+      existingLines.forEach((ln, idx) => {
+        addCaptionRow(ln, idx > 0);
+      });
+    }
+
+    btnAddCaption.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const inp = addCaptionRow("", true);
+      inp.focus();
+    });
 
     const timeDiv = document.createElement("div");
     const timeLabel = document.createElement("label");
@@ -5332,10 +5396,15 @@ input:checked + .slider:before {
     setTimeout(() => { timeInput.focus(); timeInput.select(); }, 0);
 
     function finish() {
-      const captionVal = captionInput.value;
+      const inputs = captionInputsContainer.querySelectorAll("input");
+      const lines = [];
+      inputs.forEach(inp => {
+        const t = inp.value.trim();
+        if (t) lines.push(t);
+      });
       const timeVal = timeInput.value;
       
-      n.sublabel = captionVal;
+      n.sublabel = lines.join("\n");
       n.completed = completedCheckbox.checked;
       updateNodeLabelAndAdjust(n, timeVal);
       
@@ -5369,7 +5438,6 @@ input:checked + .slider:before {
         container.remove();
       }
     };
-    captionInput.addEventListener("keydown", handleKeyDown);
     timeInput.addEventListener("keydown", handleKeyDown);
 
     container.addEventListener("focusout", onFocusOut);
@@ -6931,6 +6999,19 @@ input:checked + .slider:before {
   addExpandListener("#btnExpandH10", 0, 400);
   addExpandListener("#btnShrinkH10", 0, -400);
 
+  const selGridSize = document.getElementById("selGridSize");
+  if (selGridSize) {
+    selGridSize.addEventListener("change", (e) => {
+      setGridSize(e.target.value);
+    });
+  }
+  const selGridSizeEmpty = document.getElementById("selGridSizeEmpty");
+  if (selGridSizeEmpty) {
+    selGridSizeEmpty.addEventListener("change", (e) => {
+      setGridSize(e.target.value);
+    });
+  }
+
   // ---------------------------------------------------------
   // Undo / redo buttons
   // ---------------------------------------------------------
@@ -7884,7 +7965,13 @@ input:checked + .slider:before {
       const dtPreview = formatTgDatePreview(base, r.milestone);
       const isLast = (i === tgRows.length - 1);
       return `<tr data-index="${i}" style="border-bottom: 1px solid #e5ebf0; background: ${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-        <td style="padding: 6px; text-align: center; color: #64748b; font-weight: 600;">${i + 1}</td>
+        <td style="padding: 4px 6px; text-align: center; color: #64748b; font-weight: 600;">
+          <div style="display:inline-flex; align-items:center; justify-content:center; gap:2px;">
+            <button type="button" data-act="move-up" style="background:${i === 0 ? '#f1f5f9' : '#e2e8f0'}; border:1px solid #cbd5e1; border-radius:3px; padding:1px 4px; font-size:10px; cursor:${i === 0 ? 'default' : 'pointer'}; color:${i === 0 ? '#94a3b8' : '#334155'}; opacity:${i === 0 ? 0.35 : 1};" ${i === 0 ? 'disabled' : ''} title="เลื่อนขึ้น 1 ลำดับ">▲</button>
+            <span style="min-width:18px; text-align:center;">${i + 1}</span>
+            <button type="button" data-act="move-down" style="background:${isLast ? '#f1f5f9' : '#e2e8f0'}; border:1px solid #cbd5e1; border-radius:3px; padding:1px 4px; font-size:10px; cursor:${isLast ? 'default' : 'pointer'}; color:${isLast ? '#94a3b8' : '#334155'}; opacity:${isLast ? 0.35 : 1};" ${isLast ? 'disabled' : ''} title="เลื่อนลง 1 ลำดับ">▼</button>
+          </div>
+        </td>
         <td style="padding: 6px;">
           <input type="text" data-field="milestone" value="${escapeTgHtml(r.milestone || '')}" placeholder="0" style="width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; text-align: center; font-weight: 700; color: #1e293b;">
         </td>
@@ -7913,7 +8000,8 @@ input:checked + .slider:before {
             </label>
           </div>
         </td>
-        <td style="padding: 6px; text-align: center;">
+        <td style="padding: 6px; text-align: center; white-space: nowrap;">
+          <button type="button" data-act="swap-row" style="background:#e0f2fe; border:1px solid #7dd3fc; color:#0369a1; font-size:11.5px; font-weight:700; cursor:pointer; padding:3px 7px; border-radius:4px; margin-right:4px;" title="สลับลำดับกับแถวอื่น (เช่น สลับลำดับ 1 กับ 3)">⇄ สลับ</button>
           <button type="button" data-act="del-row" style="background: none; border: none; color: #ef4444; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 4px;" title="ลบแถวนี้">🗑</button>
         </td>
       </tr>`;
@@ -7923,6 +8011,9 @@ input:checked + .slider:before {
   }
 
   function initTgModal() {
+    const tgTsLbl = document.getElementById("tgTimeScaleOptionLabel");
+    if (tgTsLbl) tgTsLbl.textContent = `จัดตำแหน่งตามสเกลเวลา (1 ชม. = ${getGridSize()}px)`;
+
     const node0 = state.nodes.find(n => parseNumericLabel(n.label) === 0);
     if (node0 && node0.datetimeDate && node0.datetimeTime) {
       if (tgStartDate && !tgStartDate.value) tgStartDate.value = node0.datetimeDate;
@@ -8121,7 +8212,8 @@ input:checked + .slider:before {
             const val = parseNumericLabel(n.label);
             if (val !== null && val < minVal) minVal = val;
           });
-          originX = minVal < 0 ? 200 - minVal * 40 : 200;
+          const gSize = getGridSize();
+      originX = minVal < 0 ? 200 - minVal * gSize : 200;
         }
       }
 
@@ -8134,7 +8226,7 @@ input:checked + .slider:before {
         let nodeX;
         const numHour = parseFloat(row.milestone);
         if (isTimeScale && !isNaN(numHour)) {
-          nodeX = originX + (numHour * 40);
+          nodeX = originX + (numHour * getGridSize());
         } else {
           nodeX = originX + (i * 180);
         }
@@ -8508,8 +8600,53 @@ input:checked + .slider:before {
       if (isNaN(idx)) return;
 
       if (btn.dataset.act === "del-row") {
+        syncTgRowsFromDOM();
         tgRows.splice(idx, 1);
+        autoCalcMilestones();
         renderTgTable();
+      } else if (btn.dataset.act === "move-up") {
+        if (idx > 0) {
+          syncTgRowsFromDOM();
+          const tmp = tgRows[idx];
+          tgRows[idx] = tgRows[idx - 1];
+          tgRows[idx - 1] = tmp;
+          autoCalcMilestones();
+          renderTgTable();
+        }
+      } else if (btn.dataset.act === "move-down") {
+        if (idx < tgRows.length - 1) {
+          syncTgRowsFromDOM();
+          const tmp = tgRows[idx];
+          tgRows[idx] = tgRows[idx + 1];
+          tgRows[idx + 1] = tmp;
+          autoCalcMilestones();
+          renderTgTable();
+        }
+      } else if (btn.dataset.act === "swap-row") {
+        syncTgRowsFromDOM();
+        const currentNum = idx + 1;
+        const defaultTarget = currentNum === 1 ? "3" : (currentNum === 3 ? "1" : "1");
+        const targetInput = prompt(`ต้องการสลับขั้นตอนที่ ${currentNum} กับขั้นตอนที่เท่าไหร่?\n(ระบุหมายเลข 1 ถึง ${tgRows.length}):`, defaultTarget);
+        if (targetInput !== null) {
+          const targetNum = parseInt(targetInput.trim(), 10);
+          if (!isNaN(targetNum) && targetNum >= 1 && targetNum <= tgRows.length && targetNum !== currentNum) {
+            const targetIdx = targetNum - 1;
+            const tmp = tgRows[idx];
+            tgRows[idx] = tgRows[targetIdx];
+            tgRows[targetIdx] = tmp;
+            autoCalcMilestones();
+            renderTgTable();
+            if (tgPresetNotice) {
+              tgPresetNotice.textContent = `✓ สลับลำดับขั้นตอนที่ ${currentNum} กับขั้นตอนที่ ${targetNum} เรียบร้อยแล้ว`;
+              tgPresetNotice.style.color = "#0284c7";
+              setTimeout(() => { if (tgPresetNotice && tgPresetNotice.textContent.includes("สลับลำดับขั้นตอน")) tgPresetNotice.textContent = ""; }, 4000);
+            }
+          } else if (targetNum === currentNum) {
+            alert("กรุณาระบุหมายเลขขั้นตอนที่ต้องการสลับให้ต่างจากแถวเดิม");
+          } else {
+            alert(`หมายเลขไม่ถูกต้อง กรุณาระบุหมายเลขระหว่าง 1 ถึง ${tgRows.length}`);
+          }
+        }
       }
     });
   }
@@ -9591,163 +9728,9 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
     });
   }
 
-  // 3. Mini-Map Radar Implementation
-  let isMiniMapDragging = false;
-  let miniMapCollapsed = false;
-  var miniMapRadar = document.getElementById("miniMapRadar");
-  var miniMapCanvas = document.getElementById("miniMapCanvas");
-  var miniMapViewport = document.getElementById("miniMapViewport");
-  var btnToggleMiniMapCollapse = document.getElementById("btnToggleMiniMapCollapse");
-
-  function updateMiniMap() {
-    if (!miniMapCanvas) miniMapCanvas = document.getElementById("miniMapCanvas");
-    if (!miniMapRadar) miniMapRadar = document.getElementById("miniMapRadar");
-    if (!miniMapViewport) miniMapViewport = document.getElementById("miniMapViewport");
-    if (!miniMapCanvas || !miniMapRadar) return;
-    if (state.showMiniMap === false) {
-      miniMapRadar.style.display = "none";
-      return;
-    }
-    miniMapRadar.style.display = "flex";
-
-    const ctx = miniMapCanvas.getContext("2d");
-    const mw = miniMapCanvas.width;
-    const mh = miniMapCanvas.height;
-    ctx.clearRect(0, 0, mw, mh);
-
-    const cw = state.canvasWidth || 3000;
-    const ch = state.canvasHeight || 1800;
-    const scaleX = mw / cw;
-    const scaleY = mh / ch;
-
-    // Swimlanes in minimap
-    if (state.showSwimlanes && state.swimlanes) {
-      state.swimlanes.forEach(sw => {
-        ctx.fillStyle = "rgba(255,255,255,0.04)";
-        ctx.fillRect(0, sw.y * scaleY, mw, sw.height * scaleY);
-        ctx.strokeStyle = "rgba(255,255,255,0.08)";
-        ctx.strokeRect(0, sw.y * scaleY, mw, sw.height * scaleY);
-      });
-    }
-
-    // Connectors in minimap
-    const nodeMap = new Map();
-    state.nodes.forEach(n => nodeMap.set(n.id, n));
-    const connMap = new Map();
-    state.connectors.forEach(c => connMap.set(c.id, c));
-
-    state.connectors.forEach(c => {
-      const p1 = resolveConnectorEndpoint(c, "from", new Set(), nodeMap, connMap);
-      const p2 = resolveConnectorEndpoint(c, "to", new Set(), nodeMap, connMap);
-      if (!p1 || !p2) return;
-      ctx.beginPath();
-      ctx.moveTo(p1.x * scaleX, p1.y * scaleY);
-      ctx.lineTo(p2.x * scaleX, p2.y * scaleY);
-      if (state.highlightCriticalPath && c._isCritical) {
-        ctx.strokeStyle = "#dc2626";
-        ctx.lineWidth = 2.5;
-      } else {
-        ctx.strokeStyle = c.color || "#64748b";
-        ctx.lineWidth = 1;
-      }
-      ctx.stroke();
-    });
-
-    // Nodes in minimap
-    state.nodes.forEach(n => {
-      const nx = n.x * scaleX;
-      const ny = n.y * scaleY;
-      ctx.beginPath();
-      ctx.arc(nx, ny, 3.5, 0, Math.PI * 2);
-      if (state.highlightCriticalPath && n._isCritical) {
-        ctx.fillStyle = "#dc2626";
-      } else if (n.completed) {
-        ctx.fillStyle = "#16a34a";
-      } else {
-        ctx.fillStyle = "#38bdf8";
-      }
-      ctx.fill();
-    });
-
-    updateMiniMapViewport();
-  }
-
-  function updateMiniMapViewport() {
-    if (!miniMapCanvas) miniMapCanvas = document.getElementById("miniMapCanvas");
-    if (!miniMapViewport) miniMapViewport = document.getElementById("miniMapViewport");
-    if (!miniMapViewport || !canvasWrap || !miniMapCanvas) return;
-    const mw = miniMapCanvas.width;
-    const mh = miniMapCanvas.height;
-    const cw = state.canvasWidth || 3000;
-    const ch = state.canvasHeight || 1800;
-
-    const curZoom = zoom || 1;
-    const viewW = (canvasWrap.clientWidth / curZoom) * (mw / cw);
-    const viewH = (canvasWrap.clientHeight / curZoom) * (mh / ch);
-    const viewX = (canvasWrap.scrollLeft / curZoom) * (mw / cw);
-    const viewY = (canvasWrap.scrollTop / curZoom) * (mh / ch);
-
-    miniMapViewport.style.width = Math.min(mw, Math.max(16, viewW)) + "px";
-    miniMapViewport.style.height = Math.min(mh, Math.max(12, viewH)) + "px";
-    miniMapViewport.style.left = Math.max(0, Math.min(mw - 16, viewX)) + "px";
-    miniMapViewport.style.top = Math.max(0, Math.min(mh - 12, viewY)) + "px";
-  }
-
-  function panFromMiniMap(e) {
-    if (!miniMapCanvas || !canvasWrap) return;
-    const rect = miniMapCanvas.getBoundingClientRect();
-    const mx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const my = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
-
-    const cw = state.canvasWidth || 3000;
-    const ch = state.canvasHeight || 1800;
-    const targetX = (mx / rect.width) * cw;
-    const targetY = (my / rect.height) * ch;
-
-    const curZoom = zoom || 1;
-    canvasWrap.scrollLeft = targetX * curZoom - canvasWrap.clientWidth / 2;
-    canvasWrap.scrollTop = targetY * curZoom - canvasWrap.clientHeight / 2;
-    updateMiniMapViewport();
-  }
-
-  if (miniMapCanvas) {
-    miniMapCanvas.addEventListener("mousedown", (e) => {
-      isMiniMapDragging = true;
-      panFromMiniMap(e);
-    });
-  }
-  if (miniMapViewport) {
-    miniMapViewport.addEventListener("mousedown", (e) => {
-      isMiniMapDragging = true;
-      panFromMiniMap(e);
-    });
-  }
-  window.addEventListener("mousemove", (e) => {
-    if (isMiniMapDragging) panFromMiniMap(e);
-  });
-  window.addEventListener("mouseup", () => {
-    isMiniMapDragging = false;
-  });
-  if (canvasWrap) canvasWrap.addEventListener("scroll", updateMiniMapViewport);
-
-  if (btnToggleMiniMapCollapse) {
-    btnToggleMiniMapCollapse.addEventListener("click", () => {
-      const body = document.getElementById("miniMapBody");
-      miniMapCollapsed = !miniMapCollapsed;
-      if (body) body.style.display = miniMapCollapsed ? "none" : "block";
-      btnToggleMiniMapCollapse.textContent = miniMapCollapsed ? "+" : "−";
-    });
-  }
-
-  const btnMenuMiniMap = document.getElementById("btnMenuMiniMap");
-  if (btnMenuMiniMap) {
-    btnMenuMiniMap.addEventListener("click", () => {
-      state.showMiniMap = state.showMiniMap === false ? true : false;
-      updateViewMenuCheckmarks();
-      updateMiniMap();
-      commit();
-    });
-  }
+  // Mini-map radar removed per user request
+  function updateMiniMap() {}
+  function updateMiniMapViewport() {}
 
   // 4. Turnaround Shift Handover & Progress Report Implementation
   const shiftReportModal = document.getElementById("shiftReportModal");
@@ -10052,7 +10035,7 @@ Ensure all positions are numbers (integers or floats). Return the result matchin
     const txtRev = svgElCreate("text", { x: tbX + 190, y: tbY + 98, fill: "#475569", "font-size": "10px" });
     txtRev.textContent = `REVISION: ${revision}`;
     const txtScale = svgElCreate("text", { x: tbX + 190, y: tbY + 116, fill: "#475569", "font-size": "10px" });
-    txtScale.textContent = `SCALE: Time-Scale (1 Hr = 40px)`;
+    txtScale.textContent = `SCALE: Time-Scale (1 Hr = ${getGridSize()}px)`;
     tbG.appendChild(txtRev);
     tbG.appendChild(txtScale);
 
