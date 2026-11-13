@@ -567,6 +567,75 @@ html,body{
   border-color: var(--amber);
 }
 
+/* Floating Selection Quick Bar */
+#cpmSelectionFloatingBar {
+  position: fixed;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 30px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: floatBarSlideDown 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+@keyframes floatBarSlideDown {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.cpm-float-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 0 3px;
+}
+.cpm-float-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+  line-height: 1.2;
+}
+.cpm-float-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+.cpm-float-btn.primary {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  font-weight: 700;
+}
+.cpm-float-btn.primary:hover {
+  background: #0369a1;
+}
+.cpm-float-btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #94a3b8;
+  min-width: 24px;
+}
+.cpm-float-btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
 /* Toggle Switch Styles */
 .switch {
   position: relative;
@@ -881,6 +950,9 @@ input:checked + .slider:before {
             <button class="dropdown-item" id="btnCopyEl"><span>Copy</span> <span class="shortcut">Ctrl+C</span></button>
             <button class="dropdown-item" id="btnPasteEl"><span>Paste</span> <span class="shortcut">Ctrl+V</span></button>
             <div class="dropdown-divider"></div>
+            <button class="dropdown-item" id="btnMenuScaleUp"><span>Scale Up Selected (ขยาย)</span> <span class="shortcut">]</span></button>
+            <button class="dropdown-item" id="btnMenuScaleDown"><span>Scale Down Selected (ย่อ)</span> <span class="shortcut">[</span></button>
+            <div class="dropdown-divider"></div>
             <button class="dropdown-item" id="btnClear"><span>Clear Canvas</span></button>
           </div>
         </div>
@@ -1077,6 +1149,24 @@ input:checked + .slider:before {
 
     <!-- ============ CANVAS ============ -->
     <main id="canvasWrap">
+      <!-- Floating Selection Quick Bar -->
+      <div id="cpmSelectionFloatingBar" style="display:none;">
+        <span id="cpmFloatSelCount" style="font-size:12px; font-weight:700; color:#f1f5f9; white-space:nowrap;">1 selected</span>
+        <div class="cpm-float-divider"></div>
+        <span style="font-size:11px; color:#94a3b8; font-weight:700; white-space:nowrap;">ขนาด:</span>
+        <button type="button" id="btnFloatScaleDown" title="ย่อขนาด (-15%) (คีย์บอร์ด: [ )" class="cpm-float-btn">➖ ย่อ</button>
+        <button type="button" id="btnFloatScaleUp" title="ขยายขนาด (+15%) (คีย์บอร์ด: ] )" class="cpm-float-btn primary">➕ ขยาย</button>
+        <div class="cpm-float-divider"></div>
+        <button type="button" id="btnFloatPresetS" title="ขนาดเล็ก S (24px)" class="cpm-float-btn ghost">S</button>
+        <button type="button" id="btnFloatPresetM" title="ขนาดปกติ M (32px)" class="cpm-float-btn ghost">M</button>
+        <button type="button" id="btnFloatPresetL" title="ขนาดใหญ่ L (44px)" class="cpm-float-btn ghost">L</button>
+        <button type="button" id="btnFloatPresetXL" title="ขนาดใหญ่มาก XL (56px)" class="cpm-float-btn ghost">XL</button>
+        <div id="floatSpreadGroup" style="display:none; align-items:center; gap:4px;">
+          <div class="cpm-float-divider"></div>
+          <button type="button" id="btnFloatSpread" title="ขยายระยะห่างระหว่างโหนด (+10%)" class="cpm-float-btn">↔️ ขยายระยะ</button>
+        </div>
+      </div>
+
       <div id="canvasInner">
         <svg id="grid" width="100%" height="100%"></svg>
         <svg id="svgCanvas" width="3000" height="1800" xmlns="http://www.w3.org/2000/svg">
@@ -1220,8 +1310,23 @@ input:checked + .slider:before {
             <input type="color" id="fFill" style="width: 100%; height: 38px; padding: 0; border: 1px solid var(--chrome-line); border-radius: var(--radius-sm); cursor: pointer; background: none;">
           </div>
           <div>
-            <label>Size</label>
-            <input type="range" id="fSize" min="20" max="80" step="2">
+            <label style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Size (ขนาดโหนด)</span>
+              <span id="fSizeVal" style="color:#38bdf8; font-weight:700;">32px</span>
+            </label>
+            <input type="range" id="fSize" min="18" max="120" step="2">
+          </div>
+        </div>
+        <div class="field" data-field="nodescaletools" style="margin-top:-6px; margin-bottom:12px;">
+          <div style="display:flex; gap:5px; align-items:center; margin-bottom:4px;">
+            <button type="button" class="btn small" id="btnSingleScaleDown" style="flex:1; padding:4px 6px; font-size:11px; font-weight:700;" title="ย่อขนาดโหนด (-15%) (คีย์บอร์ด: [ )">➖ ย่อ</button>
+            <button type="button" class="btn primary small" id="btnSingleScaleUp" style="flex:1; padding:4px 6px; font-size:11px; font-weight:700;" title="ขยายขนาดโหนด (+15%) (คีย์บอร์ด: ] )">➕ ขยาย</button>
+          </div>
+          <div style="display:flex; gap:3px; align-items:center;">
+            <button type="button" class="btn ghost small" id="btnSinglePresetS" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดเล็ก S (24px)">S</button>
+            <button type="button" class="btn ghost small" id="btnSinglePresetM" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดปกติ M (32px)">M</button>
+            <button type="button" class="btn ghost small" id="btnSinglePresetL" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดใหญ่ L (44px)">L</button>
+            <button type="button" class="btn ghost small" id="btnSinglePresetXL" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดใหญ่พิเศษ XL (56px)">XL</button>
           </div>
         </div>
         <!-- node status & completion confirmation -->
@@ -1419,6 +1524,28 @@ input:checked + .slider:before {
           <button class="btn danger small" id="btnDeleteMulti">Delete all</button>
         </div>
         <p class="multi-hint">Editing a property here applies it to every selected element it's relevant to.</p>
+
+        <!-- Multi-Object Scaling Section -->
+        <div class="field" data-field="multiScale" style="margin-top: 8px; padding: 10px; background: rgba(30,41,59,0.06); border: 1px solid var(--chrome-line); border-radius: var(--radius-sm);">
+          <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+            <span style="font-weight: 700; color: var(--chrome-text);">📏 ขยาย/ย่อ ทุกออบเจกต์ที่เลือก (Scale All)</span>
+          </label>
+          <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+            <button type="button" class="btn small" id="btnMultiScaleDown" style="flex: 1; padding: 6px 8px; font-weight: 700;" title="ย่อขนาดทุกออบเจกต์ที่เลือกลง 15% (คีย์บอร์ด: [ )">➖ ย่อ (-15%)</button>
+            <button type="button" class="btn primary small" id="btnMultiScaleUp" style="flex: 1; padding: 6px 8px; font-weight: 700;" title="ขยายขนาดทุกออบเจกต์ที่เลือกขึ้น 15% (คีย์บอร์ด: ] )">➕ ขยาย (+15%)</button>
+          </div>
+          <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 10.5px; color: #94a3b8; width: 44px;">ขนาด:</span>
+            <button type="button" class="btn ghost small" id="btnMultiPresetS" style="flex:1; padding:4px 2px; font-size:10px;" title="ขนาดเล็ก S (24px)">S (เล็ก)</button>
+            <button type="button" class="btn ghost small" id="btnMultiPresetM" style="flex:1; padding:4px 2px; font-size:10px;" title="ขนาดปกติ M (32px)">M (ปกติ)</button>
+            <button type="button" class="btn ghost small" id="btnMultiPresetL" style="flex:1; padding:4px 2px; font-size:10px;" title="ขนาดใหญ่ L (44px)">L (ใหญ่)</button>
+            <button type="button" class="btn ghost small" id="btnMultiPresetXL" style="flex:1; padding:4px 2px; font-size:10px;" title="ขนาดใหญ่มาก XL (56px)">XL (จัมโบ้)</button>
+          </div>
+          <div id="multiSpreadRow" style="display: none; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); gap: 6px;">
+            <button type="button" class="btn small" id="btnMultiSpreadCompact" style="flex: 1; padding: 4px 6px; font-size: 11px;" title="กระชับระยะห่างระหว่างโหนด (-10%)">🤏 กระชับระยะห่าง</button>
+            <button type="button" class="btn small" id="btnMultiSpreadExpand" style="flex: 1; padding: 4px 6px; font-size: 11px;" title="ขยายระยะห่างระหว่างโหนด (+10%)">↔️ ขยายระยะห่าง</button>
+          </div>
+        </div>
 
         <div class="field" data-field="multiFill">
           <label>Fill color (nodes)</label>
@@ -5756,6 +5883,7 @@ input:checked + .slider:before {
     datetime: document.querySelector('[data-field="datetime"]'),
     noderesettext: document.querySelector('[data-field="noderesettext"]'),
     fillrow: document.querySelector('[data-field="fillrow"]'),
+    nodescaletools: document.querySelector('[data-field="nodescaletools"]'),
     nodecompletion: document.querySelector('[data-field="nodecompletion"]'),
     duration: document.querySelector('[data-field="duration"]'),
     lockduration: document.querySelector('[data-field="lockduration"]'),
@@ -5783,7 +5911,12 @@ input:checked + .slider:before {
 
   function updateInspector(){
     updateCopyPasteBtns();
+    const floatBar = $("#cpmSelectionFloatingBar");
+    const floatCount = $("#cpmFloatSelCount");
+    const floatSpreadGroup = $("#floatSpreadGroup");
+
     if(selection.length === 0){
+      if(floatBar) floatBar.style.display = "none";
       inspectorEmpty.style.display = "block";
       inspectorPanel.style.display = "none";
       inspectorMulti.style.display = "none";
@@ -5793,6 +5926,13 @@ input:checked + .slider:before {
       return;
     }
     setPanelExpanded(true);
+
+    if(floatBar){
+      floatBar.style.display = "flex";
+      if(floatCount) floatCount.textContent = selection.length === 1 ? "1 selected" : selection.length + " selected";
+      const numNodes = selection.filter(s => s.kind === "node").length;
+      if(floatSpreadGroup) floatSpreadGroup.style.display = numNodes >= 2 ? "flex" : "none";
+    }
 
     if(selection.length > 1){
       inspectorEmpty.style.display = "none";
@@ -5808,6 +5948,10 @@ input:checked + .slider:before {
       document.querySelector('[data-field="multiLineColor"]').style.display = hasConnectors ? "block" : "none";
       const multiDt = document.querySelector('[data-field="multiDateTime"]');
       if (multiDt) multiDt.style.display = hasNodes ? "block" : "none";
+
+      const numNodes = selection.filter(s=> s.kind === "node").length;
+      const spreadRow = $("#multiSpreadRow");
+      if(spreadRow) spreadRow.style.display = numNodes >= 2 ? "flex" : "none";
       return;
     }
 
@@ -5874,9 +6018,13 @@ input:checked + .slider:before {
       }
 
       show(fieldEls.fillrow);
+      show(fieldEls.nodescaletools);
       updateInspectorCpmFloat(n);
       $("#fFill").value = n.fill || "#ffffff";
-      $("#fSize").value = n.r || 32;
+      const curR = n.r || 32;
+      $("#fSize").value = curR;
+      const fSizeVal = $("#fSizeVal");
+      if(fSizeVal) fSizeVal.textContent = curR + "px";
 
       show(fieldEls.nodecompletion);
       const isCompleted = !!n.completed;
@@ -6197,7 +6345,176 @@ input:checked + .slider:before {
 
   bindLive("#fFill", ()=>{ findNode(currentSingle().id).fill = $("#fFill").value; });
   bindLive("#fLabelColor", ()=>{ findNode(currentSingle().id).labelColor = $("#fLabelColor").value; });
-  bindLive("#fSize", ()=>{ findNode(currentSingle().id).r = parseInt($("#fSize").value,10); });
+  bindLive("#fSize", ()=>{
+    const sel = currentSingle();
+    if(sel && sel.kind === "node"){
+      const n = findNode(sel.id);
+      if(n){
+        const val = parseInt($("#fSize").value, 10);
+        n.r = val;
+        const lbl = $("#fSizeVal");
+        if(lbl) lbl.textContent = val + "px";
+      }
+    }
+  });
+
+  // ---------------------------------------------------------
+  // Batch & Single Object Scaling (ขยาย / ย่อ ขนาดออบเจกต์)
+  // ---------------------------------------------------------
+  function scaleSelectedObjects(factor){
+    if(!selection || selection.length === 0){
+      showToast("กรุณาเลือกออบเจกต์ก่อนขยายขนาด", "info");
+      return;
+    }
+    let count = 0;
+    selection.forEach(sel => {
+      if(sel.kind === "node"){
+        const n = findNode(sel.id);
+        if(n){
+          const curR = n.r || 32;
+          const newR = Math.max(16, Math.min(140, Math.round(curR * factor)));
+          n.r = newR;
+          if(n.datetimeFontSize){
+            n.datetimeFontSize = Math.max(9, Math.min(32, Math.round(n.datetimeFontSize * factor)));
+          }
+          count++;
+        }
+      } else if(sel.kind === "annotation"){
+        const a = findAnnotation(sel.id);
+        if(a){
+          if(a.w) a.w = Math.max(30, Math.min(1500, Math.round(a.w * factor)));
+          if(a.h) a.h = Math.max(20, Math.min(1000, Math.round(a.h * factor)));
+          if(a.fontSize) a.fontSize = Math.max(9, Math.min(48, Math.round(a.fontSize * factor)));
+          count++;
+        }
+      } else if(sel.kind === "connector"){
+        const c = findConnector(sel.id);
+        if(c){
+          if(factor > 1 && c.thickness !== "thick") { c.thickness = "thick"; count++; }
+          else if(factor < 1 && c.thickness === "thick") { c.thickness = "normal"; count++; }
+        }
+      }
+    });
+
+    if(count > 0){
+      pushHistory();
+      renderAll();
+      updateInspector();
+      commit();
+      const actionText = factor > 1 ? "ขยายขนาด (+15%)" : "ย่อขนาด (-15%)";
+      setStatus(`${actionText} ให้กับ ${count} ออบเจกต์เรียบร้อยแล้ว`);
+      showSaveNotification("ปรับขนาดออบเจกต์", `${actionText} ${count} รายการที่เลือกเรียบร้อยแล้ว`);
+    }
+  }
+
+  function applySizePresetToSelected(preset){
+    if(!selection || selection.length === 0) return;
+    const presets = {
+      s: { nodeR: 24, font: 11, noteW: 140, noteH: 70 },
+      m: { nodeR: 32, font: 13, noteW: 180, noteH: 90 },
+      l: { nodeR: 44, font: 16, noteW: 240, noteH: 120 },
+      xl: { nodeR: 56, font: 20, noteW: 300, noteH: 150 }
+    };
+    const cfg = presets[preset.toLowerCase()] || presets.m;
+    let count = 0;
+    selection.forEach(sel => {
+      if(sel.kind === "node"){
+        const n = findNode(sel.id);
+        if(n){
+          n.r = cfg.nodeR;
+          n.datetimeFontSize = cfg.font;
+          count++;
+        }
+      } else if(sel.kind === "annotation"){
+        const a = findAnnotation(sel.id);
+        if(a){
+          if(a.w && a.h){
+            const ratio = a.w / (a.h || 1);
+            a.w = cfg.noteW;
+            a.h = Math.round(cfg.noteW / ratio);
+          }
+          if(a.fontSize) a.fontSize = cfg.font;
+          count++;
+        }
+      }
+    });
+
+    if(count > 0){
+      pushHistory();
+      renderAll();
+      updateInspector();
+      commit();
+      setStatus(`ปรับขนาด ${count} ออบเจกต์เป็นขนาด ${preset.toUpperCase()} เรียบร้อยแล้ว`);
+      showSaveNotification("ปรับขนาดออบเจกต์", `ตั้งค่าขนาด ${preset.toUpperCase()} ให้กับ ${count} รายการเรียบร้อยแล้ว`);
+    }
+  }
+
+  function spreadSelectedSpacing(factor){
+    const nodes = selection.filter(s => s.kind === "node").map(s => findNode(s.id)).filter(Boolean);
+    if(nodes.length < 2){
+      showToast("ต้องเลือกอย่างน้อย 2 โหนดเพื่อปรับระยะห่าง", "info");
+      return;
+    }
+    let sumX = 0, sumY = 0;
+    nodes.forEach(n => { sumX += n.x; sumY += n.y; });
+    const cx = sumX / nodes.length;
+    const cy = sumY / nodes.length;
+    const gSize = getGridSize();
+
+    nodes.forEach(n => {
+      const dx = n.x - cx;
+      const dy = n.y - cy;
+      let newX = cx + dx * factor;
+      let newY = cy + dy * factor;
+      if(state.timeScaleMode){
+        newX = snap(newX, gSize);
+        newY = snap(newY, gSize);
+      } else {
+        newX = snap(newX);
+        newY = snap(newY);
+      }
+      n.x = Math.max(60, Math.min((state.canvasWidth || 3000) - 60, Math.round(newX)));
+      n.y = Math.max(60, Math.min((state.canvasHeight || 1800) - 60, Math.round(newY)));
+    });
+
+    pushHistory();
+    renderAll();
+    updateInspector();
+    commit();
+    const act = factor > 1 ? "ขยายระยะห่าง (+10%)" : "กระชับระยะห่าง (-10%)";
+    setStatus(`${act} ระหว่าง ${nodes.length} โหนดเรียบร้อยแล้ว`);
+  }
+
+  // Single selection scale buttons
+  const bSingleDown = $("#btnSingleScaleDown"); if(bSingleDown) bSingleDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
+  const bSingleUp = $("#btnSingleScaleUp"); if(bSingleUp) bSingleUp.addEventListener("click", () => scaleSelectedObjects(1.15));
+  const bSingleS = $("#btnSinglePresetS"); if(bSingleS) bSinglePresetS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bSingleM = $("#btnSinglePresetM"); if(bSingleM) bSinglePresetM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bSingleL = $("#btnSinglePresetL"); if(bSingleL) bSinglePresetL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bSingleXL = $("#btnSinglePresetXL"); if(bSingleXL) bSinglePresetXL.addEventListener("click", () => applySizePresetToSelected('xl'));
+
+  // Multi selection scale buttons
+  const bMultiDown = $("#btnMultiScaleDown"); if(bMultiDown) bMultiDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
+  const bMultiUp = $("#btnMultiScaleUp"); if(bMultiUp) bMultiUp.addEventListener("click", () => scaleSelectedObjects(1.15));
+  const bMultiS = $("#btnMultiPresetS"); if(bMultiS) bMultiPresetS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bMultiM = $("#btnMultiPresetM"); if(bMultiM) bMultiPresetM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bMultiL = $("#btnMultiPresetL"); if(bMultiL) bMultiPresetL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bMultiXL = $("#btnMultiPresetXL"); if(bMultiXL) bMultiPresetXL.addEventListener("click", () => applySizePresetToSelected('xl'));
+  const bMultiSpread = $("#btnMultiSpreadExpand"); if(bMultiSpread) bMultiSpread.addEventListener("click", () => spreadSelectedSpacing(1.1));
+  const bMultiCompact = $("#btnMultiSpreadCompact"); if(bMultiCompact) bMultiCompact.addEventListener("click", () => spreadSelectedSpacing(0.9));
+
+  // Floating selection bar buttons
+  const bFloatDown = $("#btnFloatScaleDown"); if(bFloatDown) bFloatDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
+  const bFloatUp = $("#btnFloatScaleUp"); if(bFloatUp) bFloatUp.addEventListener("click", () => scaleSelectedObjects(1.15));
+  const bFloatS = $("#btnFloatPresetS"); if(bFloatS) bFloatPresetS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bFloatM = $("#btnFloatPresetM"); if(bFloatM) bFloatPresetM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bFloatL = $("#btnFloatPresetL"); if(bFloatL) bFloatPresetL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bFloatXL = $("#btnFloatPresetXL"); if(bFloatXL) bFloatPresetXL.addEventListener("click", () => applySizePresetToSelected('xl'));
+  const bFloatSpread = $("#btnFloatSpread"); if(bFloatSpread) bFloatSpread.addEventListener("click", () => spreadSelectedSpacing(1.1));
+
+  // Edit menu scale buttons
+  const bMenuUp = $("#btnMenuScaleUp"); if(bMenuUp) bMenuUp.addEventListener("click", () => scaleSelectedObjects(1.15));
+  const bMenuDown = $("#btnMenuScaleDown"); if(bMenuDown) bMenuDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
 
   // ---------------------------------------------------------
   // Duration auto-calc: when a connector's duration is a plain number,
@@ -7077,6 +7394,14 @@ input:checked + .slider:before {
     }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s"){
       e.preventDefault(); saveCanvasDirect();
+    }
+    if((e.key === "]" || (e.key === "}" && e.shiftKey)) && !isTyping(e.target) && selection.length){
+      e.preventDefault();
+      scaleSelectedObjects(1.15);
+    }
+    if((e.key === "[" || (e.key === "{" && e.shiftKey)) && !isTyping(e.target) && selection.length){
+      e.preventDefault();
+      scaleSelectedObjects(1 / 1.15);
     }
   });
   window.addEventListener("keyup", (e)=>{
