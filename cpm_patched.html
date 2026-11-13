@@ -1384,6 +1384,30 @@ input:checked + .slider:before {
         <div class="field" data-field="connresettext" style="display:none; margin-top:-2px; margin-bottom:8px;">
           <button type="button" id="btnResetConnTextOffset" style="width:100%; padding:4px 8px; font-size:11px; background:rgba(37,99,235,0.12); color:#60a5fa; border:1px solid rgba(37,99,235,0.3); border-radius:var(--radius-sm); cursor:pointer;">⟲ คืนตำแหน่งข้อความเดิม (Reset text position)</button>
         </div>
+        <!-- connector text size & styling -->
+        <div class="field" data-field="conntextstyle" style="margin-top: 4px; padding: 10px; background: rgba(30,41,59,0.06); border: 1px solid var(--chrome-line); border-radius: var(--radius-sm);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+            <label style="margin: 0; font-weight: 700; color: var(--chrome-text); font-size: 11.5px;">ขนาดข้อความเส้นเชื่อม (Text Size)</label>
+            <span id="connFontSizeVal" style="color: #38bdf8; font-weight: 700; font-size: 12px;">13.5px</span>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom: 8px;">
+            <input type="range" id="fConnFontSizeSlider" min="9" max="36" step="0.5" value="13.5" style="flex:1;">
+            <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+              <input type="checkbox" id="fConnBold" style="cursor:pointer; width:14px; height:14px;">
+              <label for="fConnBold" style="font-size:11px; margin:0; cursor:pointer; user-select:none; font-weight:600;">Bold</label>
+            </div>
+          </div>
+          <div style="display:flex; gap:5px; align-items:center; margin-bottom:4px;">
+            <button type="button" class="btn small" id="btnConnScaleDown" style="flex:1; padding:4px 6px; font-size:11px; font-weight:700;" title="ย่อขนาดข้อความเส้นเชื่อม (-15%) (คีย์บอร์ด: [ )">➖ ย่อ</button>
+            <button type="button" class="btn primary small" id="btnConnScaleUp" style="flex:1; padding:4px 6px; font-size:11px; font-weight:700;" title="ขยายขนาดข้อความเส้นเชื่อม (+15%) (คีย์บอร์ด: ] )">➕ ขยาย</button>
+          </div>
+          <div style="display:flex; gap:3px; align-items:center;">
+            <button type="button" class="btn ghost small" id="btnConnPresetS" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดเล็ก S (11px)">S</button>
+            <button type="button" class="btn ghost small" id="btnConnPresetM" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดปกติ M (13.5px)">M</button>
+            <button type="button" class="btn ghost small" id="btnConnPresetL" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดใหญ่ L (18px)">L</button>
+            <button type="button" class="btn ghost small" id="btnConnPresetXL" style="flex:1; padding:3px 2px; font-size:10px;" title="ขนาดใหญ่พิเศษ XL (24px)">XL</button>
+          </div>
+        </div>
         <div class="field" data-field="connswatches">
           <label>Quick color</label>
           <div class="swatch-row">
@@ -3056,6 +3080,9 @@ input:checked + .slider:before {
     if(!mid) return;
     let textX, textY, halfW = 40, halfH = 10;
     const color = c.color || "#c0392b";
+    const fSize = c.fontSize || 13.5;
+    const lineH = Math.round(fSize * 1.25);
+    const baseH = Math.round(fSize * 1.35);
     if(textKind === "task"){
       const tox = c.taskOffsetX || 0;
       const toy = c.taskOffsetY || 0;
@@ -3063,16 +3090,17 @@ input:checked + .slider:before {
       let maxLen = 0;
       taskLines.forEach(l => { if (l.length > maxLen) maxLen = l.length; });
       textX = mid.x + tox;
-      textY = mid.y - 18 - ((taskLines.length - 1) * 8) + toy;
-      halfW = Math.max(25, (maxLen * 7.5) / 2);
-      halfH = Math.max(10, (taskLines.length * 16) / 2);
+      textY = mid.y - baseH - ((taskLines.length - 1) * (lineH / 2)) + toy;
+      halfW = Math.max(25, (maxLen * (fSize * 0.55)) / 2);
+      halfH = Math.max(10, (taskLines.length * lineH) / 2);
     } else {
       const dox = c.durationOffsetX || 0;
       const doy = c.durationOffsetY || 0;
+      const durBaseH = Math.round(fSize * 1.5);
       textX = mid.x + dox;
-      textY = mid.y + 22 + doy;
-      halfW = Math.max(16, ((c.duration || "").length * 8) / 2);
-      halfH = 10;
+      textY = mid.y + durBaseH + 2 + doy;
+      halfW = Math.max(16, ((c.duration || "").length * (fSize * 0.55)) / 2);
+      halfH = Math.max(10, fSize * 0.7);
     }
     const edge = textEdgePoint(textX, textY, halfW, halfH, mid.x, mid.y);
     drawLeaderLine(edge.x, edge.y, mid.x, mid.y, color);
@@ -3414,8 +3442,19 @@ input:checked + .slider:before {
         const toy = c.taskOffsetY || 0;
         const taskLines = c.task.split("\n");
         const taskG = svgElCreate("g", {class:"cpm-connector-task-group"});
+        const fSize = c.fontSize || 13.5;
+        const lineH = Math.round(fSize * 1.25);
+        const baseH = Math.round(fSize * 1.35);
         taskLines.forEach((ln,i)=>{
-          const t = svgElCreate("text", {class:"cpm-connector-task", x:midx + tox, y:midy - 18 - ((taskLines.length-1-i)*16) + toy, "text-anchor":"middle", "dominant-baseline":"central"});
+          const t = svgElCreate("text", {
+            class:"cpm-connector-task", 
+            x:midx + tox, 
+            y:midy - baseH - ((taskLines.length-1-i)*lineH) + toy, 
+            "text-anchor":"middle", 
+            "dominant-baseline":"central"
+          });
+          if(c.fontSize) t.style.fontSize = c.fontSize + "px";
+          if(c.bold) t.style.fontWeight = "bold";
           t.textContent = ln;
           taskG.appendChild(t);
         });
@@ -3451,7 +3490,17 @@ input:checked + .slider:before {
       if(c.duration){
         const dox = c.durationOffsetX || 0;
         const doy = c.durationOffsetY || 0;
-        const d = svgElCreate("text", {class:"cpm-connector-duration", x:midx + dox, y:midy + 22 + doy, "text-anchor":"middle", "dominant-baseline":"central"});
+        const fSize = c.fontSize || 13.5;
+        const durBaseH = Math.round(fSize * 1.5);
+        const d = svgElCreate("text", {
+          class:"cpm-connector-duration", 
+          x:midx + dox, 
+          y:midy + durBaseH + 2 + doy, 
+          "text-anchor":"middle", 
+          "dominant-baseline":"central"
+        });
+        if(c.fontSize) d.style.fontSize = c.fontSize + "px";
+        if(c.bold) d.style.fontWeight = "bold";
         d.textContent = c.duration;
         d.addEventListener("mousedown", (e)=>{
           e.stopPropagation();
@@ -5898,6 +5947,7 @@ input:checked + .slider:before {
     lockduration: document.querySelector('[data-field="lockduration"]'),
     task: document.querySelector('[data-field="task"]'),
     connresettext: document.querySelector('[data-field="connresettext"]'),
+    conntextstyle: document.querySelector('[data-field="conntextstyle"]'),
     connswatches: document.querySelector('[data-field="connswatches"]'),
     connarrow: document.querySelector('[data-field="connarrow"]'),
     conntracking: document.querySelector('[data-field="conntracking"]'),
@@ -6061,6 +6111,14 @@ input:checked + .slider:before {
       if((c.taskOffsetX && c.taskOffsetX !== 0) || (c.taskOffsetY && c.taskOffsetY !== 0) || (c.durationOffsetX && c.durationOffsetX !== 0) || (c.durationOffsetY && c.durationOffsetY !== 0)){
         show(fieldEls.connresettext);
       }
+      show(fieldEls.conntextstyle);
+      const curConnSize = c.fontSize || 13.5;
+      const fConnSlider = $("#fConnFontSizeSlider");
+      if(fConnSlider) fConnSlider.value = curConnSize;
+      const fConnValLbl = $("#connFontSizeVal");
+      if(fConnValLbl) fConnValLbl.textContent = curConnSize + "px";
+      const fConnBoldEl = $("#fConnBold");
+      if(fConnBoldEl) fConnBoldEl.checked = !!c.bold;
       show(fieldEls.duration);
       updateInspectorCpmFloat(c);
       $("#fDuration").value = c.duration || "";
@@ -6399,8 +6457,10 @@ input:checked + .slider:before {
       } else if(sel.kind === "connector"){
         const c = findConnector(sel.id);
         if(c){
-          if(factor > 1 && c.thickness !== "thick") { c.thickness = "thick"; count++; }
-          else if(factor < 1 && c.thickness === "thick") { c.thickness = "normal"; count++; }
+          const curSize = c.fontSize || 13.5;
+          const newSize = Math.max(9, Math.min(48, Math.round(curSize * factor * 10) / 10));
+          c.fontSize = newSize;
+          count++;
         }
       }
     });
@@ -6419,10 +6479,10 @@ input:checked + .slider:before {
   function applySizePresetToSelected(preset){
     if(!selection || selection.length === 0) return;
     const presets = {
-      s: { nodeR: 24, font: 11, noteW: 140, noteH: 70 },
-      m: { nodeR: 32, font: 13, noteW: 180, noteH: 90 },
-      l: { nodeR: 44, font: 16, noteW: 240, noteH: 120 },
-      xl: { nodeR: 56, font: 20, noteW: 300, noteH: 150 }
+      s: { nodeR: 24, font: 11, connFont: 11, noteW: 140, noteH: 70 },
+      m: { nodeR: 32, font: 13, connFont: 13.5, noteW: 180, noteH: 90 },
+      l: { nodeR: 44, font: 16, connFont: 18, noteW: 240, noteH: 120 },
+      xl: { nodeR: 56, font: 20, connFont: 24, noteW: 300, noteH: 150 }
     };
     const cfg = presets[preset.toLowerCase()] || presets.m;
     let count = 0;
@@ -6443,6 +6503,12 @@ input:checked + .slider:before {
             a.h = Math.round(cfg.noteW / ratio);
           }
           if(a.fontSize) a.fontSize = cfg.font;
+          count++;
+        }
+      } else if(sel.kind === "connector"){
+        const c = findConnector(sel.id);
+        if(c){
+          c.fontSize = cfg.connFont;
           count++;
         }
       }
@@ -6524,6 +6590,14 @@ input:checked + .slider:before {
   // Edit menu scale buttons
   const bMenuUp = $("#btnMenuScaleUp"); if(bMenuUp) bMenuUp.addEventListener("click", () => scaleSelectedObjects(1.15));
   const bMenuDown = $("#btnMenuScaleDown"); if(bMenuDown) bMenuDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
+
+  // Connector text scale buttons
+  const bConnDown = $("#btnConnScaleDown"); if(bConnDown) bConnDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
+  const bConnUp = $("#btnConnScaleUp"); if(bConnUp) bConnUp.addEventListener("click", () => scaleSelectedObjects(1.15));
+  const bConnS = $("#btnConnPresetS"); if(bConnS) bConnS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bConnM = $("#btnConnPresetM"); if(bConnM) bConnM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bConnL = $("#btnConnPresetL"); if(bConnL) bConnL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bConnXL = $("#btnConnPresetXL"); if(bConnXL) bConnXL.addEventListener("click", () => applySizePresetToSelected('xl'));
 
   // ---------------------------------------------------------
   // Duration auto-calc: when a connector's duration is a plain number,
@@ -7070,6 +7144,27 @@ input:checked + .slider:before {
     $("#fLineColor").value = c.color;
     $("#fLineStyle").value = c.dashed ? "dashed" : "solid";
     syncConnSwatches(c.color);
+  });
+
+  bindLive("#fConnFontSizeSlider", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "connector") return;
+    const c = findConnector(sel.id);
+    if(c){
+      const val = parseFloat($("#fConnFontSizeSlider").value);
+      c.fontSize = val;
+      const lbl = $("#connFontSizeVal");
+      if(lbl) lbl.textContent = val + "px";
+    }
+  });
+
+  bindLive("#fConnBold", ()=>{
+    const sel = currentSingle();
+    if(!sel || sel.kind !== "connector") return;
+    const c = findConnector(sel.id);
+    if(c){
+      c.bold = $("#fConnBold").checked;
+    }
   });
 
   bindLive("#fTimelineType", ()=>{
