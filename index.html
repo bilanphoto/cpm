@@ -4076,6 +4076,11 @@ input:checked + .slider:before {
   // ---------------------------------------------------------
   function onNodeMouseDown(e, node){
     clearLeaderLine();
+    if(drag && drag.type !== "pan") {
+      drag = null;
+      window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup", onWindowMouseUp);
+    }
     e.stopPropagation();
     if(currentTool === "erase"){ deleteNode(node.id); return; }
     if(currentTool === "connector" || currentTool === "connector-left" || currentTool === "connector-line"){
@@ -4417,53 +4422,57 @@ input:checked + .slider:before {
 
   function onWindowMouseUp(e){
     const wasDragging = drag !== null;
-    if(drag && drag.type === "marquee"){
-      const marquee = $("#marqueeSelectRect");
-      if(marquee) marquee.style.display = "none";
-      const moved = drag.moved;
+    try {
+      if(drag && drag.type === "marquee"){
+        const marquee = $("#marqueeSelectRect");
+        if(marquee) marquee.style.display = "none";
+        const moved = drag.moved;
+        drag = null;
+        if(!moved){
+          deselectAll();
+        } else {
+          renderAll();
+          updateInspector();
+          updateCopyPasteBtns();
+          setStatus(selection.length > 0 ? (selection.length + " elements selected") : "Ready");
+        }
+        return;
+      }
+      if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "connector-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
+        if(drag.type === "group" && state.timeScaleMode && drag.hourChanged){
+          adjustConnectorDurationsToMatchNodeLabels();
+          recalculateDiagramTimes();
+        }
+        renderAll();
+        commit();
+        if(drag.type === "delay-badge"){
+          setStatus("Delay badge position updated");
+        }
+      }
+      if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
+    } catch(err) {
+      console.error("Error in onWindowMouseUp:", err);
+    } finally {
       drag = null;
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("mouseup", onWindowMouseUp);
-
-      if(!moved){
-        deselectAll();
-      } else {
-        renderAll();
-        updateInspector();
-        updateCopyPasteBtns();
-        setStatus(selection.length > 0 ? (selection.length + " elements selected") : "Ready");
-      }
-      return;
     }
-    if(drag && (drag.type === "node" || drag.type === "annotation" || drag.type === "group" || drag.type === "pin-text" || drag.type === "node-text" || drag.type === "connector-text" || drag.type === "ann-resize" || drag.type === "delay-badge")){
-      if(drag.type === "group" && state.timeScaleMode && drag.hourChanged){
-        adjustConnectorDurationsToMatchNodeLabels();
-        recalculateDiagramTimes();
-      }
-      renderAll();
-      commit();
-      if(drag.type === "delay-badge"){
-        setStatus("Delay badge position updated");
-      }
-    }
-    if(drag && drag.type === "pan") canvasWrap.classList.remove("panning");
-    drag = null;
-    window.removeEventListener("mousemove", onWindowMouseMove);
-    window.removeEventListener("mouseup", onWindowMouseUp);
 
     // If mouse is not hovering over a movable text element, clear leader line
-    const hoveredEl = e ? document.elementFromPoint(e.clientX, e.clientY) : null;
-    const isOverText = hoveredEl && (
-      hoveredEl.classList?.contains("cpm-node-sublabel") ||
-      hoveredEl.closest?.(".cpm-node-sublabel-group") ||
-      hoveredEl.classList?.contains("cpm-node-datetime") ||
-      hoveredEl.closest?.(".cpm-connector-task-group") ||
-      hoveredEl.classList?.contains("cpm-connector-task") ||
-      hoveredEl.classList?.contains("cpm-connector-duration")
-    );
-    if (!isOverText) {
-      clearLeaderLine();
-    }
+    try {
+      const hoveredEl = e ? document.elementFromPoint(e.clientX, e.clientY) : null;
+      const isOverText = hoveredEl && (
+        hoveredEl.classList?.contains("cpm-node-sublabel") ||
+        hoveredEl.closest?.(".cpm-node-sublabel-group") ||
+        hoveredEl.classList?.contains("cpm-node-datetime") ||
+        hoveredEl.closest?.(".cpm-connector-task-group") ||
+        hoveredEl.classList?.contains("cpm-connector-task") ||
+        hoveredEl.classList?.contains("cpm-connector-duration")
+      );
+      if (!isOverText) {
+        clearLeaderLine();
+      }
+    } catch(e){}
 
     // Apply any remote state update that was queued during drag
     if(wasDragging && typeof remoteUpdatePending === "string") {
@@ -6488,28 +6497,28 @@ input:checked + .slider:before {
   // Single selection scale buttons
   const bSingleDown = $("#btnSingleScaleDown"); if(bSingleDown) bSingleDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
   const bSingleUp = $("#btnSingleScaleUp"); if(bSingleUp) bSingleUp.addEventListener("click", () => scaleSelectedObjects(1.15));
-  const bSingleS = $("#btnSinglePresetS"); if(bSingleS) bSinglePresetS.addEventListener("click", () => applySizePresetToSelected('s'));
-  const bSingleM = $("#btnSinglePresetM"); if(bSingleM) bSinglePresetM.addEventListener("click", () => applySizePresetToSelected('m'));
-  const bSingleL = $("#btnSinglePresetL"); if(bSingleL) bSinglePresetL.addEventListener("click", () => applySizePresetToSelected('l'));
-  const bSingleXL = $("#btnSinglePresetXL"); if(bSingleXL) bSinglePresetXL.addEventListener("click", () => applySizePresetToSelected('xl'));
+  const bSingleS = $("#btnSinglePresetS"); if(bSingleS) bSingleS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bSingleM = $("#btnSinglePresetM"); if(bSingleM) bSingleM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bSingleL = $("#btnSinglePresetL"); if(bSingleL) bSingleL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bSingleXL = $("#btnSinglePresetXL"); if(bSingleXL) bSingleXL.addEventListener("click", () => applySizePresetToSelected('xl'));
 
   // Multi selection scale buttons
   const bMultiDown = $("#btnMultiScaleDown"); if(bMultiDown) bMultiDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
   const bMultiUp = $("#btnMultiScaleUp"); if(bMultiUp) bMultiUp.addEventListener("click", () => scaleSelectedObjects(1.15));
-  const bMultiS = $("#btnMultiPresetS"); if(bMultiS) bMultiPresetS.addEventListener("click", () => applySizePresetToSelected('s'));
-  const bMultiM = $("#btnMultiPresetM"); if(bMultiM) bMultiPresetM.addEventListener("click", () => applySizePresetToSelected('m'));
-  const bMultiL = $("#btnMultiPresetL"); if(bMultiL) bMultiPresetL.addEventListener("click", () => applySizePresetToSelected('l'));
-  const bMultiXL = $("#btnMultiPresetXL"); if(bMultiXL) bMultiPresetXL.addEventListener("click", () => applySizePresetToSelected('xl'));
+  const bMultiS = $("#btnMultiPresetS"); if(bMultiS) bMultiS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bMultiM = $("#btnMultiPresetM"); if(bMultiM) bMultiM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bMultiL = $("#btnMultiPresetL"); if(bMultiL) bMultiL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bMultiXL = $("#btnMultiPresetXL"); if(bMultiXL) bMultiXL.addEventListener("click", () => applySizePresetToSelected('xl'));
   const bMultiSpread = $("#btnMultiSpreadExpand"); if(bMultiSpread) bMultiSpread.addEventListener("click", () => spreadSelectedSpacing(1.1));
   const bMultiCompact = $("#btnMultiSpreadCompact"); if(bMultiCompact) bMultiCompact.addEventListener("click", () => spreadSelectedSpacing(0.9));
 
   // Floating selection bar buttons
   const bFloatDown = $("#btnFloatScaleDown"); if(bFloatDown) bFloatDown.addEventListener("click", () => scaleSelectedObjects(1 / 1.15));
   const bFloatUp = $("#btnFloatScaleUp"); if(bFloatUp) bFloatUp.addEventListener("click", () => scaleSelectedObjects(1.15));
-  const bFloatS = $("#btnFloatPresetS"); if(bFloatS) bFloatPresetS.addEventListener("click", () => applySizePresetToSelected('s'));
-  const bFloatM = $("#btnFloatPresetM"); if(bFloatM) bFloatPresetM.addEventListener("click", () => applySizePresetToSelected('m'));
-  const bFloatL = $("#btnFloatPresetL"); if(bFloatL) bFloatPresetL.addEventListener("click", () => applySizePresetToSelected('l'));
-  const bFloatXL = $("#btnFloatPresetXL"); if(bFloatXL) bFloatPresetXL.addEventListener("click", () => applySizePresetToSelected('xl'));
+  const bFloatS = $("#btnFloatPresetS"); if(bFloatS) bFloatS.addEventListener("click", () => applySizePresetToSelected('s'));
+  const bFloatM = $("#btnFloatPresetM"); if(bFloatM) bFloatM.addEventListener("click", () => applySizePresetToSelected('m'));
+  const bFloatL = $("#btnFloatPresetL"); if(bFloatL) bFloatL.addEventListener("click", () => applySizePresetToSelected('l'));
+  const bFloatXL = $("#btnFloatPresetXL"); if(bFloatXL) bFloatXL.addEventListener("click", () => applySizePresetToSelected('xl'));
   const bFloatSpread = $("#btnFloatSpread"); if(bFloatSpread) bFloatSpread.addEventListener("click", () => spreadSelectedSpacing(1.1));
 
   // Edit menu scale buttons
